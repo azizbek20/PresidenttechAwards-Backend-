@@ -1,0 +1,4 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Compose Material3 ishlatadi; bu faqat Activity startidagi bazaviy tema. -->
+    <style name="Theme.EyeDetectAI" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
