@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Kamera va tarmoq ruxsatlari -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EyeDetectAI"
+        android:usesCleartextTraffic="true">
+        <!-- android:icon o'chirildi — Android Studio "Image Asset" bilan
+             ic_launcher yaratib, shu yerga qo'shsangiz bo'ladi. -->
+        <!-- Demo skelet uchun tizim standart ikonkasi ishlatiladi. -->
+        <!-- usesCleartextTraffic=true: demo uchun http:// (LAN/ngrok) ga ruxsat.
+             Ishlab chiqarishda HTTPS ishlatib, buni olib tashlang. -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

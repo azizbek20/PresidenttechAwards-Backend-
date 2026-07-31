@@ -1,0 +1,417 @@
+package com.eyedetect.ai.ui
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
+import com.eyedetect.ai.ScreeningViewModel
+import com.eyedetect.ai.ui.components.InfoBanner
+import com.eyedetect.ai.ui.components.PrimaryButton
+import com.eyedetect.ai.ui.components.QualityLevel
+import com.eyedetect.ai.ui.components.QualityPanel
+import com.eyedetect.ai.ui.components.SecondaryButton
+import com.eyedetect.ai.ui.components.ShutterButton
+import com.eyedetect.ai.ui.components.TextActionButton
+import com.eyedetect.ai.ui.theme.Spacing
+import com.eyedetect.ai.ui.theme.TrafficGreen
+import java.io.File
+import java.util.concurrent.Executors
+
+/**
+ * 2-ekran (6-hujjat, 6.B): CameraX preview + jonli sifat yo'l-yo'riqchisi,
+ * doiraviy markazlash overlay, tezkor ko'rib chiqish, va galereya zaxira rejimi.
+ *
+ * ESLATMA: sifat paneli (fokus/yorug'lik/joylashuv) hozircha ko'rgazmali qiymatlar bilan.
+ * Keyingi qadam — CameraX ImageAnalysis + Laplasian variansi (3-hujjat 2.3) ni ulash.
+ */
+@Composable
+fun CameraScreen(
+    vm: ScreeningViewModel,
+    onResult: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val executor = remember { Executors.newSingleThreadExecutor() }
+
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val imageCapture = remember { ImageCapture.Builder().build() }
+
+    // Olingan, ammo hali yuborilmagan rasm (tezkor ko'rib chiqish uchun)
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+
+    // Galereyadan tanlangan, ammo hali tasdiqlanmagan rasmlar (grid ko'rib chiqish uchun)
+    var pendingGalleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    val eyeLabel = if (vm.eye == "left") "Chap ko'z" else "O'ng ko'z"
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    // Galereyadan bir nechta rasm tanlash (zaxira rejim — reja 3.3, 6-hujjat 6.E)
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            // Ikkita ko'rib chiqish varag'i bir vaqtda ustma-ust chiqmasligi uchun
+            // qarama-qarshi holatni tozalaymiz (6-hujjat, 6.B/6.E o'zaro eksklyuziv).
+            pendingFile = null
+            pendingGalleryUris = uris
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ---- Jonli preview + overlaylar ----
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(Color.Black),
+        ) {
+            if (hasCameraPermission) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        val previewView = PreviewView(ctx)
+                        val providerFuture = ProcessCameraProvider.getInstance(ctx)
+                        providerFuture.addListener({
+                            val provider = providerFuture.get()
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+                            val selector = CameraSelector.DEFAULT_BACK_CAMERA
+                            try {
+                                provider.unbindAll()
+                                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+                            } catch (_: Exception) { /* demo: e'tiborsiz */ }
+                        }, ContextCompat.getMainExecutor(ctx))
+                        previewView
+                    },
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "Kamera ruxsati yo'q.\nGalereyadan tanlashingiz mumkin.",
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(Spacing.xl),
+                    )
+                }
+            }
+
+            // Ko'z tegi (yuqori chap)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(Spacing.md)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = Spacing.md, vertical = 6.dp),
+            ) {
+                Text("👁 $eyeLabel", color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // Sifat paneli (yuqori o'ng) — ko'rgazmali qiymatlar
+            QualityPanel(
+                focus = QualityLevel.GOOD,
+                light = QualityLevel.WARN,
+                position = QualityLevel.GOOD,
+                modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.md),
+            )
+
+            // Doiraviy markazlash overlay (fundus doirasi)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(230.dp)
+                    .clip(CircleShape)
+                    .border(3.dp, TrafficGreen, CircleShape),
+            )
+
+            // Yo'riqnoma (pastda)
+            Text(
+                "🟡 Retinani doira ichiga markazlang",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(Spacing.lg),
+            )
+        }
+
+        // ---- Boshqaruvlar ----
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ShutterButton(
+                enabled = hasCameraPermission,
+                onClick = {
+                    val photoFile = File(context.cacheDir, "fundus_${System.currentTimeMillis()}.jpg")
+                    val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                    imageCapture.takePicture(
+                        output, executor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(results: ImageCapture.OutputFileResults) {
+                                ContextCompat.getMainExecutor(context).execute {
+                                    pendingGalleryUris = emptyList()
+                                    pendingFile = photoFile
+                                }
+                            }
+                            override fun onError(exc: ImageCaptureException) {
+                                // Demo: xato bo'lsa ham yuborishga urinamiz (VM Error ko'rsatadi)
+                                ContextCompat.getMainExecutor(context).execute {
+                                    vm.uploadFile(photoFile)
+                                    onResult()
+                                }
+                            }
+                        },
+                    )
+                },
+            )
+            SecondaryButton(
+                "🖼️ Galereyadan tanlash (zaxira)",
+                onClick = {
+                    galleryLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+            )
+            TextActionButton("← Orqaga", onClick = onBack)
+        }
+    }
+
+    // ---- Tezkor ko'rib chiqish (6-hujjat, 6.B) ----
+    val fileToReview = pendingFile
+    if (fileToReview != null) {
+        CaptureReviewSheet(
+            onRetake = { fileToReview.delete(); pendingFile = null },
+            onConfirm = {
+                pendingFile = null
+                vm.uploadFile(fileToReview)
+                onResult()
+            },
+        )
+    }
+
+    // ---- Galereya grid ko'rib chiqish (6-hujjat, 6.E) ----
+    if (pendingGalleryUris.isNotEmpty()) {
+        GalleryPickSheet(
+            uris = pendingGalleryUris,
+            onCancel = { pendingGalleryUris = emptyList() },
+            onConfirm = { uri ->
+                pendingGalleryUris = emptyList()
+                vm.uploadUri(context, uri)
+                onResult()
+            },
+        )
+    }
+}
+
+/**
+ * Galereyadan tanlangan bir nechta rasmni katakchali (grid) ko'rinishda ko'rsatib,
+ * foydalanuvchi ulardan bittasini tanlab tahlilga yuborishiga imkon beradi (6-hujjat, 6.E).
+ */
+@Composable
+private fun GalleryPickSheet(uris: List<Uri>, onCancel: () -> Unit, onConfirm: (Uri) -> Unit) {
+    val context = LocalContext.current
+    var selected by remember(uris) { mutableStateOf(uris.first()) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text("Rasmni tanlang", style = MaterialTheme.typography.titleLarge)
+            InfoBanner("${uris.size} ta rasm topildi — tahlil uchun eng aniq va yorug'ini tanlang.")
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                modifier = Modifier.heightIn(max = 320.dp),
+            ) {
+                items(uris) { uri ->
+                    val isSelected = uri == selected
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            .selectable(selected = isSelected, onClick = { selected = uri }),
+                    ) {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = "Galereya rasmi",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                fileLabel(context, selected),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                SecondaryButton("Bekor qilish", onClick = onCancel, modifier = Modifier.weight(1f))
+                PrimaryButton(
+                    "Tanlangan rasmni yuklash",
+                    onClick = { onConfirm(selected) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** Rasmning nomi va hajmini ContentResolver orqali o'qiydi ("nomi.jpg · 1.2 MB"). */
+private fun fileLabel(context: android.content.Context, uri: Uri): String {
+    var name = "rasm.jpg"
+    var size = -1L
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+        if (cursor.moveToFirst()) {
+            if (nameIdx >= 0) name = cursor.getString(nameIdx) ?: name
+            if (sizeIdx >= 0) size = cursor.getLong(sizeIdx)
+        }
+    }
+    val sizeLabel = if (size > 0) " · %.1f MB".format(size / 1024f / 1024f) else ""
+    return "$name$sizeLabel"
+}
+
+/** Rasm olingach chiqadigan "Rasm yaxshimi?" tasdiq oynasi. */
+@Composable
+private fun CaptureReviewSheet(onRetake: () -> Unit, onConfirm: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Rasm yaxshimi?", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Fokus, yorug'lik va markazlashuvni tekshiring. Ishonchingiz komil bo'lsa yuboring.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                SecondaryButton("Qayta olish", onClick = onRetake, modifier = Modifier.weight(1f))
+                PrimaryButton("Yuborish ✓", onClick = onConfirm, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
