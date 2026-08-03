@@ -33,7 +33,9 @@ private fun cleanupStaleCaptures(context: Context) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        cleanupStaleCaptures(applicationContext)
+        if (savedInstanceState == null) {
+            cleanupStaleCaptures(applicationContext)
+        }
         setContent {
             EyeDetectTheme {
                 Surface(
