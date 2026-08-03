@@ -74,7 +74,7 @@ val checkReleaseSecrets = tasks.register("checkReleaseSecrets") {
             "RELEASE_API_URL local.properties'da topilmadi yoki HTTPS emas. " +
             "Masalan: RELEASE_API_URL=https://api.eyedetect.example.com/"
         }
-        check(backendApiKey != "dev-key-CHANGE-ME") {
+        check(backendApiKey.isNotBlank() && backendApiKey != "dev-key-CHANGE-ME") {
             "API_KEY local.properties'da o'rnatilmagan (hali placeholder qiymatda)."
         }
     }
