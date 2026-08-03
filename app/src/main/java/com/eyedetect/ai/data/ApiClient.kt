@@ -1,6 +1,7 @@
 package com.eyedetect.ai.data
 
 import com.eyedetect.ai.BuildConfig
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -15,11 +16,20 @@ object ApiClient {
 
     val baseUrl: String get() = BuildConfig.API_BASE_URL
 
+    private val authInterceptor = Interceptor { chain ->
+        val request = chain.request().newBuilder()
+            .addHeader("X-API-Key", BuildConfig.API_KEY)
+            .build()
+        chain.proceed(request)
+    }
+
     private val logging = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                else HttpLoggingInterceptor.Level.BASIC
     }
 
     private val okHttp = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
         .addInterceptor(logging)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)   // CPU inference 1-3s, ehtiyot uchun 30s
