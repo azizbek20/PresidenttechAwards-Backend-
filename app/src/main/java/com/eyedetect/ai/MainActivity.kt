@@ -1,5 +1,6 @@
 package com.eyedetect.ai
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,9 +23,17 @@ import com.eyedetect.ai.ui.theme.EyeDetectTheme
 /** Ilova ichidagi 3 ekran (reja 2.1): Bemor -> Kamera -> Natija. */
 enum class Screen { Patient, Camera, Result }
 
+/** Ilova ishga tushganda cacheDir'da qolib ketgan eski fundus rasm fayllarini (masalan, oldingi
+ * ilova to'satdan yopilishi qoldiqlari) tozalaydi. */
+private fun cleanupStaleCaptures(context: Context) {
+    context.cacheDir.listFiles { f -> f.name.startsWith("fundus_") && f.name.endsWith(".jpg") }
+        ?.forEach { it.delete() }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cleanupStaleCaptures(applicationContext)
         setContent {
             EyeDetectTheme {
                 Surface(

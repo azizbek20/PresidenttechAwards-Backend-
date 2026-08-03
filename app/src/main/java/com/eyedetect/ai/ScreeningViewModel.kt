@@ -41,14 +41,23 @@ class ScreeningViewModel : ViewModel() {
         _uiState.value = UiState.Idle
     }
 
-    /** Faylni (kameradan) yuboradi. */
+    /** Faylni (kameradan) yuboradi; yuborilgach (muvaffaqiyat yoki xato) faylni o'chiradi. */
     fun uploadFile(file: File) {
         val part = MultipartBody.Part.createFormData(
             name = "file",
             filename = file.name,
             body = file.asRequestBody("image/jpeg".toMediaTypeOrNull()),
         )
-        send(part)
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            try {
+                doRequest(part)
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(friendly(e))
+            } finally {
+                file.delete()
+            }
+        }
     }
 
     /** Galereyadan tanlangan Uri'ni yuboradi (zaxira rejim, reja 3.3). */
@@ -61,17 +70,6 @@ class ScreeningViewModel : ViewModel() {
                 } ?: throw IllegalStateException("Rasmni o'qib bo'lmadi")
                 val body = bytes.toRequestBody("image/*".toMediaTypeOrNull())
                 val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
-                doRequest(part)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e))
-            }
-        }
-    }
-
-    private fun send(part: MultipartBody.Part) {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            try {
                 doRequest(part)
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(friendly(e))
