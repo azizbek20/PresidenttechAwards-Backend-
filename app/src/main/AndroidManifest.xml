@@ -12,12 +12,14 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.EyeDetectAI"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config">
         <!-- android:icon o'chirildi — Android Studio "Image Asset" bilan
              ic_launcher yaratib, shu yerga qo'shsangiz bo'ladi. -->
         <!-- Demo skelet uchun tizim standart ikonkasi ishlatiladi. -->
-        <!-- usesCleartextTraffic=true: demo uchun http:// (LAN/ngrok) ga ruxsat.
-             Ishlab chiqarishda HTTPS ishlatib, buni olib tashlang. -->
+        <!-- Cleartext (HTTP) faqat debug buildda ruxsat etiladi, ko'ring
+             src/debug/res/xml/network_security_config.xml. Release faqat
+             HTTPS. -->
 
         <activity
             android:name=".MainActivity"
