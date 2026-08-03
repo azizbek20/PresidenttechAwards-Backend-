@@ -91,6 +91,8 @@ class ScreeningViewModel : ViewModel() {
             "Serverga ulanib bo'lmadi. Backend ishga tushganini va manzilni tekshiring."
         is java.net.SocketTimeoutException ->
             "Server javob bermadi (timeout). Qayta urinib ko'ring."
+        is java.net.UnknownServiceException ->
+            "Xavfsiz ulanish (HTTPS) talab qilinadi, lekin server manzili buni qo'llab-quvvatlamaydi. Administrator bilan bog'laning."
         else -> e.message ?: "Noma'lum xato"
     }
 }

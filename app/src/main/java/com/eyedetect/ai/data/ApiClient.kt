@@ -24,6 +24,7 @@ object ApiClient {
     }
 
     private val logging = HttpLoggingInterceptor().apply {
+        redactHeader("X-API-Key")
         level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
                 else HttpLoggingInterceptor.Level.BASIC
     }
