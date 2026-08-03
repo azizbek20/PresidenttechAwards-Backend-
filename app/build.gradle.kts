@@ -1,7 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val localProperties = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        load(FileInputStream(localPropsFile))
+    }
+}
+val backendApiKey: String = localProperties.getProperty("API_KEY") ?: "dev-key-CHANGE-ME"
 
 android {
     namespace = "com.eyedetect.ai"
@@ -22,6 +33,7 @@ android {
         // Oxirida "/" bo'lishi SHART (Retrofit baseUrl talabi).
         // ===================================================================
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        buildConfigField("String", "API_KEY", "\"$backendApiKey\"")
     }
 
     buildTypes {
