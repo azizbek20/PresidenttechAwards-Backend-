@@ -13,6 +13,7 @@ val localProperties = Properties().apply {
     }
 }
 val backendApiKey: String = localProperties.getProperty("API_KEY") ?: "dev-key-CHANGE-ME"
+val releaseApiUrl: String = localProperties.getProperty("RELEASE_API_URL") ?: ""
 
 android {
     namespace = "com.eyedetect.ai"
@@ -40,6 +41,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiUrl\"")
         }
     }
 
@@ -64,6 +66,23 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+val checkReleaseSecrets = tasks.register("checkReleaseSecrets") {
+    doLast {
+        check(releaseApiUrl.startsWith("https://")) {
+            "RELEASE_API_URL local.properties'da topilmadi yoki HTTPS emas. " +
+            "Masalan: RELEASE_API_URL=https://api.eyedetect.example.com/"
+        }
+        check(backendApiKey != "dev-key-CHANGE-ME") {
+            "API_KEY local.properties'da o'rnatilmagan (hali placeholder qiymatda)."
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.findByName("assembleRelease")?.dependsOn(checkReleaseSecrets)
+    tasks.findByName("bundleRelease")?.dependsOn(checkReleaseSecrets)
 }
 
 dependencies {
