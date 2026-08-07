@@ -14,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.eyedetect.ai.R
 import com.eyedetect.ai.UiState
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.ui.components.ClinicalDetailCard
@@ -50,7 +52,7 @@ fun ResultScreen(
         is UiState.Success -> SuccessContent(uiState.result, onRetry, onNewPatient)
 
         UiState.Idle -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Natija yo'q.", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.result_none), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -69,12 +71,12 @@ private fun SuccessContent(r: PredictResponse, onRetry: () -> Unit, onNewPatient
         // Brend + bemor
         Column {
             Text(
-                "EYE DETECT AI",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                "Natija · ${r.patientId ?: "—"}",
+                stringResource(R.string.result_header, r.patientId ?: stringResource(R.string.result_unknown_patient)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -85,7 +87,7 @@ private fun SuccessContent(r: PredictResponse, onRetry: () -> Unit, onNewPatient
 
         // UNGRADABLE uchun ogohlantirish
         if (ungradable) {
-            WarningBanner("Bu \"kasallik yo'q\" degani EMAS. Rasm sifati past — qayta oling yoki mutaxassisga yo'llang.")
+            WarningBanner(stringResource(R.string.result_ungradable_warning))
         }
 
         // 2) Klinik tafsilot
@@ -106,12 +108,12 @@ private fun SuccessContent(r: PredictResponse, onRetry: () -> Unit, onNewPatient
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             PrimaryButton(
-                text = if (ungradable) "Qayta olish" else "Yana bir rasm",
+                text = if (ungradable) stringResource(R.string.common_retake) else stringResource(R.string.result_new_photo),
                 onClick = onRetry,
                 modifier = Modifier.weight(1f),
             )
             SecondaryButton(
-                text = "Yangi bemor",
+                text = stringResource(R.string.common_new_patient),
                 onClick = onNewPatient,
                 modifier = Modifier.weight(1f),
             )

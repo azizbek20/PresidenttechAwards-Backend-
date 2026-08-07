@@ -4,6 +4,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val localProperties = Properties().apply {
@@ -57,10 +58,6 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        // Kotlin 1.9.24 uchun mos Compose compiler
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -112,6 +109,15 @@ dependencies {
 
     // --- Rasm yuklash (heatmap URL'ni ko'rsatish uchun) ---
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // --- Persistensiya (eslatma sozlamalari, mashq statistikasi) ---
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // --- Fon rejimi: 20-20-20 eslatma ---
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // --- Compose animatsiya (ko'z mashqlari uchun) ---
+    implementation("androidx.compose.animation:animation")
 
     // --- Debug ---
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -1,8 +1,9 @@
 package com.eyedetect.ai
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.PredictResponse
@@ -29,7 +30,7 @@ sealed interface UiState {
 /**
  * Skrining oqimi ViewModel'i: bemor ID, rasm yuborish va natija holatini boshqaradi.
  */
-class ScreeningViewModel : ViewModel() {
+class ScreeningViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -67,7 +68,7 @@ class ScreeningViewModel : ViewModel() {
             try {
                 val bytes = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                } ?: throw IllegalStateException("Rasmni o'qib bo'lmadi")
+                } ?: throw IllegalStateException(getApplication<Application>().getString(R.string.error_cannot_read_image))
                 val body = bytes.toRequestBody("image/*".toMediaTypeOrNull())
                 val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
                 doRequest(part)
@@ -84,15 +85,18 @@ class ScreeningViewModel : ViewModel() {
         _uiState.value = UiState.Success(result)
     }
 
-    /** Texnik xatoni foydalanuvchiga tushunarli o'zbekcha xabarga aylantiradi. */
-    private fun friendly(e: Exception): String = when (e) {
-        is java.net.UnknownHostException,
-        is java.net.ConnectException ->
-            "Serverga ulanib bo'lmadi. Backend ishga tushganini va manzilni tekshiring."
-        is java.net.SocketTimeoutException ->
-            "Server javob bermadi (timeout). Qayta urinib ko'ring."
-        is java.net.UnknownServiceException ->
-            "Xavfsiz ulanish (HTTPS) talab qilinadi, lekin server manzili buni qo'llab-quvvatlamaydi. Administrator bilan bog'laning."
-        else -> e.message ?: "Noma'lum xato"
+    /** Texnik xatoni foydalanuvchiga tushunarli, joriy tildagi xabarga aylantiradi. */
+    private fun friendly(e: Exception): String {
+        val app = getApplication<Application>()
+        return when (e) {
+            is java.net.UnknownHostException,
+            is java.net.ConnectException ->
+                app.getString(R.string.error_no_connection)
+            is java.net.SocketTimeoutException ->
+                app.getString(R.string.error_timeout)
+            is java.net.UnknownServiceException ->
+                app.getString(R.string.error_https_required)
+            else -> e.message ?: app.getString(R.string.error_unknown)
+        }
     }
 }

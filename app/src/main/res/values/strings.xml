@@ -1,3 +1,156 @@
 <resources>
     <string name="app_name">EYE DETECT AI</string>
+
+    <!-- Umumiy / qayta ishlatiladigan -->
+    <string name="common_back">← Orqaga</string>
+    <string name="common_cancel">Bekor qilish</string>
+    <string name="common_start">Boshlash</string>
+    <string name="common_repeat">Yana bir marta</string>
+    <string name="common_retry">Qayta urinish</string>
+    <string name="common_retake">Qayta olish</string>
+    <string name="common_new_patient">Yangi bemor</string>
+    <string name="common_eye_right">O\'ng ko\'z</string>
+    <string name="common_eye_left">Chap ko\'z</string>
+    <string name="common_eye_right_short">o\'ng</string>
+    <string name="common_eye_left_short">chap</string>
+    <string name="common_exercise_done_title">Ajoyib! Mashq tugadi.</string>
+    <string name="common_language">Til</string>
+
+    <!-- Til nomlari — har doim o\'z tilida ko\'rsatiladi -->
+    <string name="lang_uz">O\'zbekcha</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+
+    <!-- Bosh sahifa -->
+    <string name="home_subtitle">Nima qilmoqchisiz?</string>
+    <string name="home_screening_title">Skrining</string>
+    <string name="home_screening_subtitle">Ko\'z tubi rasmi orqali DR skrining</string>
+    <string name="home_eyecare_title">Ko\'z mashqlari</string>
+    <string name="home_eyecare_subtitle">Charchashni kamaytiruvchi mashqlar va eslatmalar</string>
+
+    <!-- Bemor ekrani -->
+    <string name="patient_subtitle">DR skrining · yangi tekshiruv</string>
+    <string name="patient_id_label">Bemor ID</string>
+    <string name="patient_id_placeholder">masalan, P-0001</string>
+    <string name="patient_id_hint">ID kiritilmasa avtomatik raqam beriladi.</string>
+    <string name="patient_which_eye">Qaysi ko\'z?</string>
+    <string name="patient_continue">Davom etish → Kamera</string>
+    <string name="status_online">Ulangan</string>
+    <string name="status_offline">Oflayn</string>
+    <string name="status_content_desc">Server holati: %1$s</string>
+
+    <!-- Kamera ekrani -->
+    <string name="camera_no_permission">Kamera ruxsati yo\'q.\nGalereyadan tanlashingiz mumkin.</string>
+    <string name="camera_eye_tag">👁 %1$s</string>
+    <string name="camera_center_guide">🟡 Retinani doira ichiga markazlang</string>
+    <string name="camera_pick_gallery">🖼️ Galereyadan tanlash (zaxira)</string>
+    <string name="camera_shutter_content_desc">Rasm olish</string>
+    <string name="gallery_pick_title">Rasmni tanlang</string>
+    <string name="gallery_pick_info">%1$d ta rasm topildi — tahlil uchun eng aniq va yorug\'ini tanlang.</string>
+    <string name="gallery_pick_confirm">Tanlangan rasmni yuklash</string>
+    <string name="gallery_image_content_desc">Galereya rasmi</string>
+    <string name="capture_review_title">Rasm yaxshimi?</string>
+    <string name="capture_review_body">Fokus, yorug\'lik va markazlashuvni tekshiring. Ishonchingiz komil bo\'lsa yuboring.</string>
+    <string name="capture_review_confirm">Yuborish ✓</string>
+
+    <!-- Natija ekrani -->
+    <string name="result_none">Natija yo\'q.</string>
+    <string name="result_header">Natija · %1$s</string>
+    <string name="result_unknown_patient">—</string>
+    <string name="result_ungradable_warning">Bu \"kasallik yo\'q\" degani EMAS. Rasm sifati past — qayta oling yoki mutaxassisga yo\'llang.</string>
+    <string name="result_new_photo">Yana bir rasm</string>
+    <string name="result_ungradable">Baholab bo\'lmadi</string>
+    <string name="result_confidence">ISHONCH</string>
+    <string name="result_clinical_details">Klinik tafsilot</string>
+    <string name="result_icdr_grade">ICDR daraja</string>
+    <string name="result_image_quality">Rasm sifati</string>
+    <string name="result_patient_eye">Bemor / ko\'z</string>
+    <string name="result_model">Model</string>
+    <string name="result_heatmap_title">SI qayerga qaradi (issiqlik xaritasi)</string>
+    <string name="result_original_image">Asl rasm</string>
+    <string name="result_original_image_content_desc">Asl fundus rasm</string>
+    <string name="result_gradcam">Grad-CAM</string>
+    <string name="result_gradcam_content_desc">Grad-CAM issiqlik xaritasi</string>
+    <string name="result_heatmap_note">Issiq (qizil) joylar — SI e\'tibor bergan hududlar.</string>
+    <string name="result_recommendation_refer">Keyingi qadam: bemorni oftalmologga yo\'llang.</string>
+    <string name="result_recommendation_no_refer">Keyingi qadam: 12 oydan keyin qayta chaqiring.</string>
+    <string name="result_recommendation_ungradable">Keyingi qadam: rasmni qayta oling (fokus/yorug\'likka e\'tibor bering) yoki mutaxassisga yo\'llang.</string>
+
+    <!-- Yuklanish / xato holatlari -->
+    <string name="loading_title">Tahlil qilinmoqda…</string>
+    <string name="loading_step_uploaded">Rasm yuborildi</string>
+    <string name="loading_step_quality">Sifat tekshirildi</string>
+    <string name="loading_step_analyzing">SI tahlil qilmoqda…</string>
+    <string name="loading_step_preparing">Natija tayyorlanmoqda</string>
+    <string name="error_title">Xatolik</string>
+
+    <!-- Sifat paneli -->
+    <string name="quality_focus">Fokus</string>
+    <string name="quality_light">Yorug\'lik</string>
+    <string name="quality_position">Joylashuv</string>
+    <string name="quality_good">yaxshi</string>
+    <string name="quality_warn">chegaraviy</string>
+    <string name="quality_bad">yomon</string>
+    <string name="quality_row_format">%1$s: %2$s</string>
+
+    <!-- Tarmoq xato xabarlari -->
+    <string name="error_no_connection">Serverga ulanib bo\'lmadi. Backend ishga tushganini va manzilni tekshiring.</string>
+    <string name="error_timeout">Server javob bermadi (timeout). Qayta urinib ko\'ring.</string>
+    <string name="error_https_required">Xavfsiz ulanish (HTTPS) talab qilinadi, lekin server manzili buni qo\'llab-quvvatlamaydi. Administrator bilan bog\'laning.</string>
+    <string name="error_unknown">Noma\'lum xato</string>
+    <string name="error_cannot_read_image">Rasmni o\'qib bo\'lmadi</string>
+
+    <!-- Ko\'z mashqlari menyusi -->
+    <string name="eyecare_menu_title">Ko\'z mashqlari</string>
+    <string name="eyecare_streak">Kunlik ketma-ketlik: %1$d kun</string>
+    <string name="eyecare_done_today">Bugun bajarilgan ✓</string>
+    <string name="eyecare_not_done_today">Hali bajarilmagan</string>
+    <string name="exercise_followdot_title">Nuqtani kuzatish</string>
+    <string name="exercise_followdot_subtitle">Ko\'z mushaklari mashqi</string>
+    <string name="exercise_focusshift_title">Yaqin-uzoq fokus</string>
+    <string name="exercise_focusshift_subtitle">Akkomodatsiya mashqi</string>
+    <string name="exercise_blinkpalm_title">Pilpirash + Palming</string>
+    <string name="exercise_blinkpalm_subtitle">Miltillash va dam olish</string>
+    <string name="reminder_row_title">20-20-20 qoidasi</string>
+    <string name="reminder_row_enabled">Yoqilgan · har %1$d daqiqada</string>
+    <string name="reminder_row_disabled">O\'chirilgan</string>
+    <string name="reminder_row_configure">Sozlash →</string>
+    <string name="reminder_row_enable">Yoqish →</string>
+
+    <!-- Nuqtani kuzatish -->
+    <string name="followdot_instructions">Boshingizni qimirlatmasdan, faqat ko\'zingiz bilan nuqtani kuzating.</string>
+    <string name="followdot_seconds_left">%1$d soniya qoldi</string>
+    <string name="followdot_done_message">Ko\'z mushaklaringiz mashq qildi. Har kuni takrorlang.</string>
+
+    <!-- Yaqin-uzoq fokus -->
+    <string name="focusshift_instructions">Ko\'rsatmaga qarab, navbat bilan yaqin va uzoq nuqtaga fokuslaning.</string>
+    <string name="focusshift_phase">Bosqich %1$d/%2$d</string>
+    <string name="focusshift_look_near">Yaqinga qarang</string>
+    <string name="focusshift_look_far">Uzoqqa qarang</string>
+    <string name="focusshift_done_message">Akkomodatsiya mushaklaringiz mashq qildi. Har kuni takrorlang.</string>
+
+    <!-- Pilpirash + Palming -->
+    <string name="blinkpalm_instructions">Avval ongli miltillash, so\'ng kaftlar bilan ko\'zni yopib dam olish.</string>
+    <string name="blinkpalm_cycle">%1$d/%2$d</string>
+    <string name="blinkpalm_close">Yuming</string>
+    <string name="blinkpalm_open">Oching</string>
+    <string name="blinkpalm_palming_instruction">Kaftlaringiz bilan ko\'zingizni yoping, chuqur nafas oling</string>
+    <string name="blinkpalm_done_message">Ko\'zlaringiz endi ko\'proq dam oldi. Har kuni takrorlang.</string>
+
+    <!-- Eslatma sozlamalari -->
+    <string name="reminder_settings_title">20-20-20 eslatmasi</string>
+    <string name="reminder_settings_description">Har 20 daqiqada, 20 soniya davomida 6 metr uzoqlikka qarash ko\'z charchashini kamaytiradi.</string>
+    <string name="reminder_settings_toggle">Eslatmalarni yoqish</string>
+    <string name="reminder_settings_permission_denied">Bildirishnoma ruxsati kerak — eslatmalar ko\'rsatilmaydi.</string>
+    <string name="reminder_settings_open_settings">Sozlamalarga o\'tish</string>
+    <string name="reminder_settings_interval_label">Oraliq (daqiqa)</string>
+    <string name="reminder_settings_background_info">Eslatmalar ilova yopiq bo\'lsa ham ishlaydi — taxminan har %1$d daqiqada (tizim tejash rejimi biroz kechiktirishi mumkin).</string>
+    <string name="reminder_settings_total_exercises">Jami bajarilgan mashqlar: %1$d</string>
+    <string name="reminder_settings_streak_days">Ketma-ket kunlar: %1$d</string>
+
+    <!-- Bildirishnoma -->
+    <string name="notification_channel_name">Ko\'z dam olish eslatmasi</string>
+    <string name="notification_channel_description">20-20-20 qoidasi bo\'yicha davriy eslatma</string>
+    <string name="notification_title">Ko\'zingizga dam bering</string>
+    <string name="notification_text">6 metr uzoqlikka 20 soniya qarang (20-20-20 qoidasi).</string>
 </resources>

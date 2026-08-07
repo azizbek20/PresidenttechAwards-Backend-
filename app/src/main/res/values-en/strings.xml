@@ -1,0 +1,156 @@
+<resources>
+    <string name="app_name">EYE DETECT AI</string>
+
+    <!-- Common / reused -->
+    <string name="common_back">← Back</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_start">Start</string>
+    <string name="common_repeat">Do it again</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_retake">Retake</string>
+    <string name="common_new_patient">New patient</string>
+    <string name="common_eye_right">Right eye</string>
+    <string name="common_eye_left">Left eye</string>
+    <string name="common_eye_right_short">right</string>
+    <string name="common_eye_left_short">left</string>
+    <string name="common_exercise_done_title">Great! Exercise complete.</string>
+    <string name="common_language">Language</string>
+
+    <!-- Language names — always shown in their own language -->
+    <string name="lang_uz">O\'zbekcha</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+
+    <!-- Home screen -->
+    <string name="home_subtitle">What would you like to do?</string>
+    <string name="home_screening_title">Screening</string>
+    <string name="home_screening_subtitle">DR screening from a fundus photo</string>
+    <string name="home_eyecare_title">Eye exercises</string>
+    <string name="home_eyecare_subtitle">Exercises and reminders to reduce eye strain</string>
+
+    <!-- Patient screen -->
+    <string name="patient_subtitle">DR screening · new exam</string>
+    <string name="patient_id_label">Patient ID</string>
+    <string name="patient_id_placeholder">e.g. P-0001</string>
+    <string name="patient_id_hint">If left empty, an ID is assigned automatically.</string>
+    <string name="patient_which_eye">Which eye?</string>
+    <string name="patient_continue">Continue → Camera</string>
+    <string name="status_online">Connected</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_content_desc">Server status: %1$s</string>
+
+    <!-- Camera screen -->
+    <string name="camera_no_permission">No camera permission.\nYou can pick a photo from the gallery.</string>
+    <string name="camera_eye_tag">👁 %1$s</string>
+    <string name="camera_center_guide">🟡 Center the retina inside the circle</string>
+    <string name="camera_pick_gallery">🖼️ Choose from gallery (fallback)</string>
+    <string name="camera_shutter_content_desc">Take photo</string>
+    <string name="gallery_pick_title">Choose a photo</string>
+    <string name="gallery_pick_info">%1$d photos found — pick the sharpest and best lit one for analysis.</string>
+    <string name="gallery_pick_confirm">Upload selected photo</string>
+    <string name="gallery_image_content_desc">Gallery photo</string>
+    <string name="capture_review_title">Does the photo look good?</string>
+    <string name="capture_review_body">Check focus, lighting and centering. If you\'re confident, submit it.</string>
+    <string name="capture_review_confirm">Submit ✓</string>
+
+    <!-- Result screen -->
+    <string name="result_none">No result.</string>
+    <string name="result_header">Result · %1$s</string>
+    <string name="result_unknown_patient">—</string>
+    <string name="result_ungradable_warning">This does NOT mean \"no disease\". Image quality is low — retake it or refer to a specialist.</string>
+    <string name="result_new_photo">Another photo</string>
+    <string name="result_ungradable">Could not be graded</string>
+    <string name="result_confidence">CONFIDENCE</string>
+    <string name="result_clinical_details">Clinical details</string>
+    <string name="result_icdr_grade">ICDR grade</string>
+    <string name="result_image_quality">Image quality</string>
+    <string name="result_patient_eye">Patient / eye</string>
+    <string name="result_model">Model</string>
+    <string name="result_heatmap_title">Where the AI looked (heatmap)</string>
+    <string name="result_original_image">Original image</string>
+    <string name="result_original_image_content_desc">Original fundus image</string>
+    <string name="result_gradcam">Grad-CAM</string>
+    <string name="result_gradcam_content_desc">Grad-CAM heatmap</string>
+    <string name="result_heatmap_note">Warm (red) areas are the regions the AI focused on.</string>
+    <string name="result_recommendation_refer">Next step: refer the patient to an ophthalmologist.</string>
+    <string name="result_recommendation_no_refer">Next step: recall in 12 months.</string>
+    <string name="result_recommendation_ungradable">Next step: retake the photo (mind focus/lighting) or refer to a specialist.</string>
+
+    <!-- Loading / error states -->
+    <string name="loading_title">Analyzing…</string>
+    <string name="loading_step_uploaded">Photo uploaded</string>
+    <string name="loading_step_quality">Quality checked</string>
+    <string name="loading_step_analyzing">AI is analyzing…</string>
+    <string name="loading_step_preparing">Preparing result</string>
+    <string name="error_title">Error</string>
+
+    <!-- Quality panel -->
+    <string name="quality_focus">Focus</string>
+    <string name="quality_light">Lighting</string>
+    <string name="quality_position">Position</string>
+    <string name="quality_good">good</string>
+    <string name="quality_warn">borderline</string>
+    <string name="quality_bad">poor</string>
+    <string name="quality_row_format">%1$s: %2$s</string>
+
+    <!-- Network error messages -->
+    <string name="error_no_connection">Could not connect to the server. Check that the backend is running and the address is correct.</string>
+    <string name="error_timeout">The server did not respond (timeout). Please try again.</string>
+    <string name="error_https_required">A secure connection (HTTPS) is required, but the server address does not support it. Contact your administrator.</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="error_cannot_read_image">Could not read the image</string>
+
+    <!-- Eye exercises menu -->
+    <string name="eyecare_menu_title">Eye exercises</string>
+    <string name="eyecare_streak">Daily streak: %1$d days</string>
+    <string name="eyecare_done_today">Done today ✓</string>
+    <string name="eyecare_not_done_today">Not done yet</string>
+    <string name="exercise_followdot_title">Follow the dot</string>
+    <string name="exercise_followdot_subtitle">Eye muscle exercise</string>
+    <string name="exercise_focusshift_title">Near-far focus</string>
+    <string name="exercise_focusshift_subtitle">Accommodation exercise</string>
+    <string name="exercise_blinkpalm_title">Blinking + palming</string>
+    <string name="exercise_blinkpalm_subtitle">Blinking and relaxation</string>
+    <string name="reminder_row_title">20-20-20 rule</string>
+    <string name="reminder_row_enabled">On · every %1$d min</string>
+    <string name="reminder_row_disabled">Off</string>
+    <string name="reminder_row_configure">Configure →</string>
+    <string name="reminder_row_enable">Turn on →</string>
+
+    <!-- Follow the dot -->
+    <string name="followdot_instructions">Without moving your head, track the dot with your eyes only.</string>
+    <string name="followdot_seconds_left">%1$d seconds left</string>
+    <string name="followdot_done_message">Your eye muscles just got a workout. Repeat daily.</string>
+
+    <!-- Near-far focus -->
+    <string name="focusshift_instructions">Following the prompt, focus alternately on the near and far target.</string>
+    <string name="focusshift_phase">Step %1$d/%2$d</string>
+    <string name="focusshift_look_near">Look near</string>
+    <string name="focusshift_look_far">Look far</string>
+    <string name="focusshift_done_message">Your accommodation muscles just got a workout. Repeat daily.</string>
+
+    <!-- Blinking + palming -->
+    <string name="blinkpalm_instructions">First conscious blinking, then cover your eyes with your palms and relax.</string>
+    <string name="blinkpalm_cycle">%1$d/%2$d</string>
+    <string name="blinkpalm_close">Close</string>
+    <string name="blinkpalm_open">Open</string>
+    <string name="blinkpalm_palming_instruction">Cover your eyes with your palms and take deep breaths</string>
+    <string name="blinkpalm_done_message">Your eyes just got some extra rest. Repeat daily.</string>
+
+    <!-- Reminder settings -->
+    <string name="reminder_settings_title">20-20-20 reminder</string>
+    <string name="reminder_settings_description">Every 20 minutes, looking at something 6 meters away for 20 seconds reduces eye strain.</string>
+    <string name="reminder_settings_toggle">Enable reminders</string>
+    <string name="reminder_settings_permission_denied">Notification permission is required — reminders won\'t be shown.</string>
+    <string name="reminder_settings_open_settings">Open settings</string>
+    <string name="reminder_settings_interval_label">Interval (minutes)</string>
+    <string name="reminder_settings_background_info">Reminders work even if the app is closed — roughly every %1$d min (the system\'s battery saver may delay them slightly).</string>
+    <string name="reminder_settings_total_exercises">Total exercises completed: %1$d</string>
+    <string name="reminder_settings_streak_days">Day streak: %1$d</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_name">Eye rest reminder</string>
+    <string name="notification_channel_description">Periodic reminder for the 20-20-20 rule</string>
+    <string name="notification_title">Give your eyes a rest</string>
+    <string name="notification_text">Look at something 6 meters away for 20 seconds (20-20-20 rule).</string>
+</resources>
