@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.eyedetect.ai.R
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.ui.theme.Sizing
@@ -118,7 +120,8 @@ fun InfoBanner(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun StatusBadge(online: Boolean, modifier: Modifier = Modifier) {
     val color = if (online) TrafficGreen else TrafficRed
-    val label = if (online) "Ulangan" else "Oflayn"
+    val label = if (online) stringResource(R.string.status_online) else stringResource(R.string.status_offline)
+    val contentDesc = stringResource(R.string.status_content_desc, label)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -126,7 +129,7 @@ fun StatusBadge(online: Boolean, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(50))
             .background(color.copy(alpha = 0.12f))
             .padding(horizontal = Spacing.md, vertical = 6.dp)
-            .semantics { contentDescription = "Server holati: $label" },
+            .semantics { contentDescription = contentDesc },
     ) {
         Box(Modifier.size(9.dp).clip(CircleShape).background(color))
         Text(label, color = color, style = MaterialTheme.typography.bodyMedium,
@@ -144,8 +147,8 @@ fun PatientIdField(value: String, onChange: (String) -> Unit, modifier: Modifier
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Bemor ID") },
-        placeholder = { Text("masalan, P-0001") },
+        label = { Text(stringResource(R.string.patient_id_label)) },
+        placeholder = { Text(stringResource(R.string.patient_id_placeholder)) },
         singleLine = true,
         shape = RoundedCornerShape(Sizing.fieldRadius),
         modifier = modifier.fillMaxWidth(),
@@ -156,14 +159,15 @@ fun PatientIdField(value: String, onChange: (String) -> Unit, modifier: Modifier
 @Composable
 fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        listOf("right" to "O'ng ko'z", "left" to "Chap ko'z").forEach { (value, label) ->
+        listOf("right" to stringResource(R.string.common_eye_right), "left" to stringResource(R.string.common_eye_left)).forEach { (value, label) ->
             val isSel = selected == value
+            val contentDesc = if (isSel) "$label ✓" else label
             Card(
                 modifier = Modifier
                     .weight(1f)
                     .height(Sizing.buttonHeight)
                     .selectable(selected = isSel, onClick = { onSelect(value) })
-                    .semantics { contentDescription = "$label${if (isSel) ", tanlangan" else ""}" },
+                    .semantics { contentDescription = contentDesc },
                 shape = RoundedCornerShape(Sizing.fieldRadius),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer
@@ -221,7 +225,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
         )
         if (ungradable) {
             Text(
-                "Baholab bo'lmadi",
+                stringResource(R.string.result_ungradable),
                 color = Color.White.copy(alpha = 0.92f),
                 style = MaterialTheme.typography.titleMedium,
             )
@@ -233,7 +237,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
-                "ISHONCH",
+                stringResource(R.string.result_confidence),
                 color = Color.White.copy(alpha = 0.9f),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -275,20 +279,24 @@ private fun KeyValueRow(key: String, value: String, valueColor: Color = Material
 /** Klinik tafsilot kartasi. */
 @Composable
 fun ClinicalDetailCard(result: PredictResponse) {
-    SectionCard("Klinik tafsilot") {
+    SectionCard(stringResource(R.string.result_clinical_details)) {
         val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
         if (!ungradable) {
-            KeyValueRow("ICDR daraja", "${result.icdrGrade} — ${result.gradeLabel}")
+            KeyValueRow(stringResource(R.string.result_icdr_grade), "${result.icdrGrade} — ${result.gradeLabel}")
         }
         KeyValueRow(
-            "Rasm sifati",
+            stringResource(R.string.result_image_quality),
             result.quality,
             valueColor = if (ungradable) TrafficGrey else MaterialTheme.colorScheme.onSurface,
         )
-        val pid = result.patientId ?: "—"
-        val eye = when (result.eye) { "right" -> "o'ng"; "left" -> "chap"; else -> result.eye ?: "—" }
-        KeyValueRow("Bemor / ko'z", "$pid · $eye")
-        KeyValueRow("Model", result.modelVersion)
+        val pid = result.patientId ?: stringResource(R.string.result_unknown_patient)
+        val eye = when (result.eye) {
+            "right" -> stringResource(R.string.common_eye_right_short)
+            "left" -> stringResource(R.string.common_eye_left_short)
+            else -> result.eye ?: stringResource(R.string.result_unknown_patient)
+        }
+        KeyValueRow(stringResource(R.string.result_patient_eye), "$pid · $eye")
+        KeyValueRow(stringResource(R.string.result_model), result.modelVersion)
     }
 }
 
@@ -299,17 +307,27 @@ fun HeatmapCard(result: PredictResponse) {
     val heatUrl = ApiClient.absoluteUrl(result.heatmapUrl)
     if (origUrl == null && heatUrl == null) return
 
-    SectionCard("SI qayerga qaradi (issiqlik xaritasi)") {
+    SectionCard(stringResource(R.string.result_heatmap_title)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             origUrl?.let { url ->
-                HeatCell(caption = "Asl rasm", url = url, desc = "Asl fundus rasm", modifier = Modifier.weight(1f))
+                HeatCell(
+                    caption = stringResource(R.string.result_original_image),
+                    url = url,
+                    desc = stringResource(R.string.result_original_image_content_desc),
+                    modifier = Modifier.weight(1f),
+                )
             }
             heatUrl?.let { url ->
-                HeatCell(caption = "Grad-CAM", url = url, desc = "Grad-CAM issiqlik xaritasi", modifier = Modifier.weight(1f))
+                HeatCell(
+                    caption = stringResource(R.string.result_gradcam),
+                    url = url,
+                    desc = stringResource(R.string.result_gradcam_content_desc),
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         Text(
-            "Issiq (qizil) joylar — SI e'tibor bergan hududlar.",
+            stringResource(R.string.result_heatmap_note),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -332,9 +350,9 @@ private fun HeatCell(caption: String, url: String, desc: String, modifier: Modif
 @Composable
 fun RecommendationCard(decision: String) {
     val text = when (decision) {
-        "REFER" -> "Keyingi qadam: bemorni oftalmologga yo'llang."
-        "NO_REFER" -> "Keyingi qadam: 12 oydan keyin qayta chaqiring."
-        else -> "Keyingi qadam: rasmni qayta oling (fokus/yorug'likka e'tibor bering) yoki mutaxassisga yo'llang."
+        "REFER" -> stringResource(R.string.result_recommendation_refer)
+        "NO_REFER" -> stringResource(R.string.result_recommendation_no_refer)
+        else -> stringResource(R.string.result_recommendation_ungradable)
     }
     Row(
         modifier = Modifier
@@ -382,14 +400,19 @@ fun WarningBanner(text: String) {
 /** Yuklanish + progress qadamlari (6-hujjat, 6.C). */
 @Composable
 fun LoadingState(activeStep: Int = 2, onCancel: (() -> Unit)? = null) {
-    val steps = listOf("Rasm yuborildi", "Sifat tekshirildi", "SI tahlil qilmoqda…", "Natija tayyorlanmoqda")
+    val steps = listOf(
+        stringResource(R.string.loading_step_uploaded),
+        stringResource(R.string.loading_step_quality),
+        stringResource(R.string.loading_step_analyzing),
+        stringResource(R.string.loading_step_preparing),
+    )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
     ) {
         CircularProgressIndicator()
-        Text("Tahlil qilinmoqda…", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.loading_title), style = MaterialTheme.typography.titleMedium)
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             steps.forEachIndexed { i, label ->
                 val done = i < activeStep
@@ -414,7 +437,7 @@ fun LoadingState(activeStep: Int = 2, onCancel: (() -> Unit)? = null) {
         }
         if (onCancel != null) {
             Spacer(Modifier.height(Spacing.xs))
-            TextActionButton("Bekor qilish", onCancel)
+            TextActionButton(stringResource(R.string.common_cancel), onCancel)
         }
     }
 }
@@ -428,7 +451,7 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
     ) {
         Text("⚠️", fontSize = 48.sp)
-        Text("Xatolik", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.error_title), style = MaterialTheme.typography.headlineSmall)
         Text(
             message,
             style = MaterialTheme.typography.bodyLarge,
@@ -436,8 +459,8 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(Spacing.xs))
-        PrimaryButton("Qayta urinish", onRetry)
-        SecondaryButton("Yangi bemor", onNewPatient)
+        PrimaryButton(stringResource(R.string.common_retry), onRetry)
+        SecondaryButton(stringResource(R.string.common_new_patient), onNewPatient)
     }
 }
 
@@ -468,22 +491,22 @@ fun QualityPanel(
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        QualityRow("Fokus", focus)
-        QualityRow("Yorug'lik", light)
-        QualityRow("Joylashuv", position)
+        QualityRow(stringResource(R.string.quality_focus), focus)
+        QualityRow(stringResource(R.string.quality_light), light)
+        QualityRow(stringResource(R.string.quality_position), position)
     }
 }
 
 @Composable
 private fun QualityRow(label: String, level: QualityLevel) {
     val text = when (level) {
-        QualityLevel.GOOD -> "yaxshi"
-        QualityLevel.WARN -> "chegaraviy"
-        QualityLevel.BAD -> "yomon"
+        QualityLevel.GOOD -> stringResource(R.string.quality_good)
+        QualityLevel.WARN -> stringResource(R.string.quality_warn)
+        QualityLevel.BAD -> stringResource(R.string.quality_bad)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(qualityColor(level)))
-        Text("$label: $text", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.quality_row_format, label, text), color = Color.White, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -491,13 +514,14 @@ private fun QualityRow(label: String, level: QualityLevel) {
 @Composable
 fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val ring = if (enabled) TrafficGreen else MaterialTheme.colorScheme.outlineVariant
+    val contentDesc = stringResource(R.string.camera_shutter_content_desc)
     Box(
         modifier = modifier
             .size(Sizing.shutter)
             .clip(CircleShape)
             .background(ring)
             .padding(5.dp)
-            .semantics { contentDescription = "Rasm olish" },
+            .semantics { contentDescription = contentDesc },
         contentAlignment = Alignment.Center,
     ) {
         Box(

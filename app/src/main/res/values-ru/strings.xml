@@ -1,0 +1,156 @@
+<resources>
+    <string name="app_name">EYE DETECT AI</string>
+
+    <!-- Общие / переиспользуемые -->
+    <string name="common_back">← Назад</string>
+    <string name="common_cancel">Отмена</string>
+    <string name="common_start">Начать</string>
+    <string name="common_repeat">Ещё раз</string>
+    <string name="common_retry">Повторить</string>
+    <string name="common_retake">Переснять</string>
+    <string name="common_new_patient">Новый пациент</string>
+    <string name="common_eye_right">Правый глаз</string>
+    <string name="common_eye_left">Левый глаз</string>
+    <string name="common_eye_right_short">правый</string>
+    <string name="common_eye_left_short">левый</string>
+    <string name="common_exercise_done_title">Отлично! Упражнение завершено.</string>
+    <string name="common_language">Язык</string>
+
+    <!-- Названия языков — всегда на своём языке -->
+    <string name="lang_uz">O\'zbekcha</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+
+    <!-- Главный экран -->
+    <string name="home_subtitle">Что вы хотите сделать?</string>
+    <string name="home_screening_title">Скрининг</string>
+    <string name="home_screening_subtitle">Скрининг ДР по снимку глазного дна</string>
+    <string name="home_eyecare_title">Упражнения для глаз</string>
+    <string name="home_eyecare_subtitle">Упражнения и напоминания для снижения усталости глаз</string>
+
+    <!-- Экран пациента -->
+    <string name="patient_subtitle">Скрининг ДР · новое обследование</string>
+    <string name="patient_id_label">ID пациента</string>
+    <string name="patient_id_placeholder">например, P-0001</string>
+    <string name="patient_id_hint">Если ID не указан, будет присвоен автоматически.</string>
+    <string name="patient_which_eye">Какой глаз?</string>
+    <string name="patient_continue">Продолжить → Камера</string>
+    <string name="status_online">Подключено</string>
+    <string name="status_offline">Офлайн</string>
+    <string name="status_content_desc">Статус сервера: %1$s</string>
+
+    <!-- Экран камеры -->
+    <string name="camera_no_permission">Нет разрешения на камеру.\nВы можете выбрать фото из галереи.</string>
+    <string name="camera_eye_tag">👁 %1$s</string>
+    <string name="camera_center_guide">🟡 Расположите сетчатку внутри круга</string>
+    <string name="camera_pick_gallery">🖼️ Выбрать из галереи (резерв)</string>
+    <string name="camera_shutter_content_desc">Сделать снимок</string>
+    <string name="gallery_pick_title">Выберите снимок</string>
+    <string name="gallery_pick_info">Найдено снимков: %1$d — выберите самый чёткий и светлый для анализа.</string>
+    <string name="gallery_pick_confirm">Загрузить выбранный снимок</string>
+    <string name="gallery_image_content_desc">Снимок из галереи</string>
+    <string name="capture_review_title">Снимок хороший?</string>
+    <string name="capture_review_body">Проверьте фокус, освещение и центровку. Если уверены — отправляйте.</string>
+    <string name="capture_review_confirm">Отправить ✓</string>
+
+    <!-- Экран результата -->
+    <string name="result_none">Результата нет.</string>
+    <string name="result_header">Результат · %1$s</string>
+    <string name="result_unknown_patient">—</string>
+    <string name="result_ungradable_warning">Это НЕ означает \"болезни нет\". Качество снимка низкое — переснимите или направьте к специалисту.</string>
+    <string name="result_new_photo">Ещё один снимок</string>
+    <string name="result_ungradable">Невозможно оценить</string>
+    <string name="result_confidence">УВЕРЕННОСТЬ</string>
+    <string name="result_clinical_details">Клинические детали</string>
+    <string name="result_icdr_grade">Степень ICDR</string>
+    <string name="result_image_quality">Качество снимка</string>
+    <string name="result_patient_eye">Пациент / глаз</string>
+    <string name="result_model">Модель</string>
+    <string name="result_heatmap_title">Куда смотрел ИИ (тепловая карта)</string>
+    <string name="result_original_image">Исходный снимок</string>
+    <string name="result_original_image_content_desc">Исходный снимок глазного дна</string>
+    <string name="result_gradcam">Grad-CAM</string>
+    <string name="result_gradcam_content_desc">Тепловая карта Grad-CAM</string>
+    <string name="result_heatmap_note">Тёплые (красные) зоны — области, на которые обратил внимание ИИ.</string>
+    <string name="result_recommendation_refer">Следующий шаг: направьте пациента к офтальмологу.</string>
+    <string name="result_recommendation_no_refer">Следующий шаг: повторный вызов через 12 месяцев.</string>
+    <string name="result_recommendation_ungradable">Следующий шаг: переснимите (обратите внимание на фокус/свет) или направьте к специалисту.</string>
+
+    <!-- Загрузка / ошибки -->
+    <string name="loading_title">Анализ…</string>
+    <string name="loading_step_uploaded">Снимок отправлен</string>
+    <string name="loading_step_quality">Качество проверено</string>
+    <string name="loading_step_analyzing">ИИ анализирует…</string>
+    <string name="loading_step_preparing">Подготовка результата</string>
+    <string name="error_title">Ошибка</string>
+
+    <!-- Панель качества -->
+    <string name="quality_focus">Фокус</string>
+    <string name="quality_light">Освещение</string>
+    <string name="quality_position">Положение</string>
+    <string name="quality_good">хорошо</string>
+    <string name="quality_warn">на грани</string>
+    <string name="quality_bad">плохо</string>
+    <string name="quality_row_format">%1$s: %2$s</string>
+
+    <!-- Сообщения об ошибках сети -->
+    <string name="error_no_connection">Не удалось подключиться к серверу. Проверьте, запущен ли бэкенд, и правильность адреса.</string>
+    <string name="error_timeout">Сервер не ответил (таймаут). Попробуйте ещё раз.</string>
+    <string name="error_https_required">Требуется защищённое соединение (HTTPS), но адрес сервера его не поддерживает. Обратитесь к администратору.</string>
+    <string name="error_unknown">Неизвестная ошибка</string>
+    <string name="error_cannot_read_image">Не удалось прочитать снимок</string>
+
+    <!-- Меню упражнений для глаз -->
+    <string name="eyecare_menu_title">Упражнения для глаз</string>
+    <string name="eyecare_streak">Серия дней подряд: %1$d</string>
+    <string name="eyecare_done_today">Выполнено сегодня ✓</string>
+    <string name="eyecare_not_done_today">Ещё не выполнено</string>
+    <string name="exercise_followdot_title">Слежение за точкой</string>
+    <string name="exercise_followdot_subtitle">Упражнение для глазных мышц</string>
+    <string name="exercise_focusshift_title">Фокус вблизи-вдали</string>
+    <string name="exercise_focusshift_subtitle">Упражнение на аккомодацию</string>
+    <string name="exercise_blinkpalm_title">Моргание + пальминг</string>
+    <string name="exercise_blinkpalm_subtitle">Моргание и отдых</string>
+    <string name="reminder_row_title">Правило 20-20-20</string>
+    <string name="reminder_row_enabled">Включено · каждые %1$d мин</string>
+    <string name="reminder_row_disabled">Выключено</string>
+    <string name="reminder_row_configure">Настроить →</string>
+    <string name="reminder_row_enable">Включить →</string>
+
+    <!-- Слежение за точкой -->
+    <string name="followdot_instructions">Не двигая головой, следите за точкой только глазами.</string>
+    <string name="followdot_seconds_left">Осталось %1$d сек</string>
+    <string name="followdot_done_message">Ваши глазные мышцы поработали. Повторяйте каждый день.</string>
+
+    <!-- Фокус вблизи-вдали -->
+    <string name="focusshift_instructions">Следуя подсказке, фокусируйтесь поочерёдно на ближней и дальней точке.</string>
+    <string name="focusshift_phase">Этап %1$d/%2$d</string>
+    <string name="focusshift_look_near">Смотрите вблизи</string>
+    <string name="focusshift_look_far">Смотрите вдаль</string>
+    <string name="focusshift_done_message">Мышцы аккомодации поработали. Повторяйте каждый день.</string>
+
+    <!-- Моргание + пальминг -->
+    <string name="blinkpalm_instructions">Сначала осознанное моргание, затем закройте глаза ладонями и отдохните.</string>
+    <string name="blinkpalm_cycle">%1$d/%2$d</string>
+    <string name="blinkpalm_close">Закройте</string>
+    <string name="blinkpalm_open">Откройте</string>
+    <string name="blinkpalm_palming_instruction">Закройте глаза ладонями и глубоко дышите</string>
+    <string name="blinkpalm_done_message">Ваши глаза отдохнули. Повторяйте каждый день.</string>
+
+    <!-- Настройки напоминания -->
+    <string name="reminder_settings_title">Напоминание 20-20-20</string>
+    <string name="reminder_settings_description">Каждые 20 минут смотреть на предмет в 6 метрах в течение 20 секунд — снижает усталость глаз.</string>
+    <string name="reminder_settings_toggle">Включить напоминания</string>
+    <string name="reminder_settings_permission_denied">Требуется разрешение на уведомления — напоминания не будут показаны.</string>
+    <string name="reminder_settings_open_settings">Перейти в настройки</string>
+    <string name="reminder_settings_interval_label">Интервал (минуты)</string>
+    <string name="reminder_settings_background_info">Напоминания работают, даже если приложение закрыто — примерно каждые %1$d мин (режим энергосбережения может немного задерживать их).</string>
+    <string name="reminder_settings_total_exercises">Всего выполнено упражнений: %1$d</string>
+    <string name="reminder_settings_streak_days">Дней подряд: %1$d</string>
+
+    <!-- Уведомление -->
+    <string name="notification_channel_name">Напоминание об отдыхе для глаз</string>
+    <string name="notification_channel_description">Периодическое напоминание по правилу 20-20-20</string>
+    <string name="notification_title">Дайте отдых глазам</string>
+    <string name="notification_text">Посмотрите на 6 метров вдаль в течение 20 секунд (правило 20-20-20).</string>
+</resources>

@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.eyedetect.ai.R
 import com.eyedetect.ai.ScreeningViewModel
 import com.eyedetect.ai.ui.components.EyeSelector
 import com.eyedetect.ai.ui.components.PatientIdField
@@ -46,12 +48,12 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
         ) {
             Column {
                 Text(
-                    "EYE DETECT AI",
+                    stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    "DR skrining · yangi tekshiruv",
+                    stringResource(R.string.patient_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -65,18 +67,18 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
         ) {
             PatientIdField(value = pid, onChange = { pid = it })
             Text(
-                "ID kiritilmasa avtomatik raqam beriladi.",
+                stringResource(R.string.patient_id_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text("Qaysi ko'z?", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.patient_which_eye), style = MaterialTheme.typography.titleMedium)
             EyeSelector(selected = eye, onSelect = { eye = it })
         }
 
         Spacer(Modifier.padding(top = Spacing.xs))
         PrimaryButton(
-            text = "Davom etish → Kamera",
+            text = stringResource(R.string.patient_continue),
             onClick = {
                 vm.patientId = pid
                 vm.eye = eye

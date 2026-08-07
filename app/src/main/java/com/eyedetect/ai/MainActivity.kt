@@ -1,8 +1,11 @@
 package com.eyedetect.ai
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -10,18 +13,36 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eyedetect.ai.ui.CameraScreen
+import com.eyedetect.ai.ui.HomeScreen
 import com.eyedetect.ai.ui.PatientScreen
 import com.eyedetect.ai.ui.ResultScreen
+import com.eyedetect.ai.ui.eyecare.BlinkPalmScreen
+import com.eyedetect.ai.ui.eyecare.EyeCareMenuScreen
+import com.eyedetect.ai.ui.eyecare.FocusShiftScreen
+import com.eyedetect.ai.ui.eyecare.FollowDotScreen
+import com.eyedetect.ai.ui.eyecare.ReminderSettingsScreen
 import com.eyedetect.ai.ui.theme.EyeDetectTheme
 
-/** Ilova ichidagi 3 ekran (reja 2.1): Bemor -> Kamera -> Natija. */
-enum class Screen { Patient, Camera, Result }
+/** Ilova ichidagi ekranlar (reja 2.1 + ko'z mashqlari bo'limi). */
+enum class Screen {
+    Home,
+    Patient, Camera, Result,
+    EyeCareMenu, ReminderSettings,
+    FollowDot, FocusShift, BlinkPalm,
+}
+
+private val ScreenListSaver: Saver<SnapshotStateList<Screen>, List<String>> = Saver(
+    save = { list -> list.map { it.name } },
+    restore = { saved -> mutableStateListOf(*saved.map { Screen.valueOf(it) }.toTypedArray()) },
+)
 
 /** Ilova ishga tushganda cacheDir'da qolib ketgan eski fundus rasm fayllarini (masalan, oldingi
  * ilova to'satdan yopilishi qoldiqlari) tozalaydi. */
@@ -31,6 +52,15 @@ private fun cleanupStaleCaptures(context: Context) {
 }
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        /** Bildirishnoma tap qilinganda ko'z mashqlari bo'limiga to'g'ridan-to'g'ri o'tish uchun. */
+        const val EXTRA_OPEN_EYECARE = "open_eyecare"
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocalePrefs.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
@@ -45,34 +75,69 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
 }
 
 @Composable
 fun AppRoot(vm: ScreeningViewModel = viewModel()) {
-    // Oddiy, kutubxonasiz navigatsiya (demo skelet uchun yetarli).
-    var screen by remember { mutableStateOf(Screen.Patient) }
+    val activity = LocalContext.current as? Activity
+    val openEyeCareOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_EYECARE, false) ?: false
+
+    val backStack = rememberSaveable(saver = ScreenListSaver) {
+        mutableStateListOf(Screen.Home).apply {
+            if (openEyeCareOnStart) add(Screen.EyeCareMenu)
+        }
+    }
+    val current = backStack.last()
+
+    fun push(s: Screen) { backStack.add(s) }
+    fun pop(): Boolean =
+        if (backStack.size > 1) { backStack.removeAt(backStack.lastIndex); true } else false
+    fun resetTo(vararg s: Screen) { backStack.clear(); backStack.addAll(s) }
+
+    BackHandler(enabled = backStack.size > 1) { pop() }
+
     val uiState by vm.uiState.collectAsState()
 
-    when (screen) {
+    when (current) {
+        Screen.Home -> HomeScreen(
+            onScreening = { push(Screen.Patient) },
+            onEyeCare = { push(Screen.EyeCareMenu) },
+        )
         Screen.Patient -> PatientScreen(
             vm = vm,
-            onNext = { screen = Screen.Camera },
+            onNext = { push(Screen.Camera) },
         )
         Screen.Camera -> CameraScreen(
             vm = vm,
-            onResult = { screen = Screen.Result },
-            onBack = { screen = Screen.Patient },
+            onResult = { push(Screen.Result) },
+            onBack = { pop() },
         )
         Screen.Result -> ResultScreen(
             uiState = uiState,
             onRetry = {
                 vm.reset()
-                screen = Screen.Camera
+                pop()
             },
             onNewPatient = {
                 vm.reset()
-                screen = Screen.Patient
+                resetTo(Screen.Home, Screen.Patient)
             },
         )
+        Screen.EyeCareMenu -> EyeCareMenuScreen(
+            onFollowDot = { push(Screen.FollowDot) },
+            onFocusShift = { push(Screen.FocusShift) },
+            onBlinkPalm = { push(Screen.BlinkPalm) },
+            onReminderSettings = { push(Screen.ReminderSettings) },
+            onBack = { pop() },
+        )
+        Screen.FollowDot -> FollowDotScreen(onBack = { pop() })
+        Screen.FocusShift -> FocusShiftScreen(onBack = { pop() })
+        Screen.BlinkPalm -> BlinkPalmScreen(onBack = { pop() })
+        Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
     }
 }

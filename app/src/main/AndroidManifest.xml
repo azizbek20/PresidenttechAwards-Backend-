@@ -4,16 +4,21 @@
     <!-- Kamera va tarmoq ruxsatlari -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ko'z mashqlari: 20-20-20 fon eslatmasi va fokus-almashish vibratsiyasi uchun -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
+        android:name=".EyeCareApp"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.EyeDetectAI"
         android:usesCleartextTraffic="false"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:localeConfig="@xml/locales_config">
         <!-- android:icon o'chirildi — Android Studio "Image Asset" bilan
              ic_launcher yaratib, shu yerga qo'shsangiz bo'ladi. -->
         <!-- Demo skelet uchun tizim standart ikonkasi ishlatiladi. -->
@@ -24,6 +29,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

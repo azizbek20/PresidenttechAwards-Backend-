@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.eyedetect.ai.R
 import com.eyedetect.ai.ScreeningViewModel
 import com.eyedetect.ai.ui.components.InfoBanner
 import com.eyedetect.ai.ui.components.PrimaryButton
@@ -97,7 +99,7 @@ fun CameraScreen(
     // Galereyadan tanlangan, ammo hali tasdiqlanmagan rasmlar (grid ko'rib chiqish uchun)
     var pendingGalleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    val eyeLabel = if (vm.eye == "left") "Chap ko'z" else "O'ng ko'z"
+    val eyeLabel = if (vm.eye == "left") stringResource(R.string.common_eye_left) else stringResource(R.string.common_eye_right)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -150,7 +152,7 @@ fun CameraScreen(
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "Kamera ruxsati yo'q.\nGalereyadan tanlashingiz mumkin.",
+                        stringResource(R.string.camera_no_permission),
                         color = Color.White,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
@@ -168,7 +170,7 @@ fun CameraScreen(
                     .background(Color.Black.copy(alpha = 0.55f))
                     .padding(horizontal = Spacing.md, vertical = 6.dp),
             ) {
-                Text("👁 $eyeLabel", color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                Text(stringResource(R.string.camera_eye_tag, eyeLabel), color = Color.White, style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold)
             }
 
@@ -191,7 +193,7 @@ fun CameraScreen(
 
             // Yo'riqnoma (pastda)
             Text(
-                "🟡 Retinani doira ichiga markazlang",
+                stringResource(R.string.camera_center_guide),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
@@ -234,14 +236,14 @@ fun CameraScreen(
                 },
             )
             SecondaryButton(
-                "🖼️ Galereyadan tanlash (zaxira)",
+                stringResource(R.string.camera_pick_gallery),
                 onClick = {
                     galleryLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 },
             )
-            TextActionButton("← Orqaga", onClick = onBack)
+            TextActionButton(stringResource(R.string.common_back), onClick = onBack)
         }
     }
 
@@ -296,8 +298,8 @@ private fun GalleryPickSheet(uris: List<Uri>, onCancel: () -> Unit, onConfirm: (
                 .padding(Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text("Rasmni tanlang", style = MaterialTheme.typography.titleLarge)
-            InfoBanner("${uris.size} ta rasm topildi — tahlil uchun eng aniq va yorug'ini tanlang.")
+            Text(stringResource(R.string.gallery_pick_title), style = MaterialTheme.typography.titleLarge)
+            InfoBanner(stringResource(R.string.gallery_pick_info, uris.size))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -321,7 +323,7 @@ private fun GalleryPickSheet(uris: List<Uri>, onCancel: () -> Unit, onConfirm: (
                     ) {
                         AsyncImage(
                             model = uri,
-                            contentDescription = "Galereya rasmi",
+                            contentDescription = stringResource(R.string.gallery_image_content_desc),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
                         )
@@ -352,9 +354,9 @@ private fun GalleryPickSheet(uris: List<Uri>, onCancel: () -> Unit, onConfirm: (
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                SecondaryButton("Bekor qilish", onClick = onCancel, modifier = Modifier.weight(1f))
+                SecondaryButton(stringResource(R.string.common_cancel), onClick = onCancel, modifier = Modifier.weight(1f))
                 PrimaryButton(
-                    "Tanlangan rasmni yuklash",
+                    stringResource(R.string.gallery_pick_confirm),
                     onClick = { onConfirm(selected) },
                     modifier = Modifier.weight(1f),
                 )
@@ -398,9 +400,9 @@ private fun CaptureReviewSheet(onRetake: () -> Unit, onConfirm: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Rasm yaxshimi?", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.capture_review_title), style = MaterialTheme.typography.titleLarge)
             Text(
-                "Fokus, yorug'lik va markazlashuvni tekshiring. Ishonchingiz komil bo'lsa yuboring.",
+                stringResource(R.string.capture_review_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -409,8 +411,8 @@ private fun CaptureReviewSheet(onRetake: () -> Unit, onConfirm: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                SecondaryButton("Qayta olish", onClick = onRetake, modifier = Modifier.weight(1f))
-                PrimaryButton("Yuborish ✓", onClick = onConfirm, modifier = Modifier.weight(1f))
+                SecondaryButton(stringResource(R.string.common_retake), onClick = onRetake, modifier = Modifier.weight(1f))
+                PrimaryButton(stringResource(R.string.capture_review_confirm), onClick = onConfirm, modifier = Modifier.weight(1f))
             }
         }
     }
