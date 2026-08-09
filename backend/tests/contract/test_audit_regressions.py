@@ -6,6 +6,7 @@ come back silently.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -178,3 +179,157 @@ def test_shadow_refuses_a_dark_image_too(
         "/api/v1/predict", files=upload(dark_jpeg_bytes), data={"eye": "right"}
     )
     assert response.status_code == 503, response.text
+
+
+# --------------------------------------------------------------------------
+# 5. C11: the cap must bite on a body that declares NO Content-Length.
+# --------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_raw_stream_cap_aborts_a_chunked_body() -> None:
+    """Drives the ASGI middleware directly.
+
+    A chunked request carries no Content-Length, so the cheap header check
+    cannot help and only the counting path can stop it. Exercising the ASGI
+    contract here (rather than through TestClient) keeps the test independent
+    of whether httpx chooses to stream or to buffer.
+    """
+    from app.core.limits import MaxBodySizeMiddleware
+
+    async def never_called(scope, receive, send):  # noqa: ANN001
+        # Drain the stream the way the multipart parser would.
+        while True:
+            message = await receive()
+            if not message.get("more_body"):
+                return
+
+    sent: list[dict] = []
+
+    async def send(message):  # noqa: ANN001
+        sent.append(message)
+
+    chunks = [b"\x00" * 4096] * 40  # 160 KB against a 64 KB cap
+    index = 0
+
+    async def receive():
+        nonlocal index
+        if index < len(chunks):
+            body = chunks[index]
+            index += 1
+            return {"type": "http.request", "body": body, "more_body": True}
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    middleware = MaxBodySizeMiddleware(
+        never_called, max_bytes=64 * 1024, detail="Rasm hajmi juda katta"
+    )
+    scope = {"type": "http", "method": "POST", "path": "/api/v1/predict", "headers": []}
+    await middleware(scope, receive, send)
+
+    assert sent[0]["status"] == 413, sent
+    body = json.loads(sent[1]["body"])
+    assert body["error"] == "payload_too_large"
+    _assert_uzbek_detail(body)
+    assert index < len(chunks), "the stream must abort early, not drain fully"
+
+
+@pytest.mark.asyncio
+async def test_raw_stream_cap_lets_a_small_body_through() -> None:
+    from app.core.limits import MaxBodySizeMiddleware
+
+    seen = []
+
+    async def inner(scope, receive, send):  # noqa: ANN001
+        while True:
+            message = await receive()
+            seen.append(len(message.get("body", b"")))
+            if not message.get("more_body"):
+                break
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    sent: list[dict] = []
+    done = False
+
+    async def receive():
+        nonlocal done
+        if not done:
+            done = True
+            return {"type": "http.request", "body": b"x" * 1024, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    async def send(message):  # noqa: ANN001
+        sent.append(message)
+
+    middleware = MaxBodySizeMiddleware(inner, max_bytes=64 * 1024, detail="x")
+    await middleware(
+        {"type": "http", "method": "POST", "path": "/p", "headers": []},
+        receive,
+        send,
+    )
+    assert sent[0]["status"] == 200
+    assert sum(seen) == 1024
+
+
+# --------------------------------------------------------------------------
+# 6. D4: the admin exams table needs model_version from the LIST endpoint.
+# --------------------------------------------------------------------------
+def test_exams_list_carries_model_version(
+    authed_client: Any, refer_jpeg_bytes: bytes
+) -> None:
+    """`response_model=list[ExamSummary]` used to strip it, so the admin
+    panel's `Model` column rendered "—" for every row (§5-D D4)."""
+    created = authed_client.post(
+        "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+    )
+    assert created.status_code == 200, created.text
+
+    rows = authed_client.get("/api/v1/exams").json()
+    assert rows, "expected at least one exam"
+    for row in rows:
+        assert row.get("model_version"), f"model_version missing/blank: {row}"
+    assert rows[0]["model_version"] == created.json()["model_version"]
+
+
+# --------------------------------------------------------------------------
+# 7. C10: persistence failure is 500 in BOTH modes — varying EYE_MODE, not auth.
+# --------------------------------------------------------------------------
+class _LoadedEngine:
+    """A shadow-mode engine that reports itself loaded, so the request gets
+    past the C9 gate and reaches persistence."""
+
+    model_loaded = True
+
+    def predict(self, img):  # noqa: ANN001
+        return {"grade": 4, "probs": [0.0, 0.0, 0.0, 0.0, 1.0], "model_version": "shadow-test"}
+
+
+def _boom(*args: object, **kwargs: object) -> None:
+    raise RuntimeError("database is on fire")
+
+
+def test_persistence_failure_is_500_in_demo_mode(
+    authed_client: Any, refer_jpeg_bytes: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.db.crud.create_exam_with_result", _boom)
+    response = authed_client.post(
+        "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+    )
+    assert response.status_code == 500, response.text
+    assert response.json()["error"] == "persistence_error"
+
+
+def test_persistence_failure_is_500_in_shadow_mode(
+    shadow_client: Any, refer_jpeg_bytes: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C10 is UNCONDITIONAL. The existing suite only varied AUTH, which its own
+    docstring admits "changes nothing about C10" — the mode axis was untested.
+    """
+    shadow_client.app.state.engine = _LoadedEngine()
+    monkeypatch.setattr("app.db.crud.create_exam_with_result", _boom)
+
+    response = shadow_client.post(
+        "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+    )
+    assert response.status_code == 500, response.text
+    body = response.json()
+    assert body["error"] == "persistence_error"
+    _assert_uzbek_detail(body)

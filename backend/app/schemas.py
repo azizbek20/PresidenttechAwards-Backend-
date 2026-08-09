@@ -48,6 +48,18 @@ class ExamSummary(BaseModel):
     icdr_grade: int
     decision: Decision
     processed_at: str
+    # ADDED at the orchestrator level (§0 rule 2 — interfaces change by adding,
+    # never renaming). The spec contradicts itself: §5-D D4 requires
+    # `model_version` as a column of the admin exams table, while §4.3 froze
+    # this model without it, so `response_model=list[ExamSummary]` silently
+    # stripped the value `crud.list_exams` already returns and the column
+    # rendered "—" for 100% of rows.
+    #
+    # Safe: `GET /api/v1/exams` is consumed ONLY by the Streamlit panel. The
+    # Android client declares exactly one endpoint (ApiService.kt: POST
+    # api/v1/predict) and never reads this one, so the APK's wire contract is
+    # untouched.
+    model_version: str
 
 
 class ErrorEnvelope(BaseModel):
