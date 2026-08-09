@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.io.File
@@ -159,6 +159,18 @@ class ScreeningViewModel @JvmOverloads constructor(
         }
     }
 
+    /** Yuklashdan oldin rasmni siqadi (uzun tomoni ~1500px, JPEG ~85%) — to'liq o'lchamdagi
+     * kamera surati sekin/qimmat mobil internetga mos emas. Siqish muvaffaqiyatsiz bo'lsa
+     * (masalan, kutilmagan format) asl baytlar o'zgarishsiz yuboriladi. */
+    private suspend fun buildUploadBody(bytes: ByteArray, fallbackMediaType: String): RequestBody {
+        val compressed = withContext(Dispatchers.Default) { BitmapLoader.compressForUpload(bytes) }
+        val (finalBytes, mediaType) =
+            if (compressed != null) compressed to "image/jpeg" else bytes to fallbackMediaType
+        return ProgressRequestBody(finalBytes.toRequestBody(mediaType.toMediaTypeOrNull())) {
+            _uploadProgress.value = it
+        }
+    }
+
     /** Faylni (kameradan) yuboradi; faqat muvaffaqiyatda o'chiriladi — xato bo'lsa [retry]
      * uchun saqlanadi. */
     fun uploadFile(file: File) {
@@ -175,9 +187,8 @@ class ScreeningViewModel @JvmOverloads constructor(
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeFileScaled(file.absolutePath) }
                 if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
 
-                val body = ProgressRequestBody(file.asRequestBody("image/jpeg".toMediaTypeOrNull())) {
-                    _uploadProgress.value = it
-                }
+                val fileBytes = withContext(Dispatchers.IO) { file.readBytes() }
+                val body = buildUploadBody(fileBytes, fallbackMediaType = "image/jpeg")
                 val part = MultipartBody.Part.createFormData("file", file.name, body)
                 doRequest(part, rowId)
 
@@ -213,9 +224,7 @@ class ScreeningViewModel @JvmOverloads constructor(
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(bytes) }
                 if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
 
-                val body = ProgressRequestBody(bytes.toRequestBody("image/*".toMediaTypeOrNull())) {
-                    _uploadProgress.value = it
-                }
+                val body = buildUploadBody(bytes, fallbackMediaType = "image/*")
                 val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
                 doRequest(part, rowId)
 

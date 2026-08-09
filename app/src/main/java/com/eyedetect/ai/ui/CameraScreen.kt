@@ -1,9 +1,11 @@
 package com.eyedetect.ai.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -160,6 +162,10 @@ fun CameraScreen(
     // Galereyadan tanlangan, ammo hali tasdiqlanmagan rasmlar (grid ko'rib chiqish uchun)
     var pendingGalleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
+    // Suratga olishning o'zi (fayl yozish) muvaffaqiyatsiz bo'lsa — natija ekraniga
+    // o'tmasdan, shu yerda ogohlantirib, qayta urinishga taklif qilinadi.
+    var captureError by remember { mutableStateOf(false) }
+
     val eyeLabel = if (vm.eye == "left") stringResource(R.string.common_eye_left) else stringResource(R.string.common_eye_right)
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -211,13 +217,31 @@ fun CameraScreen(
                     },
                 )
             } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
                         stringResource(R.string.camera_no_permission),
                         color = Color.White,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(Spacing.xl),
+                    )
+                    SecondaryButton(
+                        stringResource(R.string.camera_request_permission),
+                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    )
+                    SecondaryButton(
+                        stringResource(R.string.camera_open_settings),
+                        onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.fromParts("package", context.packageName, null),
+                                )
+                            )
+                        },
                     )
                 }
             }
@@ -284,9 +308,13 @@ fun CameraScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (captureError) {
+                WarningBanner(stringResource(R.string.camera_capture_error))
+            }
             ShutterButton(
                 enabled = hasCameraPermission,
                 onClick = {
+                    captureError = false
                     val photoFile = File(context.cacheDir, "fundus_${System.currentTimeMillis()}.jpg")
                     val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
                     imageCapture.takePicture(
@@ -301,10 +329,12 @@ fun CameraScreen(
                                 }
                             }
                             override fun onError(exc: ImageCaptureException) {
-                                // Demo: xato bo'lsa ham yuborishga urinamiz (VM Error ko'rsatadi)
+                                // Suratga olish muvaffaqiyatsiz bo'lsa, natija ekraniga
+                                // o'tmaymiz (fayl to'liq/yaroqli emas) — shu yerda
+                                // ogohlantirib, foydalanuvchi qayta bosishini kutamiz.
                                 ContextCompat.getMainExecutor(context).execute {
-                                    vm.uploadFile(photoFile)
-                                    onResult()
+                                    photoFile.delete()
+                                    captureError = true
                                 }
                             }
                         },
