@@ -12,18 +12,24 @@ Muhimlik belgilari: 🔴 muhim (ishlab chiqarishga chiqishdan oldin shart)
 
 ## 1. Xavfsizlik va maxfiylik (PHI) 🔴
 
-Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot. Hozir bular himoyasiz.
+Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
 
-- [ ] `usesCleartextTraffic="true"`ni olib tashlash, faqat HTTPS orqali ishlash
-      (`AndroidManifest.xml`). Real backend HTTPS bo'lgandan keyin o'chirish.
-- [ ] `ApiClient.kt`dagi `HttpLoggingInterceptor.Level.BODY`ni faqat debug
-      build uchun yoqish (`BuildConfig.DEBUG` sharti bilan) — hozir release
-      buildda ham to'liq so'rov/javob tanasi (bemor ID, rasm bytelari) logga
-      yoziladi.
-- [ ] Backend bilan autentifikatsiya (API key yoki token header) qo'shish —
-      hozir `ApiService.kt`da hech qanday auth yo'q.
-- [ ] `cacheDir`dagi vaqtinchalik rasm fayllarini (kamera surati) yuborilgach
-      yoki ilova yopilganda tozalash (hozir faqat "qayta olish"da o'chadi).
+- [x] `usesCleartextTraffic`ni release buildda `false` qildik, faqat HTTPS
+      (`AndroidManifest.xml` + `network_security_config.xml`) — debug buildda
+      `src/debug/res/xml/network_security_config.xml` orqali cleartext hali
+      ruxsat etilgan (lokal backend bilan test uchun).
+- [x] `ApiClient.kt`dagi `HttpLoggingInterceptor.Level`ni `BuildConfig.DEBUG`
+      shartiga bog'ladik — release buildda faqat `BASIC` (URL/status/vaqt),
+      body (bemor ID, rasm bytelari) logga yozilmaydi; `X-API-Key` headeri
+      ham `redactHeader` bilan logdan yashirilgan.
+- [x] Backend bilan autentifikatsiya qo'shildi: `ApiClient.kt`dagi
+      `authInterceptor` har bir so'rovga `X-API-Key: BuildConfig.API_KEY`
+      headerini qo'shadi (kalit `local.properties`/build config orqali).
+- [x] `cacheDir`dagi vaqtinchalik fundus rasm fayli endi har doim
+      o'chiriladi: `ScreeningViewModel.uploadFile()`dagi `finally` bloki
+      (muvaffaqiyat ham, xato ham) + `MainActivity.cleanupStaleCaptures()`
+      ilova ishga tushganda qolib ketgan eski `fundus_*.jpg` fayllarni
+      tozalaydi (masalan, jarayon kutilmagan o'chishidan keyin).
 
 ## 2. Kamera va sifat nazorati 🔴
 
