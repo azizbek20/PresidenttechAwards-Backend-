@@ -158,14 +158,33 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
 
 ## 7. Test qamrovi 🔴
 
-Hozir loyihada birorta test yo'q (`test/`, `androidTest/` mavjud emas).
-
-- [ ] Unit testlar: `ScreeningViewModel` (holat o'tishlari: Idle → Loading →
-      Success/Error), `friendly()` xato xabarlari xaritalash.
-- [ ] UI/instrumentation testlar (Compose test): asosiy oqim — bemor ID
-      kiritish → rasm olish (fake) → natija ko'rsatilishi.
-- [ ] `ApiService`ni MockWebServer bilan sinash (muvaffaqiyat, 4xx, 5xx,
-      timeout holatlari).
+- [x] Test infratuzilmasi qo'shildi: JUnit4, `kotlinx-coroutines-test`,
+      Robolectric, MockWebServer (`testImplementation`) va Compose UI test +
+      Espresso (`androidTestImplementation`) `app/build.gradle.kts`ga
+      qo'shildi (`testOptions.unitTests.isIncludeAndroidResources` Robolectric
+      uchun yoqildi).
+- [x] Unit testlar: `ScreeningViewModelTest` (`app/src/test/...`, Robolectric)
+      holat o'tishlarini (Idle → Loading → Success/Error) va `friendly()`
+      xato xabarlari xaritalashni (UnknownHostException/SocketTimeoutException/
+      UnknownServiceException/xabarsiz/xabarli generic xato) sinaydi. Buning
+      uchun `ScreeningViewModel`ga `ApiService`ni inject qilish imkoniyati
+      qo'shildi (`@JvmOverloads` konstruktor parametri — standart qiymati
+      `ApiClient.service`, shu bilan androidx `viewModel()` factory ham
+      ishlashda davom etadi). `EyeSymmetryAnalyzerTest` (pure JUnit, Room/
+      Android'siz) ham qo'shildi. Barchasi `./gradlew testDebugUnitTest`
+      bilan yashil (19/19).
+- [x] `ApiServiceTest`: MockWebServer bilan `ApiService`ni to'g'ridan-to'g'ri
+      (haqiqiy `ApiClient` singletonini chetlab o'tib) sinaydi — muvaffaqiyat
+      (JSON parse), 4xx/5xx (`HttpException`), timeout (`SocketTimeoutException`)
+      holatlari.
+- [x] UI/instrumentation testlar yozildi: `MainFlowTest` (Bosh ekran →
+      "Skrining" → bemor ID → Kamera ekraniga yetib borish — CAMERA ruxsati
+      ataylab berilmagan, shu sababli ruxsat so'rash holati tekshiriladi) va
+      `ResultScreenTest` (`ResultScreen`ni fake `UiState.Success`/`Error`
+      bilan to'g'ridan-to'g'ri, kamera/tarmoqsiz sinaydi). Faqat kompilyatsiya
+      tasdiqlandi (`./gradlew compileDebugAndroidTestKotlin` — muvaffaqiyatli);
+      bu muhitda ulangan qurilma/emulyator yo'qligi sababli haqiqiy ishga
+      tushirish (`./gradlew connectedDebugAndroidTest`) tekshirilmagan.
 
 ## 8. Relizga tayyorlik 🟢
 

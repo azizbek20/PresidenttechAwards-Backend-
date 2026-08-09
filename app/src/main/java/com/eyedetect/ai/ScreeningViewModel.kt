@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.ApiClient
+import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
@@ -48,8 +49,14 @@ data class EyeSymmetryUiState(
 
 /**
  * Skrining oqimi ViewModel'i: bemor ID, rasm yuborish va natija holatini boshqaradi.
+ * [api] standart holatda [ApiClient.service] — testlarda soxta implementatsiya berish uchun
+ * almashtiriladi (`@JvmOverloads` androidx `viewModel()` factory'si `Application`dan
+ * qurish uchun konstruktorni topa olishi kerak).
  */
-class ScreeningViewModel(application: Application) : AndroidViewModel(application) {
+class ScreeningViewModel @JvmOverloads constructor(
+    application: Application,
+    private val api: ApiService = ApiClient.service,
+) : AndroidViewModel(application) {
 
     private val historyRepo = ScreeningHistoryRepository(application)
 
@@ -181,7 +188,7 @@ class ScreeningViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun doRequest(part: MultipartBody.Part, rowId: CompletableDeferred<Long?>) {
         val pid = patientId.ifBlank { null }?.toRequestBody("text/plain".toMediaTypeOrNull())
         val eyePart = eye.toRequestBody("text/plain".toMediaTypeOrNull())
-        val result = ApiClient.service.predict(part, pid, eyePart)
+        val result = api.predict(part, pid, eyePart)
         _uiState.value = UiState.Success(result)
         // Tarixga saqlash — shu payt mahalliy evristika hali tayyor bo'lmasa (odatda
         // sekinroq, backend javobidan keyin ham kelishi mumkin), holsiz saqlanadi;
