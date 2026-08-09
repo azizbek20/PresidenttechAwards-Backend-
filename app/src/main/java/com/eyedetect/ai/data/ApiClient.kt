@@ -13,7 +13,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Retrofit klienti. baseUrl = BuildConfig.API_BASE_URL
- * (app/build.gradle.kts ichida sozlanadi — o'sha yerni o'zgartiring).
+ * (`local.properties` ichidagi `API_BASE_URL` orqali sozlanadi — git'ga
+ * kirmaydi; standart qiymat emulyator uchun `app/build.gradle.kts`da).
  */
 object ApiClient {
 
