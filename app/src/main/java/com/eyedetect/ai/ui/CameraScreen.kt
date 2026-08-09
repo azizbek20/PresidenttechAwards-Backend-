@@ -496,7 +496,7 @@ private fun GalleryPickSheet(uris: List<Uri>, onCancel: () -> Unit, onConfirm: (
 
 /** Rasmning nomi va hajmini ContentResolver orqali o'qiydi ("nomi.jpg · 1.2 MB"). */
 private fun fileLabel(context: android.content.Context, uri: Uri): String {
-    var name = "rasm.jpg"
+    var name = context.getString(R.string.gallery_default_file_name)
     var size = -1L
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
         val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -506,7 +506,9 @@ private fun fileLabel(context: android.content.Context, uri: Uri): String {
             if (sizeIdx >= 0) size = cursor.getLong(sizeIdx)
         }
     }
-    val sizeLabel = if (size > 0) " · %.1f MB".format(size / 1024f / 1024f) else ""
+    val sizeLabel = if (size > 0) {
+        context.getString(R.string.gallery_file_size_suffix, size / 1024f / 1024f)
+    } else ""
     return "$name$sizeLabel"
 }
 
