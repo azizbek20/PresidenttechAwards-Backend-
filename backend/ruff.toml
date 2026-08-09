@@ -1,0 +1,19 @@
+# Frozen lint contract (orchestrator, Phase 0 follow-up).
+#
+# SPEC.md §4.1 pins `ruff` UNVERSIONED in requirements-dev.txt, so the rule set
+# would otherwise be whatever the installed release defaults to. ruff 0.16.2
+# reports 8 findings against the pristine frozen kit (UP037 on the frozen
+# `-> "Patient"` annotation, UP045, RUF100, BLE001) — i.e. every agent's
+# `ruff check` DoD command fails on files they are forbidden to edit.
+#
+# Selecting explicitly makes the gate deterministic across ruff versions.
+# This is ruff's classic default set: pycodestyle errors + pyflakes.
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
+
+[lint.per-file-ignores]
+# Tests may shadow builtins / use fixtures that read as unused arguments.
+"tests/**" = ["F811"]
