@@ -68,14 +68,17 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       refleks testi flash bilan olingan suratda ancha ishonchli). Faqat
       surat olish payti bir marta yonadi (doimiy torch emas) — shu tarzda
       batareya/qizib ketishdan saqlanadi.
-- [ ] `imageCapture.takePicture`ning `onError` holatida foydalanuvchiga xato
-      ko'rsatish, natija ekraniga o'tmaslik (hozir xato bo'lsa ham yuborishga
-      urinadi).
-- [ ] Rasmni yuborishdan oldin siqish/kichraytirish (masalan, uzun tomoni
-      ~1500px gacha, JPEG quality ~85%) — hozir to'liq o'lchamdagi rasm
-      yuboriladi, sekin/qimmat mobil internetga mos emas.
-- [ ] Kamera ruxsati rad etilganda tushuntirish + "Sozlamalarga o'tish"
-      tugmasi (hozir faqat statik matn).
+- [x] `imageCapture.takePicture`ning `onError` holatida foydalanuvchiga xato
+      ko'rsatiladi (`CameraScreen.kt` — `captureError` holati, `WarningBanner`
+      + `camera_capture_error` matni), fayl o'chiriladi va natija ekraniga
+      o'tilmaydi — foydalanuvchi qayta bosishi kerak.
+- [x] Rasmni yuborishdan oldin siqish/kichraytirish qo'shildi:
+      `vision/BitmapLoader.compressForUpload()` (uzun tomoni ~1500px gacha,
+      JPEG quality ~85%) `ScreeningViewModel`da yuborishdan oldin chaqiriladi;
+      birlik testlar bilan qoplangan (`BitmapLoaderTest`).
+- [x] Kamera ruxsati rad etilganda tushuntirish matni + "Sozlamalarga o'tish"
+      tugmasi qo'shildi (`CameraScreen.kt` — `camera_open_settings`,
+      `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`ga olib boradi).
 
 ## 3. Tarmoq va ishonchlilik 🟡
 
