@@ -123,39 +123,37 @@ EYE_API_KEY=demo123 uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 (`docker compose up api` already publishes on all interfaces.)
 
-**Step 3 — set the API key** in `local.properties` at the repo root (this file
-is git-ignored and must stay that way):
+**Step 3 — point the app at this machine** in `local.properties` at the repo
+root (git-ignored, and it must stay that way). Both values live here; no
+tracked source needs editing:
 
 ```properties
 API_KEY=demo123
+API_BASE_URL=http://192.168.1.108:8000/
 ```
 
-**Step 4 — ⚠️ EDIT THE BASE URL. `API_BASE_URL` IS NOT READ FROM
-`local.properties`.**
+Find this machine's address with `ipconfig getifaddr en0`.
 
-This is the single most likely reason a phone test fails. Only `API_KEY` comes
-from `local.properties` (`app/build.gradle.kts:17`). The URL is **hardcoded**
-at `app/build.gradle.kts:38`:
-
-```kotlin
-buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
-```
+| target | `API_BASE_URL` |
+|---|---|
+| Emulator on this host | omit the key — the default is `http://10.0.2.2:8000/` |
+| Real phone, same Wi-Fi | `http://<THIS-MACHINE-LAN-IP>:8000/` |
+| ngrok fallback (different networks / captive Wi-Fi) | `https://xxxx.ngrok-free.app/` |
 
 `10.0.2.2` is the **Android emulator's** alias for the host loopback. On a real
-phone it resolves to nothing and every request fails. Change line 38 to this
-machine's LAN IP and rebuild:
+phone it resolves to nothing and every request fails, which is why it is only
+the fallback default.
 
-```kotlin
-buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.108:8000/\"")
-```
+⚠️ **If you tether from the phone, the laptop's address changes.** Sharing the
+phone's hotspot moves the laptop onto the hotspot's subnet and it gets a new IP
+(e.g. `192.168.1.108` → `10.104.167.232`). A stale `API_BASE_URL` is
+indistinguishable from a server outage on the phone — the badge just reads
+offline. Re-check with `ipconfig getifaddr en0` after any network change.
 
-The trailing `/` is mandatory (Retrofit `baseUrl` requirement).
-
-| target | value for line 38 |
-|---|---|
-| Emulator on this host | `http://10.0.2.2:8000/` (the default) |
-| Real phone, same Wi-Fi | `http://192.168.1.108:8000/` |
-| ngrok fallback (different networks / captive Wi-Fi) | `https://xxxx.ngrok-free.app/` |
+The value is validated at build time: it must start with `http://` or
+`https://` and end with `/` (a Retrofit `baseUrl` requirement), must not be
+quoted, and is trimmed. A bad value fails the build with a message naming
+`local.properties` rather than crashing the app at launch.
 
 **Cleartext HTTP is already allowed in the debug build** —
 `app/src/debug/res/xml/network_security_config.xml` sets
@@ -314,10 +312,12 @@ oversight; each serves an actor or a data volume that does not exist yet.
   unauthenticated because Coil sends no API key and the app persists URLs in
   Room, so short-lived tokens would break history thumbnails. Requires a
   coordinated Android change.
-* **Nullable wire fields (`PredictResponseV2`)** — the canonical schema with
-  null UNGRADABLE fields exists as an **unrouted stub** and activates only with
-  the Android nullability patch. The current non-null placeholders are a
-  versioned compatibility surface, not the permanent contract.
+* **Nullable wire fields (`PredictResponseV2`)** — **not implemented; planned.**
+  SPEC.md §9 describes it as an unrouted stub, but no such model exists in
+  `app/schemas.py` today. The intended shape is the canonical schema with null
+  UNGRADABLE fields, activated only together with the Android nullability
+  patch. The current non-null placeholders are a versioned compatibility
+  surface, not the permanent contract.
 * **SQLite → PostgreSQL** — code-portable by construction, but the migration
   *event* needs an Alembic baseline, a data migration, and the integration
   suite re-run against real Postgres. An explicit pilot gate, not a URL flip.
