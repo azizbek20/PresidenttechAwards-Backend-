@@ -116,6 +116,21 @@ def create_app() -> FastAPI:
     # validation shape the phone cannot read.
     register_handlers(app)
 
+    # ORDER MATTERS. `add_middleware` inserts at index 0, so the LAST one
+    # registered ends up OUTERMOST. The body cap is registered first precisely
+    # so CORS wraps it: registered the other way round, the 413 was emitted
+    # outside CORSMiddleware and carried no access-control-allow-origin, so a
+    # browser client saw a network failure instead of the Uzbek `detail`.
+    #
+    # C11: cap the RAW ASGI body stream, not the parsed form. `UploadFile`
+    # spools the whole upload to disk before the endpoint runs, so an
+    # in-handler cap never bounds intake. See app/core/limits.py.
+    app.add_middleware(
+        MaxBodySizeMiddleware,
+        max_bytes=settings.max_upload_bytes,
+        detail=f"Rasm hajmi juda katta — {settings.max_upload_mb} MB dan oshmasin",
+    )
+
     # Starlette's CORS middleware is app-scoped; /api/v1/* is the surface that
     # needs it and the open /static + /health probes are unharmed by it.
     app.add_middleware(
@@ -124,15 +139,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
         allow_credentials=False,
-    )
-
-    # C11: cap the RAW ASGI body stream, not the parsed form. `UploadFile`
-    # spools the whole upload to disk before the endpoint runs, so an
-    # in-handler cap never bounds intake. See app/core/limits.py.
-    app.add_middleware(
-        MaxBodySizeMiddleware,
-        max_bytes=settings.max_upload_bytes,
-        detail=f"Rasm hajmi juda katta — {settings.max_upload_mb} MB dan oshmasin",
     )
 
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_api_key)])

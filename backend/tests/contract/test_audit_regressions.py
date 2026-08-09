@@ -6,6 +6,7 @@ come back silently.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -315,6 +316,70 @@ def test_persistence_failure_is_500_in_demo_mode(
     )
     assert response.status_code == 500, response.text
     assert response.json()["error"] == "persistence_error"
+
+
+def test_shadow_never_replays_a_stored_mock_exam(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, refer_jpeg_bytes: bytes
+) -> None:
+    """C9 hole found by the closure audit: the gate sat BELOW the C14 replay.
+
+    A model-less shadow deployment sharing a database with an earlier demo run
+    replayed the stored exam and answered
+    200 {"model_version": "mock-v0", "mode": "shadow"} — a deployment with no
+    model answering as though one were loaded. Realistic because the compose
+    volume survives `down`, EYE_MODE is a .env flip, and DEDUP_WINDOW_MIN
+    reaches 1440 minutes.
+    """
+    shared = tmp_path / "shared"
+    shared.mkdir()
+
+    with contextlib.closing(build_client(monkeypatch, shared)) as gen:
+        demo = next(gen)
+        created = demo.post(
+            "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+        )
+        assert created.status_code == 200, created.text
+        assert created.json()["model_version"] == "mock-v0"
+
+    empty_models = tmp_path / "models"
+    empty_models.mkdir()
+    shadow_gen = build_client(
+        monkeypatch,
+        shared,
+        EYE_MODE="shadow",
+        EYE_MODEL_SOURCE="torch",
+        EYE_MODEL_SHA256=SHADOW_DIGEST,
+        EYE_MODEL_DIR=str(empty_models),
+    )
+    with contextlib.closing(shadow_gen) as gen:
+        shadow = next(gen)
+        replay = shadow.post(
+            "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+        )
+        assert replay.status_code == 503, replay.text
+        assert replay.json()["error"] == "model_unavailable"
+        assert "mock" not in replay.text.lower()
+
+
+def test_oversize_413_still_carries_cors_headers(small_cap_client: Any) -> None:
+    """The cap middleware must sit INSIDE CORSMiddleware.
+
+    Registered outermost, its 413 bypassed CORS entirely and a browser client
+    saw a network error instead of the Uzbek `detail`.
+    """
+    payload = b"\xff\xd8\xff" + b"\x00" * (2 * 1024 * 1024)
+    response = small_cap_client.post(
+        "/api/v1/predict",
+        content=payload,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "Origin": "https://example.com",
+        },
+    )
+    assert response.status_code == 413, response.status_code
+    assert response.headers.get("access-control-allow-origin") == "*", dict(
+        response.headers
+    )
 
 
 def test_persistence_failure_is_500_in_shadow_mode(

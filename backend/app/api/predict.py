@@ -248,6 +248,26 @@ async def predict(
     if img is None:
         raise ApiError(400, "invalid_image", _D_INVALID_IMAGE)
 
+    # ---- 3c. C9 gate: refuse before ANY state is read or written ---------
+    # §4.9: "predict returns 503 model_unavailable — it never serves mock
+    # output." This must sit ABOVE the replay in 3b, not merely outside the
+    # `report.ok` branch below. A model-less shadow deployment sharing a
+    # database with an earlier demo run would otherwise REPLAY a stored
+    # mock-v0 exam: verified reachable end-to-end, returning
+    # 200 {"model_version": "mock-v0", "mode": "shadow"} — precisely the
+    # "answering as though a model were loaded" that C9 forbids. It is a
+    # realistic configuration because the compose volume survives `down`,
+    # EYE_MODE is a .env flip, and DEDUP_WINDOW_MIN reaches 1440 minutes.
+    #
+    # Placing it here (after decode, before dedup and before step 4's write)
+    # also means a refused request stores no orphan original on disk.
+    # A payload that is not an image at all still gets 400 from step 3: that
+    # needs no model to reject and produces no verdict, so C9's harm cannot
+    # occur.
+    engine = engine_for(request.app)
+    if not getattr(engine, "model_loaded", False):
+        raise ApiError(503, "model_unavailable", _D_MODEL)
+
     # ---- 3b. dedup / idempotency (C14) -----------------------------------
     content_sha256 = hashlib.sha256(raw).hexdigest()
     idempotency_key = request.headers.get("Idempotency-Key")
@@ -275,17 +295,7 @@ async def predict(
     # ---- 6. inference, only when the gate passed -------------------------
     pred = None
     tensor = None
-    engine = engine_for(request.app)
-
-    # C9 / §4.9: an engine without a verified artifact refuses the request
-    # OUTRIGHT — "predict returns 503 model_unavailable". This check must sit
-    # OUTSIDE the `report.ok` branch: when it lived inside, a blurry image in
-    # shadow mode skipped it and came back 200 UNGRADABLE carrying
-    # model_version="mock-v0" and mode="shadow" — a model-less deployment
-    # answering as though a model were loaded.
-    if not getattr(engine, "model_loaded", False):
-        raise ApiError(503, "model_unavailable", _D_MODEL)
-
+    # The C9 gate ran at 3c, before dedup and before anything was written.
     if report.ok:
         try:
             tensor = await run_in_threadpool(

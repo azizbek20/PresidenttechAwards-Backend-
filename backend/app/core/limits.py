@@ -95,6 +95,14 @@ class MaxBodySizeMiddleware:
 
         if exceeded and not forwarded:
             await self._reject(send)
+        elif exceeded and forwarded:
+            # The app had already begun streaming a response before the cap
+            # tripped, so a 413 can no longer be substituted. Close the body
+            # cleanly instead of silently dropping the remaining chunks and
+            # leaving the connection open forever. No route in this app streams
+            # a response while still reading its request body, so this is a
+            # guard rather than a live path.
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def _reject(self, send: Any) -> None:
         body = json.dumps(
