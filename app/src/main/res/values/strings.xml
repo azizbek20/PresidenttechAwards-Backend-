@@ -121,6 +121,14 @@
     <string name="error_https_required">Xavfsiz ulanish (HTTPS) talab qilinadi, lekin server manzili buni qo\'llab-quvvatlamaydi. Administrator bilan bog\'laning.</string>
     <string name="error_unknown">Noma\'lum xato</string>
     <string name="error_cannot_read_image">Rasmni o\'qib bo\'lmadi</string>
+    <string name="error_bad_request">Rasm formati yoki hajmi noto\'g\'ri. Boshqa surat bilan urinib ko\'ring.</string>
+    <string name="error_unauthorized">Ruxsat rad etildi. Administrator bilan bog\'laning.</string>
+    <string name="error_not_found">Server manzili topilmadi. Sozlamalarni tekshiring.</string>
+    <string name="error_too_many_requests">Juda ko\'p so\'rov yuborildi. Bir oz kutib, qayta urinib ko\'ring.</string>
+    <string name="error_server">Serverda xatolik yuz berdi. Birozdan keyin qayta urinib ko\'ring.</string>
+    <string name="error_http_generic">Server xatosi (kod %1$d). Qayta urinib ko\'ring.</string>
+    <string name="error_retry_unavailable">Qayta urinib bo\'lmadi — rasm topilmadi. Iltimos, qaytadan suratga oling.</string>
+    <string name="loading_uploading_percent">Yuklanmoqda: %1$d%%</string>
 
     <!-- Ko\'z mashqlari menyusi -->
     <string name="eyecare_menu_title">Ko\'z mashqlari</string>

@@ -96,16 +96,21 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
     }
     val current = backStack.last()
 
-    fun push(s: Screen) { backStack.add(s) }
-    fun pop(): Boolean =
-        if (backStack.size > 1) { backStack.removeAt(backStack.lastIndex); true } else false
-    fun resetTo(vararg s: Screen) { backStack.clear(); backStack.addAll(s) }
-
-    BackHandler(enabled = backStack.size > 1) { pop() }
-
     val uiState by vm.uiState.collectAsState()
     val localHeuristic by vm.localHeuristic.collectAsState()
     val symmetry by vm.symmetry.collectAsState()
+    val uploadProgress by vm.uploadProgress.collectAsState()
+
+    fun push(s: Screen) { backStack.add(s) }
+    // Natija ekranida so'rov hali ketayotgan bo'lsa (Loading), orqaga qaytishdan oldin
+    // uni bekor qiladi — aks holda foydalanuvchi chiqib ketsa ham so'rov fonda davom etardi.
+    fun pop(): Boolean {
+        if (current == Screen.Result && uiState is UiState.Loading) vm.cancelUpload()
+        return if (backStack.size > 1) { backStack.removeAt(backStack.lastIndex); true } else false
+    }
+    fun resetTo(vararg s: Screen) { backStack.clear(); backStack.addAll(s) }
+
+    BackHandler(enabled = backStack.size > 1) { pop() }
 
     when (current) {
         Screen.Home -> HomeScreen(
@@ -126,10 +131,20 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
             uiState = uiState,
             localHeuristic = localHeuristic,
             symmetry = symmetry,
+            uploadProgress = uploadProgress,
             onRetry = {
-                vm.reset()
-                pop()
+                // Tarmoq/server xatosi va rasm hali saqlangan bo'lsa — qayta suratga
+                // olmasdan xuddi shu rasmni qaytadan yuboradi. Aks holda (masalan,
+                // UNGRADABLE natija) kameraga qaytib qayta suratga olish so'raladi.
+                val s = uiState
+                if (s is UiState.Error && s.canRetry) {
+                    vm.retry()
+                } else {
+                    vm.reset()
+                    pop()
+                }
             },
+            onCancelUpload = { pop() },
             onNewPatient = {
                 vm.reset()
                 resetTo(Screen.Home, Screen.Patient)

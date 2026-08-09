@@ -10,8 +10,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -23,6 +25,8 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import retrofit2.HttpException
+import retrofit2.Response
 import java.io.File
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -92,6 +96,28 @@ class ScreeningViewModelTest {
         ): PredictResponse = respond()
     }
 
+    /** Har chaqiruvda ro'yxatdagi keyingi xatti-harakatni qaytaradi ([retry] testlari
+     * uchun — masalan, birinchi urinish xato, ikkinchisi muvaffaqiyatli). */
+    private class SequencedFakeApiService(private vararg val behaviors: suspend () -> PredictResponse) : ApiService {
+        var callCount = 0
+            private set
+
+        override suspend fun predict(
+            file: MultipartBody.Part,
+            patientId: RequestBody?,
+            eye: RequestBody?,
+        ): PredictResponse {
+            val behavior = behaviors[callCount.coerceAtMost(behaviors.size - 1)]
+            callCount++
+            return behavior()
+        }
+    }
+
+    private fun httpException(code: Int, body: String? = null): HttpException {
+        val responseBody = (body ?: "").toResponseBody("application/json".toMediaTypeOrNull())
+        return HttpException(Response.error<Any>(code, responseBody))
+    }
+
     /** `uiState` hali `Loading`ligicha qolsa, alohida (real) threadda ishlayotgan
      * `Dispatchers.Default` ishi tugashini kutib, qisqa muddat so'rovlar bilan tekshiradi. */
     private fun awaitTerminalState(vm: ScreeningViewModel, timeoutMs: Long = 3_000): UiState {
@@ -138,13 +164,129 @@ class ScreeningViewModelTest {
     }
 
     @Test
-    fun `uploadFile deletes the temp file even when the request fails`() {
+    fun `uploadFile keeps the temp file when the request fails, so retry can resend it`() {
         val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("boom") })
         val file = newFile()
 
         vm.uploadFile(file)
-        awaitTerminalState(vm)
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertTrue("Error state should allow retry when the source photo is still on disk", (state as UiState.Error).canRetry)
+        assertTrue("temp file must survive a failed upload for retry to work", file.exists())
+    }
+
+    @Test
+    fun `retry resends the same file without the caller retaking a photo`() {
+        val api = SequencedFakeApiService(
+            { throw java.net.SocketTimeoutException("first attempt times out") },
+            { sampleResponse() },
+        )
+        val vm = ScreeningViewModel(app(), api)
+        val file = newFile()
+
+        vm.uploadFile(file)
+        val failed = awaitTerminalState(vm)
+        assertTrue(failed is UiState.Error)
+        assertTrue(file.exists())
+
+        vm.retry()
+        val succeeded = awaitTerminalState(vm)
+
+        assertTrue(succeeded is UiState.Success)
+        assertEquals(2, api.callCount)
         awaitFileDeleted(file)
+    }
+
+    @Test
+    fun `retry is a no-op when there is no pending upload source`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() })
+
+        vm.retry()
+
+        assertEquals(UiState.Idle, vm.uiState.value)
+    }
+
+    @Test
+    fun `cancelUpload deletes the pending file and returns to Idle`() {
+        val gate = CompletableDeferred<Unit>()
+        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() })
+        val file = newFile()
+
+        vm.uploadFile(file)
+        assertEquals(UiState.Loading, vm.uiState.value)
+
+        vm.cancelUpload()
+
+        assertEquals(UiState.Idle, vm.uiState.value)
+        awaitFileDeleted(file)
+        // Bekor qilingandan keyin so'nggi manba tozalangan -- qayta urinish endi hech narsa qilmaydi.
+        vm.retry()
+        assertEquals(UiState.Idle, vm.uiState.value)
+    }
+
+    @Test
+    fun `uploadFile maps a 422 HttpException body detail when present`() {
+        val vm = ScreeningViewModel(app(), FakeApiService {
+            throw httpException(422, """{"detail":"Rasm juda xira"}""")
+        })
+
+        vm.uploadFile(newFile())
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertEquals("Rasm juda xira", (state as UiState.Error).message)
+    }
+
+    @Test
+    fun `uploadFile maps a 404 HttpException without a detail body to the not-found message`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(404) })
+
+        vm.uploadFile(newFile())
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertEquals(app().getString(R.string.error_not_found), (state as UiState.Error).message)
+    }
+
+    @Test
+    fun `uploadFile maps a 5xx HttpException to the server error message`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(503) })
+
+        vm.uploadFile(newFile())
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertEquals(app().getString(R.string.error_server), (state as UiState.Error).message)
+    }
+
+    @Test
+    fun `uploadFile maps an unmapped HttpException code to the generic http message with the code`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(418) })
+
+        vm.uploadFile(newFile())
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertEquals(app().getString(R.string.error_http_generic, 418), (state as UiState.Error).message)
+    }
+
+    @Test
+    fun `checkBackendHealth reflects the injected health check result`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { true })
+
+        vm.checkBackendHealth()
+
+        assertEquals(true, vm.backendOnline.value)
+    }
+
+    @Test
+    fun `checkBackendHealth reports offline when the health check fails`() {
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { throw java.io.IOException("down") })
+
+        vm.checkBackendHealth()
+
+        assertEquals(false, vm.backendOnline.value)
     }
 
     @Test

@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -465,21 +466,35 @@ fun WarningBanner(text: String) {
 //  HOLAT EKRANLARI
 // =====================================================================
 
-/** Yuklanish + progress qadamlari (6-hujjat, 6.C). */
+/** Yuklanish + progress qadamlari (6-hujjat, 6.C). [progress] (0f..1f) haqiqiy multipart
+ * yuklash ulushi bo'lsa (hali 1f'ga yetmagan), 0-qadam aniq foizni ko'rsatadi; bayt darajasida
+ * bundan keyingi bosqichlar (sifat/tahlil/tayyorlash) backend tomonidan alohida signal
+ * yuborilmagani uchun bilinmaydi, shu sababli yuklash tugagach umumiy spinner ko'rsatiladi. */
 @Composable
-fun LoadingState(activeStep: Int = 2, onCancel: (() -> Unit)? = null) {
+fun LoadingState(progress: Float? = null, onCancel: (() -> Unit)? = null) {
     val steps = listOf(
         stringResource(R.string.loading_step_uploaded),
         stringResource(R.string.loading_step_quality),
         stringResource(R.string.loading_step_analyzing),
         stringResource(R.string.loading_step_preparing),
     )
+    val uploading = progress != null && progress < 1f
+    val activeStep = if (uploading) 0 else 2
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
     ) {
-        CircularProgressIndicator()
+        if (uploading) {
+            LinearProgressIndicator(progress = { progress!! }, modifier = Modifier.fillMaxWidth())
+            Text(
+                stringResource(R.string.loading_uploading_percent, (progress!! * 100).toInt()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            CircularProgressIndicator()
+        }
         Text(stringResource(R.string.loading_title), style = MaterialTheme.typography.titleMedium)
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             steps.forEachIndexed { i, label ->

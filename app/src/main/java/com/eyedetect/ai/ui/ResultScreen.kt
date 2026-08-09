@@ -43,12 +43,14 @@ fun ResultScreen(
     uiState: UiState,
     localHeuristic: PupilHeuristicResult?,
     symmetry: EyeSymmetryUiState?,
+    uploadProgress: Float? = null,
     onRetry: () -> Unit,
+    onCancelUpload: (() -> Unit)? = null,
     onNewPatient: () -> Unit,
 ) {
     when (uiState) {
         is UiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LoadingState()
+            LoadingState(progress = uploadProgress, onCancel = onCancelUpload)
         }
 
         is UiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
