@@ -13,7 +13,7 @@ android/
 ├── build.gradle.kts                 # root plaginlar
 ├── gradle.properties
 └── app/
-    ├── build.gradle.kts             # <-- API_BASE_URL SHU YERDA sozlanadi
+    ├── build.gradle.kts             # <-- API_BASE_URL local.properties'dan o'qiladi
     ├── proguard-rules.pro
     └── src/main/
         ├── AndroidManifest.xml      # CAMERA + INTERNET ruxsatlari
@@ -37,14 +37,20 @@ android/
    Studio Gradle wrapper va SDK'larni avtomatik sozlaydi/yuklaydi.
    *(CLI'da qurish uchun avval `gradle wrapper` bilan wrapper yarating.)*
 
-2. **Backend manzilini sozlang** — `app/build.gradle.kts` ichida:
-   ```kotlin
-   buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+2. **Backend manzilini sozlang** — `local.properties` (repo ildizida, git'ga
+   kirmaydi). Kodni tahrirlash SHART EMAS:
+   ```properties
+   API_KEY=demo123
+   API_BASE_URL=http://<NOUTBUK-LAN-IP>:8000/
    ```
-   - Emulyator (host'dagi backend): `http://10.0.2.2:8000/`
-   - Real telefon (bir Wi-Fi): `http://<NOUTBUK-LAN-IP>:8000/`
+   - Emulyator (host'dagi backend): kalitni yozmang — standart `http://10.0.2.2:8000/`
+   - Real telefon (bir Wi-Fi): `http://<NOUTBUK-LAN-IP>:8000/` (`ipconfig getifaddr en0`)
    - ngrok: `https://xxxx.ngrok-free.app/`
-   > Oxirida `/` bo'lishi SHART. `http://` uchun manifestda `usesCleartextTraffic=true` yoqilgan.
+   > Oxirida `/` bo'lishi SHART — qiymat qurish paytida tekshiriladi.
+   > Cleartext `http://` faqat **debug** buildda ruxsat etilgan
+   > (`app/src/debug/res/xml/network_security_config.xml`); asosiy manifestda
+   > `usesCleartextTraffic="false"`, ya'ni release build HTTPS talab qiladi.
+   > Telefondan hotspot ulashsangiz noutbuk IP'si o'zgaradi — qayta tekshiring.
 
 3. **Sync + Run** — real qurilmada (kamera bor) ishga tushiring.
    Emulyatorda kamera cheklangan — **galereya zaxira rejimi**ni ishlating.

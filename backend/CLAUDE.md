@@ -40,6 +40,11 @@ untested success. When blocked → finish what is unblocked, report the blocker.
 # environment (Python 3.11)
 python3.11 -m venv venv && source venv/bin/activate
 pip install -r requirements-torch.txt && pip install -r requirements-dev.txt
+# MANDATORY: grad-cam depends on opencv-python (the GUI build), which overwrites
+# opencv-python-headless's cv2 directory. In a container the GUI build dies on
+# `import cv2` with libGL.so.1 not found. Restore the pinned headless build:
+pip uninstall -y opencv-python && \
+  pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
 
 # the default suite (what every gate runs)
 pytest -q -m "not model and not perf"

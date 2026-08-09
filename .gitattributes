@@ -1,0 +1,16 @@
+# The Gradle wrapper script must keep LF endings: CRLF makes the shebang
+# unusable and `./gradlew` fails with a confusing "bad interpreter" error on
+# macOS/Linux after a checkout on Windows. Its executable bit is carried by the
+# index mode (100755) — see the commit that restored it.
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Windows batch launcher genuinely wants CRLF.
+gradlew.bat text eol=crlf
+
+# Never mangle binaries.
+*.jar binary
+*.png binary
+*.jpg binary
+*.apk binary
+*.dex binary

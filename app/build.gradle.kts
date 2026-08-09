@@ -22,8 +22,34 @@ val releaseApiUrl: String = localProperties.getProperty("RELEASE_API_URL") ?: ""
 // change: the previous hardcoded value meant every network change required
 // editing tracked code and rebuilding, and a stale address looks exactly like a
 // server outage from the phone. Default stays the emulator loopback.
+// Validated at CONFIGURATION time so a bad value fails the build with a message
+// naming local.properties, instead of failing the app at launch. `?:` alone was
+// not enough: Properties.getProperty returns "" for a present-but-empty key, so
+// `API_BASE_URL=` silently shipped an empty baseUrl and crashed MainActivity on
+// first composition. Properties also preserves TRAILING whitespace, and a
+// trailing space is the nastiest case of all — /predict still works while every
+// Grad-CAM and original image 404s, because Coil resolves the relative
+// /static/... path against a corrupted base.
 val debugApiUrl: String =
-    localProperties.getProperty("API_BASE_URL") ?: "http://10.0.2.2:8000/"
+    (localProperties.getProperty("API_BASE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "http://10.0.2.2:8000/")
+        .also { url ->
+            require(url.startsWith("http://") || url.startsWith("https://")) {
+                "local.properties: API_BASE_URL must start with http:// or https:// — got \"$url\""
+            }
+            // The value is interpolated verbatim into generated Java by
+            // buildConfigField, so a stray quote or backslash produces
+            // uncompilable source with an error that never mentions
+            // local.properties. Reject it here instead.
+            require(!url.contains('"') && !url.contains('\\')) {
+                "local.properties: API_BASE_URL must not contain quotes or backslashes — " +
+                    "write it unquoted, e.g. API_BASE_URL=http://192.168.1.10:8000/ — got \"$url\""
+            }
+            require(url.endsWith("/")) {
+                "local.properties: API_BASE_URL must end with '/' (Retrofit baseUrl requirement) " +
+                    "— got \"$url\""
+            }
+        }
 
 android {
     namespace = "com.eyedetect.ai"
