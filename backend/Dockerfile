@@ -100,7 +100,7 @@ COPY scripts/ ./scripts/
 # read-only models bind and the storage volume both work without a chown at
 # container start.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin eyeapp && \
-    mkdir -p /app/storage/images /app/storage/heatmaps /app/models && \
+    mkdir -p /app/storage/images /app/storage/heatmaps /app/models /app/data && \
     chown -R 10001:10001 /app
 
 USER 10001

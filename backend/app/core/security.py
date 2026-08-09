@@ -44,9 +44,17 @@ def verify_api_key(provided: str | None, expected: str | None) -> bool:
     # Compare BYTES, not str: secrets.compare_digest rejects non-ASCII str with
     # TypeError, so a header like "Cyrillic-а" crashed the dependency and the
     # generic handler turned a wrong key into 500 inference_error instead of
-    # 401 unauthorized. Encoding first keeps the comparison constant-time and
-    # makes every malformed key a clean 401.
-    return compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+    # 401 unauthorized.
+    #
+    # The two sides need DIFFERENT codecs, which is not symmetric-looking but is
+    # correct. `provided` came off the wire and Starlette decodes header bytes
+    # as latin-1, so encoding it back with latin-1 recovers the client's
+    # original bytes. `expected` is a real str from the environment, so it
+    # encodes as utf-8. Using utf-8 on both looked tidier but meant a CORRECT
+    # non-ASCII key arrived as latin-1 mojibake, re-encoded to different bytes
+    # and 401'd forever — a silent, unlogged lockout, worse than the 500 it
+    # replaced. For ASCII keys the two encodings are byte-identical.
+    return compare_digest(provided.encode("latin-1", "ignore"), expected.encode("utf-8"))
 
 
 def warn_if_unprotected(expected: str | None) -> None:

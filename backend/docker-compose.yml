@@ -40,7 +40,7 @@ x-eye-env: &eye-env
   # was being overridden: the DB landed in the container layer and every exam
   # row was destroyed by `compose down` while images survived on the volume as
   # orphans. The admin panel — step 5 of the demo — came back empty.
-  DATABASE_URL: sqlite:////app/storage/eye.db
+  DATABASE_URL: sqlite:////app/data/eye.db
 
 services:
   api:
@@ -57,6 +57,11 @@ services:
       # Weights are delivered air-gapped and are never written by the app.
       - ./models:/app/models:ro
       - eye-storage:/app/storage
+      # The database gets its OWN volume, deliberately NOT under /app/storage:
+      # /static serves media unauthenticated (C6, Coil sends no key), and a
+      # SQLite file inside that tree was downloadable as GET /static/eye.db —
+      # the whole patient database, while /api/v1/exams correctly returned 401.
+      - eye-db:/app/data
     # Inherits the image HEALTHCHECK (/health/ready). Declared here too so the
     # admin service can depend on readiness rather than on "process started".
     healthcheck:
@@ -141,4 +146,5 @@ services:
 
 volumes:
   eye-storage:
+  eye-db:
   eye-pgdata:
