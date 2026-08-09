@@ -22,7 +22,7 @@ import com.eyedetect.ai.ui.theme.Spacing
  * bo'limiga o'tishni tanlaydi.
  */
 @Composable
-fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit) {
+fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -58,6 +58,12 @@ fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit) {
             subtitle = stringResource(R.string.home_eyecare_subtitle),
             emoji = "🧘",
             onClick = onEyeCare,
+        )
+        MenuCard(
+            title = stringResource(R.string.home_history_title),
+            subtitle = stringResource(R.string.home_history_subtitle),
+            emoji = "🗂️",
+            onClick = onHistory,
         )
     }
 }

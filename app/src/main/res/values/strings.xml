@@ -27,6 +27,8 @@
     <string name="home_screening_subtitle">Ko\'z tubi rasmi orqali DR skrining</string>
     <string name="home_eyecare_title">Ko\'z mashqlari</string>
     <string name="home_eyecare_subtitle">Charchashni kamaytiruvchi mashqlar va eslatmalar</string>
+    <string name="home_history_title">Tarix</string>
+    <string name="home_history_subtitle">O\'tgan skrininglar natijalari</string>
 
     <!-- Bemor ekrani -->
     <string name="patient_subtitle">DR skrining · yangi tekshiruv</string>
@@ -45,6 +47,9 @@
     <string name="camera_center_guide">🟡 Retinani doira ichiga markazlang</string>
     <string name="camera_pick_gallery">🖼️ Galereyadan tanlash (zaxira)</string>
     <string name="camera_shutter_content_desc">Rasm olish</string>
+    <string name="camera_flash_on">Flash: yoqilgan</string>
+    <string name="camera_flash_auto">Flash: avto</string>
+    <string name="camera_flash_off">Flash: o\'chiq</string>
     <string name="gallery_pick_title">Rasmni tanlang</string>
     <string name="gallery_pick_info">%1$d ta rasm topildi — tahlil uchun eng aniq va yorug\'ini tanlang.</string>
     <string name="gallery_pick_confirm">Tanlangan rasmni yuklash</string>
@@ -52,6 +57,7 @@
     <string name="capture_review_title">Rasm yaxshimi?</string>
     <string name="capture_review_body">Fokus, yorug\'lik va markazlashuvni tekshiring. Ishonchingiz komil bo\'lsa yuboring.</string>
     <string name="capture_review_confirm">Yuborish ✓</string>
+    <string name="capture_review_quality_warning">Fokus yoki yorug\'lik past bo\'lishi mumkin — aniqroq natija uchun qayta suratga olish tavsiya etiladi.</string>
 
     <!-- Natija ekrani -->
     <string name="result_none">Natija yo\'q.</string>
@@ -66,6 +72,22 @@
     <string name="result_image_quality">Rasm sifati</string>
     <string name="result_patient_eye">Bemor / ko\'z</string>
     <string name="result_model">Model</string>
+    <string name="result_local_heuristic_title">Mahalliy dastlabki ko\'rsatkich</string>
+    <string name="result_local_heuristic_disclaimer">Qurilmada hisoblangan oddiy rang tahlili — tashxis emas, faqat qo\'shimcha ko\'rsatkich. Yakuniy xulosa uchun yuqoridagi natijaga tayaning.</string>
+    <string name="result_local_opacity">Xiralik (opacity)</string>
+    <string name="result_local_red_reflex">Qizil refleks</string>
+    <string name="result_local_no_region">Ko\'z hududi aniq topilmadi — kadr markazi taxminan tahlil qilindi.</string>
+    <string name="result_symmetry_title">Ikki ko\'z simmetriyasi</string>
+    <string name="result_symmetry_disclaimer">Joriy ko\'z qarshi ko\'zning oldingi natijasi bilan solishtirildi — sezilarli farq alohida e\'tibor talab qilishi mumkin. Tashxis emas.</string>
+    <string name="result_symmetry_row">Simmetriya</string>
+    <string name="result_symmetry_compared_with">Solishtirildi: %1$s ko\'z, %2$s</string>
+
+    <!-- Tarix ekrani -->
+    <string name="history_title">Skrininglar tarixi</string>
+    <string name="history_empty">Hali hech qanday skrining saqlanmagan.</string>
+    <string name="history_delete_content_desc">Yozuvni o\'chirish</string>
+    <string name="history_patient_eye_row">Bemor / ko\'z: %1$s · %2$s</string>
+    <string name="history_local_heuristic_row">Mahalliy: xiralik — %1$s, qizil refleks — %2$s</string>
     <string name="result_heatmap_title">SI qayerga qaradi (issiqlik xaritasi)</string>
     <string name="result_original_image">Asl rasm</string>
     <string name="result_original_image_content_desc">Asl fundus rasm</string>

@@ -27,11 +27,41 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot. Hozir bular himoyasiz.
 
 ## 2. Kamera va sifat nazorati 🔴
 
-- [ ] `QualityPanel`dagi fokus/yorug'lik/joylashuv qiymatlarini haqiqiy
-      qilish: CameraX `ImageAnalysis` + Laplasian variansi orqali fokus,
-      histogram orqali yorug'lik (README'da ham "keyingi qadam" deb
-      belgilangan, hozir `CameraScreen.kt`da qattiq kodlangan
-      `GOOD/WARN/GOOD` qiymatlar).
+- [x] `QualityPanel`dagi fokus/yorug'lik qiymatlarini haqiqiy qilish:
+      CameraX `ImageAnalysis` + Laplasian variansi orqali fokus, histogram
+      o'rtacha yorqinligi orqali yorug'lik (`vision/FrameQualityAnalyzer.kt`,
+      `CameraScreen.kt`ga ulandi). Chegaralar taxminiy kalibrlangan — haqiqiy
+      qurilmalarda sinovdan so'ng sozlash kerak. Sifat past bo'lsa
+      (`BAD`), rasm olingach ko'rib chiqish varag'ida ogohlantirish
+      chiqadi (qat'iy bloklanmaydi — qayta olishga undaydi).
+- [x] `QualityPanel`dagi "joylashuv" (ko'z markazdami) endi ML Kit
+      `FaceDetector` orqali real: tanlangan ko'z (`vm.eye`ga mos
+      `LEFT_EYE`/`RIGHT_EYE` landmarki) kadr markaziga qanchalik yaqinligi
+      hisoblanadi (`vision/EyeDetectionAnalyzer.kt`). Hali qilinmagan:
+      - Yuz umuman aniqlanmasa (masalan juda yaqin makro surat, faqat
+        ko'z to'ldirilgan kadr) landmark topilmaydi — hozircha `WARN`
+        qaytariladi, iris-darajasidagi to'g'ridan-to'g'ri aniqlash (yuzsiz)
+        keyingi bosqich.
+      - Old kamera bilan o'z-o'zini suratga olishda chap/o'ng ko'z
+        moslashuvi oyna-effektiga qarab tekshirilmagan (hozir orqa
+        kamera ishlatiladi).
+- [x] Mahalliy CV evristikasi (xiralik/opacity + qizil refleks) qo'shildi:
+      olingan surat ustida `vision/PupilHeuristics.kt` ML Kit (aniq rejim)
+      bilan ko'z hududini topib, eng qorong'i piksellarning rangini (HSV)
+      tahlil qiladi — normal qorachiq qop-qora, oqarish/kulranglashish
+      xiralik belgisi, qizg'ish aks esa normal qizil refleks hisoblanadi.
+      Natija `ResultScreen`da backend natijasidan alohida, aniq
+      "tashxis emas" ogohlantirishi bilan ko'rsatiladi (`ScreeningViewModel`
+      `localHeuristic` oqimi, `EyeComponents.kt` `PupilHeuristicCard`).
+      Hali qilinmagan:
+      - Ikki ko'z simmetriyasi endi qo'shildi — pastga qarang (4-band,
+        Room ustiga qurilgan).
+- [x] Flash boshqaruvi qo'shildi: `CameraScreen.kt`da yuqori chapdagi chip
+      orqali YOQILGAN/AVTO/O'CHIQ o'rtasida almashtirish mumkin
+      (`ImageCapture.flashMode`, standart holat — YOQILGAN, chunki qizil
+      refleks testi flash bilan olingan suratda ancha ishonchli). Faqat
+      surat olish payti bir marta yonadi (doimiy torch emas) — shu tarzda
+      batareya/qizib ketishdan saqlanadi.
 - [ ] `imageCapture.takePicture`ning `onError` holatida foydalanuvchiga xato
       ko'rsatish, natija ekraniga o'tmaslik (hozir xato bo'lsa ham yuborishga
       urinadi).
@@ -56,13 +86,53 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot. Hozir bular himoyasiz.
 
 ## 4. Ma'lumotlarni saqlash (offline) 🟡
 
-README'da ham belgilangan, hali boshlanmagan:
-
-- [ ] Room DB: o'tgan skrininglar tarixini (bemor ID, ko'z, natija, sana)
-      lokal saqlash.
+- [x] Room DB qo'shildi: har bir muvaffaqiyatli skrining natijasi (`examId`,
+      `patientId`, `eye`, `decision`/`decisionText`, `icdrGrade`/`gradeLabel`,
+      `probability`, `quality`, `imageUrl`/`heatmapUrl`, mavjud bo'lsa
+      mahalliy `localOpacity`/`localRedReflex`, `processedAt`) avtomatik
+      saqlanadi (`data/history/` — `ScreeningHistoryEntity`,
+      `ScreeningHistoryDao`, `ScreeningHistoryDatabase`,
+      `ScreeningHistoryRepository`; `ScreeningViewModel.doRequest()`da
+      backend javobi kelgach chaqiriladi, xato bo'lsa jim o'tkazib
+      yuboriladi — tarix ixtiyoriy, asosiy oqim uchun kritik emas).
+      Room `kapt` orqali ishlaydi (KSP emas) — Kotlin 2.2.10 bilan;
+      diqqat: Room **2.6.1** kapt annotatsiya protsessori Kotlin 2.2
+      metadata (v2.2.0) formatini o'qiy olmaydi ("maximum supported
+      version is 2.0.0" xatosi berardi), shu sababli **2.7.1**ga
+      ko'tarildi — kelajakda Kotlin versiyasi yana oshsa, Room versiyasini
+      ham birga yangilash kerak bo'ladi.
+      Hali qilinmagan:
+      - Eski yozuvlarni tozalash/limitlash siyosati yo'q (masalan, N ta
+        yoki M kundan eski yozuvlarni o'chirish) — hozir cheksiz o'sadi.
+- [x] **Ikki ko'z simmetriyasini solishtirish** qo'shildi
+      (`vision/EyeSymmetryAnalyzer.kt`, klinikadagi Bruckner testi g'oyasiga
+      o'xshash): joriy ko'zning mahalliy evristika natijasi (opacity/
+      red-reflex + xom HSV qiymatlari) bemor ID bo'yicha qarshi ko'zning
+      Room'da saqlangan oxirgi natijasi bilan solishtiriladi. Bitta ko'z
+      "normal" ko'rinsa ham, ikki ko'z orasidagi sezilarli farq (masalan,
+      biri BAD, ikkinchisi emas, yoki rang farqi katta) alohida
+      ogohlantiruvchi belgi sifatida ko'rsatiladi (`ScreeningViewModel`
+      `symmetry` oqimi, `EyeSymmetryCard` — faqat bemor ID kiritilgan va
+      qarshi ko'z avval skrining qilingan bo'lsa ko'rinadi).
+      Texnik eslatma: birinchi saqlashda mahalliy evristika hali tayyor
+      bo'lmasligi mumkinligi uchun (ML Kit ACCURATE — sekinroq),
+      `ScreeningHistoryDao.updateHeuristic()` orqali keyinroq to'ldiriladi;
+      `CompletableDeferred` bilan tarix yozuvi ID'si va evristika
+      natijasi bir-biriga bog'lanadi (qaysi biri oldin tugashidan
+      qat'i nazar to'g'ri ishlashi uchun). Room sxemasi shu sababli
+      v1→v2 (`localHueDeg`/`localSaturation`/`localValue` qo'shildi,
+      `fallbackToDestructiveMigration` — loyiha hali relizga chiqmagan).
+      Hali qilinmagan: solishtirish yoshi/muddatiga chegara yo'q (masalan,
+      6 oy oldingi natija bilan solishtirilishi mumkin — foydalanuvchi
+      buni faqat ko'rsatilgan sanadan bilib oladi).
 - [ ] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
       tiklanganda avtomatik yuborish.
-- [ ] Bemor tarixini ko'rish ekrani (ixtiyoriy, agar talab qilinsa).
+- [x] Bemor tarixini ko'rish ekrani qo'shildi: Bosh ekrandan "Tarix" kartasi
+      orqali ochiladi (`ui/HistoryScreen.kt`) — barcha saqlangan
+      skrininglarni sana bo'yicha kamayish tartibida, qaror/ICDR/mahalliy
+      evristika bilan ko'rsatadi, har bir yozuvni o'chirish imkoniyati bilan.
+      Hali qilinmagan: bemor bo'yicha filtrlash/qidirish (hozir faqat
+      to'liq ro'yxat), massaviy tozalash (faqat bittalab o'chirish bor).
 
 ## 5. Holatni saqlash va navigatsiya 🟡
 

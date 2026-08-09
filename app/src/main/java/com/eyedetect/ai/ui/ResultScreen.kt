@@ -15,20 +15,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.eyedetect.ai.EyeSymmetryUiState
 import com.eyedetect.ai.R
 import com.eyedetect.ai.UiState
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.ui.components.ClinicalDetailCard
 import com.eyedetect.ai.ui.components.DisclaimerText
 import com.eyedetect.ai.ui.components.ErrorState
+import com.eyedetect.ai.ui.components.EyeSymmetryCard
 import com.eyedetect.ai.ui.components.HeatmapCard
 import com.eyedetect.ai.ui.components.LoadingState
 import com.eyedetect.ai.ui.components.PrimaryButton
+import com.eyedetect.ai.ui.components.PupilHeuristicCard
 import com.eyedetect.ai.ui.components.RecommendationCard
 import com.eyedetect.ai.ui.components.SecondaryButton
 import com.eyedetect.ai.ui.components.TrafficLightCard
 import com.eyedetect.ai.ui.components.WarningBanner
 import com.eyedetect.ai.ui.theme.Spacing
+import com.eyedetect.ai.vision.PupilHeuristicResult
 
 /**
  * 3-ekran: yuklanish / natija (svetofor + ishonch + heatmap) / xato.
@@ -37,6 +41,8 @@ import com.eyedetect.ai.ui.theme.Spacing
 @Composable
 fun ResultScreen(
     uiState: UiState,
+    localHeuristic: PupilHeuristicResult?,
+    symmetry: EyeSymmetryUiState?,
     onRetry: () -> Unit,
     onNewPatient: () -> Unit,
 ) {
@@ -49,7 +55,7 @@ fun ResultScreen(
             ErrorState(message = uiState.message, onRetry = onRetry, onNewPatient = onNewPatient)
         }
 
-        is UiState.Success -> SuccessContent(uiState.result, onRetry, onNewPatient)
+        is UiState.Success -> SuccessContent(uiState.result, localHeuristic, symmetry, onRetry, onNewPatient)
 
         UiState.Idle -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.result_none), style = MaterialTheme.typography.bodyLarge)
@@ -58,7 +64,13 @@ fun ResultScreen(
 }
 
 @Composable
-private fun SuccessContent(r: PredictResponse, onRetry: () -> Unit, onNewPatient: () -> Unit) {
+private fun SuccessContent(
+    r: PredictResponse,
+    localHeuristic: PupilHeuristicResult?,
+    symmetry: EyeSymmetryUiState?,
+    onRetry: () -> Unit,
+    onNewPatient: () -> Unit,
+) {
     val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
 
     Column(
@@ -92,6 +104,12 @@ private fun SuccessContent(r: PredictResponse, onRetry: () -> Unit, onNewPatient
 
         // 2) Klinik tafsilot
         ClinicalDetailCard(r)
+
+        // 2b) Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
+        PupilHeuristicCard(localHeuristic)
+
+        // 2c) Ikki ko'z simmetriyasi — qarshi ko'z uchun oldingi natija topilgan bo'lsa
+        EyeSymmetryCard(symmetry)
 
         // 3) Heatmap (asl + Grad-CAM)
         HeatmapCard(r)

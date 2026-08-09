@@ -4,17 +4,22 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,11 +36,18 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashAuto
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,8 +75,10 @@ import com.eyedetect.ai.ui.components.QualityPanel
 import com.eyedetect.ai.ui.components.SecondaryButton
 import com.eyedetect.ai.ui.components.ShutterButton
 import com.eyedetect.ai.ui.components.TextActionButton
+import com.eyedetect.ai.ui.components.WarningBanner
 import com.eyedetect.ai.ui.theme.Spacing
 import com.eyedetect.ai.ui.theme.TrafficGreen
+import com.eyedetect.ai.vision.EyeDetectionAnalyzer
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -72,8 +86,10 @@ import java.util.concurrent.Executors
  * 2-ekran (6-hujjat, 6.B): CameraX preview + jonli sifat yo'l-yo'riqchisi,
  * doiraviy markazlash overlay, tezkor ko'rib chiqish, va galereya zaxira rejimi.
  *
- * ESLATMA: sifat paneli (fokus/yorug'lik/joylashuv) hozircha ko'rgazmali qiymatlar bilan.
- * Keyingi qadam — CameraX ImageAnalysis + Laplasian variansi (3-hujjat 2.3) ni ulash.
+ * Fokus va yorug'lik piksel darajasida (Laplasian variansi + histogram o'rtacha
+ * yorqinligi, 3-hujjat 2.3), "joylashuv" esa ML Kit `FaceDetector` orqali —
+ * tanlangan ko'z (`vm.eye`) landmarki kadr markaziga qanchalik yaqinligidan —
+ * real-vaqtda hisoblanadi ([EyeDetectionAnalyzer], PLAN.md 2-band).
  */
 @Composable
 fun CameraScreen(
@@ -91,10 +107,55 @@ fun CameraScreen(
                 == PackageManager.PERMISSION_GRANTED
         )
     }
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    // Flash: qizil refleks testi uchun muhim (5-hujjat) — sog'lom to'r pardadan qizg'ish
+    // aks yaqindan turib flash bilan yoritilganda ancha ishonchli ko'rinadi. Standart
+    // holat YOQILGAN qilib belgilangan, foydalanuvchi pastdagi tugma bilan almashtira oladi.
+    var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_ON) }
+    val imageCapture = remember { ImageCapture.Builder().setFlashMode(flashMode).build() }
+    LaunchedEffect(flashMode) { imageCapture.flashMode = flashMode }
+
+    // Real-vaqt sifat tahlili: fokus, yorug'lik (piksel darajasida) + joylashuv (ML Kit)
+    var focusQuality by remember { mutableStateOf(QualityLevel.WARN) }
+    var lightQuality by remember { mutableStateOf(QualityLevel.WARN) }
+    var positionQuality by remember { mutableStateOf(QualityLevel.WARN) }
+    val imageAnalysis = remember {
+        ImageAnalysis.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        ResolutionStrategy(Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+                    )
+                    .build()
+            )
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+    }
+    val eyeDetectionAnalyzer = remember(vm.eye) {
+        EyeDetectionAnalyzer(
+            eye = vm.eye,
+            onQuality = { result ->
+                ContextCompat.getMainExecutor(context).execute {
+                    focusQuality = result.focus
+                    lightQuality = result.light
+                }
+            },
+            onEyePosition = { result ->
+                ContextCompat.getMainExecutor(context).execute {
+                    positionQuality = result.level
+                }
+            },
+        )
+    }
+    DisposableEffect(eyeDetectionAnalyzer) {
+        imageAnalysis.setAnalyzer(executor, eyeDetectionAnalyzer)
+        onDispose { eyeDetectionAnalyzer.close() }
+    }
 
     // Olingan, ammo hali yuborilmagan rasm (tezkor ko'rib chiqish uchun)
     var pendingFile by remember { mutableStateOf<File?>(null) }
+
+    // Suratga olingan payt sifat past bo'lsa, ko'rib chiqish varag'ida ogohlantirish ko'rsatiladi
+    var captureQualityWarning by remember { mutableStateOf(false) }
 
     // Galereyadan tanlangan, ammo hali tasdiqlanmagan rasmlar (grid ko'rib chiqish uchun)
     var pendingGalleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -143,7 +204,7 @@ fun CameraScreen(
                             val selector = CameraSelector.DEFAULT_BACK_CAMERA
                             try {
                                 provider.unbindAll()
-                                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+                                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
                             } catch (_: Exception) { /* demo: e'tiborsiz */ }
                         }, ContextCompat.getMainExecutor(ctx))
                         previewView
@@ -161,24 +222,37 @@ fun CameraScreen(
                 }
             }
 
-            // Ko'z tegi (yuqori chap)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(Spacing.md)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = Spacing.md, vertical = 6.dp),
+            // Ko'z tegi + flash boshqaruvi (yuqori chap)
+            Column(
+                modifier = Modifier.align(Alignment.TopStart).padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Text(stringResource(R.string.camera_eye_tag, eyeLabel), color = Color.White, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = Spacing.md, vertical = 6.dp),
+                ) {
+                    Text(stringResource(R.string.camera_eye_tag, eyeLabel), color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold)
+                }
+                FlashModeChip(
+                    flashMode = flashMode,
+                    onToggle = {
+                        flashMode = when (flashMode) {
+                            ImageCapture.FLASH_MODE_ON -> ImageCapture.FLASH_MODE_AUTO
+                            ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_OFF
+                            else -> ImageCapture.FLASH_MODE_ON
+                        }
+                    },
+                )
             }
 
-            // Sifat paneli (yuqori o'ng) — ko'rgazmali qiymatlar
+            // Sifat paneli (yuqori o'ng) — uchalasi ham real-vaqtda hisoblanadi
             QualityPanel(
-                focus = QualityLevel.GOOD,
-                light = QualityLevel.WARN,
-                position = QualityLevel.GOOD,
+                focus = focusQuality,
+                light = lightQuality,
+                position = positionQuality,
                 modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.md),
             )
 
@@ -221,6 +295,8 @@ fun CameraScreen(
                             override fun onImageSaved(results: ImageCapture.OutputFileResults) {
                                 ContextCompat.getMainExecutor(context).execute {
                                     pendingGalleryUris = emptyList()
+                                    captureQualityWarning = focusQuality == QualityLevel.BAD ||
+                                        lightQuality == QualityLevel.BAD || positionQuality == QualityLevel.BAD
                                     pendingFile = photoFile
                                 }
                             }
@@ -251,6 +327,7 @@ fun CameraScreen(
     val fileToReview = pendingFile
     if (fileToReview != null) {
         CaptureReviewSheet(
+            qualityWarning = captureQualityWarning,
             onRetake = { fileToReview.delete(); pendingFile = null },
             onConfirm = {
                 pendingFile = null
@@ -271,6 +348,28 @@ fun CameraScreen(
                 onResult()
             },
         )
+    }
+}
+
+/** Flash rejimini bosib almashtiradigan chip (YOQILGAN → AVTO → O'CHIQ → ...). */
+@Composable
+private fun FlashModeChip(flashMode: Int, onToggle: () -> Unit) {
+    val (icon, label) = when (flashMode) {
+        ImageCapture.FLASH_MODE_ON -> Icons.Filled.FlashOn to stringResource(R.string.camera_flash_on)
+        ImageCapture.FLASH_MODE_AUTO -> Icons.Filled.FlashAuto to stringResource(R.string.camera_flash_auto)
+        else -> Icons.Filled.FlashOff to stringResource(R.string.camera_flash_off)
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = Spacing.md, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        Text(label, color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -383,7 +482,7 @@ private fun fileLabel(context: android.content.Context, uri: Uri): String {
 
 /** Rasm olingach chiqadigan "Rasm yaxshimi?" tasdiq oynasi. */
 @Composable
-private fun CaptureReviewSheet(onRetake: () -> Unit, onConfirm: () -> Unit) {
+private fun CaptureReviewSheet(qualityWarning: Boolean, onRetake: () -> Unit, onConfirm: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -407,6 +506,9 @@ private fun CaptureReviewSheet(onRetake: () -> Unit, onConfirm: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            if (qualityWarning) {
+                WarningBanner(stringResource(R.string.capture_review_quality_warning))
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),

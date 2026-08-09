@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eyedetect.ai.ui.CameraScreen
+import com.eyedetect.ai.ui.HistoryScreen
 import com.eyedetect.ai.ui.HomeScreen
 import com.eyedetect.ai.ui.PatientScreen
 import com.eyedetect.ai.ui.ResultScreen
@@ -37,6 +38,7 @@ enum class Screen {
     Patient, Camera, Result,
     EyeCareMenu, ReminderSettings,
     FollowDot, FocusShift, BlinkPalm,
+    History,
 }
 
 private val ScreenListSaver: Saver<SnapshotStateList<Screen>, List<String>> = Saver(
@@ -102,11 +104,14 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
     BackHandler(enabled = backStack.size > 1) { pop() }
 
     val uiState by vm.uiState.collectAsState()
+    val localHeuristic by vm.localHeuristic.collectAsState()
+    val symmetry by vm.symmetry.collectAsState()
 
     when (current) {
         Screen.Home -> HomeScreen(
             onScreening = { push(Screen.Patient) },
             onEyeCare = { push(Screen.EyeCareMenu) },
+            onHistory = { push(Screen.History) },
         )
         Screen.Patient -> PatientScreen(
             vm = vm,
@@ -119,6 +124,8 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
         )
         Screen.Result -> ResultScreen(
             uiState = uiState,
+            localHeuristic = localHeuristic,
+            symmetry = symmetry,
             onRetry = {
                 vm.reset()
                 pop()
@@ -139,5 +146,6 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
         Screen.FocusShift -> FocusShiftScreen(onBack = { pop() })
         Screen.BlinkPalm -> BlinkPalmScreen(onBack = { pop() })
         Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
+        Screen.History -> HistoryScreen(onBack = { pop() })
     }
 }

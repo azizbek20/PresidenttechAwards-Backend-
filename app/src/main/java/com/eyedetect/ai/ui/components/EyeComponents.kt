@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,8 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.eyedetect.ai.R
+import com.eyedetect.ai.EyeSymmetryUiState
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.vision.PupilHeuristicResult
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.eyedetect.ai.ui.theme.Sizing
 import com.eyedetect.ai.ui.theme.Spacing
 import com.eyedetect.ai.ui.theme.TrafficGreen
@@ -297,6 +303,68 @@ fun ClinicalDetailCard(result: PredictResponse) {
         }
         KeyValueRow(stringResource(R.string.result_patient_eye), "$pid · $eye")
         KeyValueRow(stringResource(R.string.result_model), result.modelVersion)
+    }
+}
+
+/**
+ * Mahalliy CV evristikasi kartasi (xiralik/opacity + qizil refleks) — backend
+ * natijasidan MUSTAQIL, tashxis emas, faqat qo'shimcha skrining ko'rsatkichi.
+ * `result` `null` bo'lsa (hali hisoblanmagan yoki muvaffaqiyatsiz) hech narsa chizmaydi.
+ */
+@Composable
+fun PupilHeuristicCard(result: PupilHeuristicResult?) {
+    if (result == null) return
+    SectionCard(stringResource(R.string.result_local_heuristic_title)) {
+        Text(
+            stringResource(R.string.result_local_heuristic_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        QualityRow(stringResource(R.string.result_local_opacity), result.opacity)
+        QualityRow(stringResource(R.string.result_local_red_reflex), result.redReflex)
+        if (!result.regionFound) {
+            Text(
+                stringResource(R.string.result_local_no_region),
+                style = MaterialTheme.typography.bodySmall,
+                color = TrafficGrey,
+            )
+        }
+    }
+}
+
+/**
+ * Ikki ko'z simmetriyasi kartasi — joriy ko'zning mahalliy evristika natijasini bemorning
+ * qarshi ko'zi uchun oldin saqlangan natija bilan solishtiradi (klinikadagi Bruckner testi
+ * g'oyasiga o'xshash: ikkala ko'z orasidagi sezilarli farq, har biri alohida "normal" ko'rinsa
+ * ham, ogohlantiruvchi belgi hisoblanadi). `state` `null` bo'lsa (bemor ID yo'q yoki qarshi
+ * ko'z hali skrining qilinmagan) hech narsa chizmaydi. Tashxis emas.
+ */
+@Composable
+fun EyeSymmetryCard(state: EyeSymmetryUiState?) {
+    if (state == null) return
+    val comparedEyeLabel = when (state.comparedEye) {
+        "left" -> stringResource(R.string.common_eye_left_short)
+        "right" -> stringResource(R.string.common_eye_right_short)
+        else -> "—"
+    }
+    val dateLabel = remember(state.comparedAtMs) {
+        SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(state.comparedAtMs))
+    }
+
+    SectionCard(stringResource(R.string.result_symmetry_title)) {
+        Text(
+            stringResource(R.string.result_symmetry_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        QualityRow(stringResource(R.string.result_symmetry_row), state.comparison.level)
+        Text(
+            stringResource(R.string.result_symmetry_compared_with, comparedEyeLabel, dateLabel),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

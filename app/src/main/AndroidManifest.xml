@@ -26,6 +26,13 @@
              src/debug/res/xml/network_security_config.xml. Release faqat
              HTTPS. -->
 
+        <!-- ML Kit yuz aniqlash modelini ilova o'rnatilganda oldindan yuklab
+             qo'yadi (Google Play Services orqali) — birinchi ishlatishda
+             kutish bo'lmasligi uchun. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="face" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
