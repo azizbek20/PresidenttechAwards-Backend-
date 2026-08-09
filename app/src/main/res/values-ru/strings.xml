@@ -27,6 +27,8 @@
     <string name="home_screening_subtitle">Скрининг ДР по снимку глазного дна</string>
     <string name="home_eyecare_title">Упражнения для глаз</string>
     <string name="home_eyecare_subtitle">Упражнения и напоминания для снижения усталости глаз</string>
+    <string name="home_history_title">История</string>
+    <string name="home_history_subtitle">Результаты прошлых скринингов</string>
 
     <!-- Экран пациента -->
     <string name="patient_subtitle">Скрининг ДР · новое обследование</string>
@@ -45,12 +47,16 @@
     <string name="camera_center_guide">🟡 Расположите сетчатку внутри круга</string>
     <string name="camera_pick_gallery">🖼️ Выбрать из галереи (резерв)</string>
     <string name="camera_shutter_content_desc">Сделать снимок</string>
+    <string name="camera_flash_on">Вспышка: вкл</string>
+    <string name="camera_flash_auto">Вспышка: авто</string>
+    <string name="camera_flash_off">Вспышка: выкл</string>
     <string name="gallery_pick_title">Выберите снимок</string>
     <string name="gallery_pick_info">Найдено снимков: %1$d — выберите самый чёткий и светлый для анализа.</string>
     <string name="gallery_pick_confirm">Загрузить выбранный снимок</string>
     <string name="gallery_image_content_desc">Снимок из галереи</string>
     <string name="capture_review_title">Снимок хороший?</string>
     <string name="capture_review_body">Проверьте фокус, освещение и центровку. Если уверены — отправляйте.</string>
+    <string name="capture_review_quality_warning">Фокус или освещение могут быть недостаточными — для более точного результата рекомендуется переснять.</string>
     <string name="capture_review_confirm">Отправить ✓</string>
 
     <!-- Экран результата -->
@@ -66,6 +72,22 @@
     <string name="result_image_quality">Качество снимка</string>
     <string name="result_patient_eye">Пациент / глаз</string>
     <string name="result_model">Модель</string>
+    <string name="result_local_heuristic_title">Локальный предварительный показатель</string>
+    <string name="result_local_heuristic_disclaimer">Простой цветовой анализ на устройстве — не диагноз, а лишь дополнительный показатель. Для окончательного вывода опирайтесь на результат выше.</string>
+    <string name="result_local_opacity">Помутнение</string>
+    <string name="result_local_red_reflex">Красный рефлекс</string>
+    <string name="result_local_no_region">Область глаза не удалось точно определить — проанализирован приблизительно центр кадра.</string>
+    <string name="result_symmetry_title">Симметрия двух глаз</string>
+    <string name="result_symmetry_disclaimer">Этот глаз сравнён с предыдущим результатом другого глаза — заметное различие может потребовать дополнительного внимания. Не диагноз.</string>
+    <string name="result_symmetry_row">Симметрия</string>
+    <string name="result_symmetry_compared_with">Сравнено с: %1$s глаз, %2$s</string>
+
+    <!-- Экран истории -->
+    <string name="history_title">История скринингов</string>
+    <string name="history_empty">Пока нет сохранённых скринингов.</string>
+    <string name="history_delete_content_desc">Удалить запись</string>
+    <string name="history_patient_eye_row">Пациент / глаз: %1$s · %2$s</string>
+    <string name="history_local_heuristic_row">Локально: помутнение — %1$s, красный рефлекс — %2$s</string>
     <string name="result_heatmap_title">Куда смотрел ИИ (тепловая карта)</string>
     <string name="result_original_image">Исходный снимок</string>
     <string name="result_original_image_content_desc">Исходный снимок глазного дна</string>

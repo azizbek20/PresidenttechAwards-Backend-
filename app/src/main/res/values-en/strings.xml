@@ -27,6 +27,8 @@
     <string name="home_screening_subtitle">DR screening from a fundus photo</string>
     <string name="home_eyecare_title">Eye exercises</string>
     <string name="home_eyecare_subtitle">Exercises and reminders to reduce eye strain</string>
+    <string name="home_history_title">History</string>
+    <string name="home_history_subtitle">Results of past screenings</string>
 
     <!-- Patient screen -->
     <string name="patient_subtitle">DR screening · new exam</string>
@@ -45,12 +47,16 @@
     <string name="camera_center_guide">🟡 Center the retina inside the circle</string>
     <string name="camera_pick_gallery">🖼️ Choose from gallery (fallback)</string>
     <string name="camera_shutter_content_desc">Take photo</string>
+    <string name="camera_flash_on">Flash: on</string>
+    <string name="camera_flash_auto">Flash: auto</string>
+    <string name="camera_flash_off">Flash: off</string>
     <string name="gallery_pick_title">Choose a photo</string>
     <string name="gallery_pick_info">%1$d photos found — pick the sharpest and best lit one for analysis.</string>
     <string name="gallery_pick_confirm">Upload selected photo</string>
     <string name="gallery_image_content_desc">Gallery photo</string>
     <string name="capture_review_title">Does the photo look good?</string>
     <string name="capture_review_body">Check focus, lighting and centering. If you\'re confident, submit it.</string>
+    <string name="capture_review_quality_warning">Focus or lighting may be poor — retaking is recommended for a more accurate result.</string>
     <string name="capture_review_confirm">Submit ✓</string>
 
     <!-- Result screen -->
@@ -66,6 +72,22 @@
     <string name="result_image_quality">Image quality</string>
     <string name="result_patient_eye">Patient / eye</string>
     <string name="result_model">Model</string>
+    <string name="result_local_heuristic_title">Local preliminary indicator</string>
+    <string name="result_local_heuristic_disclaimer">A simple on-device color analysis — not a diagnosis, just a supplementary indicator. Rely on the result above for the final conclusion.</string>
+    <string name="result_local_opacity">Opacity</string>
+    <string name="result_local_red_reflex">Red reflex</string>
+    <string name="result_local_no_region">Eye region wasn\'t precisely located — the frame center was analyzed as an approximation.</string>
+    <string name="result_symmetry_title">Two-eye symmetry</string>
+    <string name="result_symmetry_disclaimer">This eye was compared with the other eye\'s previous result — a significant difference may warrant extra attention. Not a diagnosis.</string>
+    <string name="result_symmetry_row">Symmetry</string>
+    <string name="result_symmetry_compared_with">Compared with: %1$s eye, %2$s</string>
+
+    <!-- History screen -->
+    <string name="history_title">Screening history</string>
+    <string name="history_empty">No screenings saved yet.</string>
+    <string name="history_delete_content_desc">Delete entry</string>
+    <string name="history_patient_eye_row">Patient / eye: %1$s · %2$s</string>
+    <string name="history_local_heuristic_row">Local: opacity — %1$s, red reflex — %2$s</string>
     <string name="result_heatmap_title">Where the AI looked (heatmap)</string>
     <string name="result_original_image">Original image</string>
     <string name="result_original_image_content_desc">Original fundus image</string>

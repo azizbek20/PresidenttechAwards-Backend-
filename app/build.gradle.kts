@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 val localProperties = Properties().apply {
@@ -101,6 +102,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
 
+    // --- ML Kit (ko'z/iris joylashuvini aniqlash — kamera sifat nazorati uchun) ---
+    implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // --- Olingan suratni EXIF burilishini hisobga olib dekodlash (mahalliy CV evristikasi uchun) ---
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // --- Tarmoq: Retrofit + OkHttp ---
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
@@ -112,6 +119,14 @@ dependencies {
 
     // --- Persistensiya (eslatma sozlamalari, mashq statistikasi) ---
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // --- Room (o'tgan skrininglar tarixini lokal saqlash) ---
+    // 2.6.1 emas — undagi kapt annotatsiya protsessori Kotlin 2.2 metadata (v2.2.0)ni
+    // qo'llab-quvvatlamaydi ("maximum supported version is 2.0.0" xatosi).
+    val room = "2.7.1"
+    implementation("androidx.room:room-runtime:$room")
+    implementation("androidx.room:room-ktx:$room")
+    kapt("androidx.room:room-compiler:$room")
 
     // --- Fon rejimi: 20-20-20 eslatma ---
     implementation("androidx.work:work-runtime-ktx:2.9.1")
