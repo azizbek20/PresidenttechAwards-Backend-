@@ -1,0 +1,19 @@
+{
+  "exam_id": "8f14e45f-ea6c-4b3a-9d21-7c0b2f5a1e93",
+  "patient_id": "P-0001",
+  "eye": "right",
+  "referable": true,
+  "probability": 0.85,
+  "icdr_grade": 3,
+  "grade_label": "Og'ir NPDR",
+  "decision": "REFER",
+  "decision_text": "Referable DR — oftalmologga yuboring",
+  "quality": "good",
+  "heatmap_url": "/static/heatmaps/8f14e45f-ea6c-4b3a-9d21-7c0b2f5a1e93.png",
+  "image_url": "/static/images/8f14e45f-ea6c-4b3a-9d21-7c0b2f5a1e93.jpg",
+  "model_version": "mock-v0",
+  "processed_at": "2026-08-09T06:30:00Z",
+  "disclaimer": "Bu skrining/triaj vositasi; yakuniy tashxis oftalmolog mas'uliyati.",
+  "request_id": "3f2b1c8e-5a47-4d19-8e6f-2b9c4a7d1e05",
+  "mode": "demo"
+}
