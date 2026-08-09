@@ -12,6 +12,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +38,9 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
     var pid by remember { mutableStateOf(vm.patientId) }
     var eye by remember { mutableStateOf(vm.eye) }
 
+    val backendOnline by vm.backendOnline.collectAsState()
+    LaunchedEffect(Unit) { vm.checkBackendHealth() }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -58,7 +63,10 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            StatusBadge(online = true)
+            // `backendOnline == null` -> tekshirilmoqda; natija kelguncha "online" deb
+            // ko'rsatiladi (avvalgi qattiq kodlangan holat bilan bir xil, faqat endi
+            // haqiqiy tekshiruv orqali yangilanadi).
+            StatusBadge(online = backendOnline ?: true)
         }
 
         Column(

@@ -121,6 +121,14 @@
     <string name="error_https_required">A secure connection (HTTPS) is required, but the server address does not support it. Contact your administrator.</string>
     <string name="error_unknown">Unknown error</string>
     <string name="error_cannot_read_image">Could not read the image</string>
+    <string name="error_bad_request">Invalid image format or size. Please try a different photo.</string>
+    <string name="error_unauthorized">Access denied. Please contact your administrator.</string>
+    <string name="error_not_found">Server address not found. Please check the settings.</string>
+    <string name="error_too_many_requests">Too many requests. Please wait a moment and try again.</string>
+    <string name="error_server">A server error occurred. Please try again shortly.</string>
+    <string name="error_http_generic">Server error (code %1$d). Please try again.</string>
+    <string name="error_retry_unavailable">Couldn\'t retry — the photo is no longer available. Please take a new one.</string>
+    <string name="loading_uploading_percent">Uploading: %1$d%%</string>
 
     <!-- Eye exercises menu -->
     <string name="eyecare_menu_title">Eye exercises</string>

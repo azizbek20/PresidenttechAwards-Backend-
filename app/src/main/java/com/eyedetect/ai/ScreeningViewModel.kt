@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.data.ProgressRequestBody
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.ui.components.QualityLevel
@@ -18,8 +19,10 @@ import com.eyedetect.ai.vision.EyeSymmetryResult
 import com.eyedetect.ai.vision.EyeSymmetrySample
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import com.eyedetect.ai.vision.PupilHeuristics
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.HttpException
 import java.io.File
 
 /** UI holati (ekranlar shu holatga qarab chiziladi). */
@@ -37,7 +41,9 @@ sealed interface UiState {
     data object Idle : UiState
     data object Loading : UiState
     data class Success(val result: PredictResponse) : UiState
-    data class Error(val message: String) : UiState
+    /** [canRetry] true bo'lsa, so'nggi so'rov manbai (fayl/URI) hali mavjud — foydalanuvchi
+     * qaytadan suratga olmasdan xuddi shu rasmni qayta yuborishi mumkin ([retry]). */
+    data class Error(val message: String, val canRetry: Boolean = false) : UiState
 }
 
 /** Ikki ko'z simmetriyasini solishtirish natijasi + qaysi ko'z/qachon bilan solishtirilgani. */
@@ -49,13 +55,14 @@ data class EyeSymmetryUiState(
 
 /**
  * Skrining oqimi ViewModel'i: bemor ID, rasm yuborish va natija holatini boshqaradi.
- * [api] standart holatda [ApiClient.service] — testlarda soxta implementatsiya berish uchun
- * almashtiriladi (`@JvmOverloads` androidx `viewModel()` factory'si `Application`dan
- * qurish uchun konstruktorni topa olishi kerak).
+ * [api] va [healthCheck] standart holatda [ApiClient]ga bog'lanadi — testlarda soxta
+ * implementatsiya berish uchun almashtiriladi (`@JvmOverloads` androidx `viewModel()`
+ * factory'si `Application`dan qurish uchun konstruktorni topa olishi kerak).
  */
 class ScreeningViewModel @JvmOverloads constructor(
     application: Application,
     private val api: ApiService = ApiClient.service,
+    private val healthCheck: suspend () -> Boolean = { ApiClient.ping() },
 ) : AndroidViewModel(application) {
 
     private val historyRepo = ScreeningHistoryRepository(application)
@@ -73,24 +80,92 @@ class ScreeningViewModel @JvmOverloads constructor(
     private val _symmetry = MutableStateFlow<EyeSymmetryUiState?>(null)
     val symmetry: StateFlow<EyeSymmetryUiState?> = _symmetry.asStateFlow()
 
+    // Multipart so'rovning haqiqiy yuklash progressi (0f..1f) — faqat baytlar jo'natilayotgan
+    // paytda; tugagach (muvaffaqiyat/xato/bekor) null'ga qaytadi.
+    private val _uploadProgress = MutableStateFlow<Float?>(null)
+    val uploadProgress: StateFlow<Float?> = _uploadProgress.asStateFlow()
+
+    // Backend bilan tezkor ulanish holati — null = hali tekshirilmagan/tekshirilmoqda.
+    private val _backendOnline = MutableStateFlow<Boolean?>(null)
+    val backendOnline: StateFlow<Boolean?> = _backendOnline.asStateFlow()
+
     var patientId: String = ""
     var eye: String = "right"   // "right" | "left"
 
+    /** So'nggi yuborilgan (yoki yuborilmoqchi bo'lgan) rasm manbai — xato bo'lsa [retry] shu
+     * orqali xuddi shu rasmni qaytadan yuboradi (foydalanuvchi qayta suratga olmasdan). */
+    private sealed interface UploadSource {
+        data class FromFile(val file: File) : UploadSource
+        data class FromGalleryUri(val appContext: Context, val uri: Uri) : UploadSource
+    }
+    private var currentSource: UploadSource? = null
+    private var activeJob: Job? = null
+
+    fun checkBackendHealth() {
+        viewModelScope.launch {
+            _backendOnline.value = runCatching { healthCheck() }.getOrDefault(false)
+        }
+    }
+
+    /** Joriy so'rovni bekor qiladi (masalan, foydalanuvchi natija kutayotganda orqaga
+     * qaytsa) va tozalaydi — qayta suratga olish talab qilinadi (fayl o'chiriladi). */
+    fun cancelUpload() {
+        val fileToDelete = (currentSource as? UploadSource.FromFile)?.file
+        cancelActiveJobAndDeleteAfter(fileToDelete)
+        _uploadProgress.value = null
+        _localHeuristic.value = null
+        _symmetry.value = null
+        currentSource = null
+        _uiState.value = UiState.Idle
+    }
+
     fun reset() {
+        val fileToDelete = (currentSource as? UploadSource.FromFile)?.file
+        cancelActiveJobAndDeleteAfter(fileToDelete)
+        _uploadProgress.value = null
+        currentSource = null
         _uiState.value = UiState.Idle
         _localHeuristic.value = null
         _symmetry.value = null
     }
 
-    /** Faylni (kameradan) yuboradi; yuborilgach (muvaffaqiyat yoki xato) faylni o'chiradi. */
+    /** [file]ni darhol o'chirishga urinish xavfli — [activeJob] hali fon threadida (masalan,
+     * `BitmapLoader`da) faylni o'qiyotgan bo'lishi mumkin, va Windows'da ochiq fayl
+     * o'chirilmaydi. Shu sababli avval joyni ega bo'lgan job to'liq to'xtashini kutamiz
+     * (`join`), keyingina o'chiramiz — alohida, bekor qilinmagan koroutinada. */
+    private fun cancelActiveJobAndDeleteAfter(file: File?) {
+        val jobToJoin = activeJob
+        activeJob?.cancel()
+        activeJob = null
+        if (file != null) {
+            viewModelScope.launch {
+                jobToJoin?.join()
+                if (file.exists()) file.delete()
+            }
+        }
+    }
+
+    /** Oxirgi xato holatidagi rasmni (fayl yoki galereya URI'si) qaytadan, o'sha holicha
+     * yuboradi — foydalanuvchi qayta suratga olishga majbur bo'lmaydi. */
+    fun retry() {
+        when (val src = currentSource) {
+            is UploadSource.FromFile ->
+                if (src.file.exists()) uploadFile(src.file)
+                else _uiState.value = UiState.Error(
+                    getApplication<Application>().getString(R.string.error_retry_unavailable),
+                )
+            is UploadSource.FromGalleryUri -> uploadUri(src.appContext, src.uri)
+            null -> Unit
+        }
+    }
+
+    /** Faylni (kameradan) yuboradi; faqat muvaffaqiyatda o'chiriladi — xato bo'lsa [retry]
+     * uchun saqlanadi. */
     fun uploadFile(file: File) {
-        val part = MultipartBody.Part.createFormData(
-            name = "file",
-            filename = file.name,
-            body = file.asRequestBody("image/jpeg".toMediaTypeOrNull()),
-        )
-        viewModelScope.launch {
+        currentSource = UploadSource.FromFile(file)
+        activeJob = viewModelScope.launch {
             _uiState.value = UiState.Loading
+            _uploadProgress.value = 0f
             _localHeuristic.value = null
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
@@ -99,37 +174,59 @@ class ScreeningViewModel @JvmOverloads constructor(
                 // keyin tahlilni fonda, yuklashni bloklamay ishga tushiramiz.
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeFileScaled(file.absolutePath) }
                 if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
+
+                val body = ProgressRequestBody(file.asRequestBody("image/jpeg".toMediaTypeOrNull())) {
+                    _uploadProgress.value = it
+                }
+                val part = MultipartBody.Part.createFormData("file", file.name, body)
                 doRequest(part, rowId)
+
+                file.delete()
+                currentSource = null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e))
+                _uiState.value = UiState.Error(friendly(e), canRetry = true)
                 if (!rowId.isCompleted) rowId.complete(null)
             } finally {
-                file.delete()
+                _uploadProgress.value = null
             }
         }
     }
 
-    /** Galereyadan tanlangan Uri'ni yuboradi (zaxira rejim, reja 3.3). */
+    /** Galereyadan tanlangan Uri'ni yuboradi (zaxira rejim, reja 3.3). Doimiy fayl
+     * yaratilmagani uchun xato bo'lsa ham [retry] uchun URI o'zi saqlanib qoladi. */
     fun uploadUri(context: Context, uri: Uri) {
-        viewModelScope.launch {
+        val appContext = context.applicationContext
+        currentSource = UploadSource.FromGalleryUri(appContext, uri)
+        activeJob = viewModelScope.launch {
             _uiState.value = UiState.Loading
+            _uploadProgress.value = 0f
             _localHeuristic.value = null
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
             try {
                 val bytes = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                } ?: throw IllegalStateException(getApplication<Application>().getString(R.string.error_cannot_read_image))
+                    appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: throw IllegalStateException(appContext.getString(R.string.error_cannot_read_image))
 
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(bytes) }
                 if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
 
-                val body = bytes.toRequestBody("image/*".toMediaTypeOrNull())
+                val body = ProgressRequestBody(bytes.toRequestBody("image/*".toMediaTypeOrNull())) {
+                    _uploadProgress.value = it
+                }
                 val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
                 doRequest(part, rowId)
+
+                currentSource = null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e))
+                _uiState.value = UiState.Error(friendly(e), canRetry = true)
                 if (!rowId.isCompleted) rowId.complete(null)
+            } finally {
+                _uploadProgress.value = null
             }
         }
     }
@@ -208,7 +305,30 @@ class ScreeningViewModel @JvmOverloads constructor(
                 app.getString(R.string.error_timeout)
             is java.net.UnknownServiceException ->
                 app.getString(R.string.error_https_required)
+            is HttpException -> httpErrorMessage(e)
             else -> e.message ?: app.getString(R.string.error_unknown)
+        }
+    }
+
+    /** 4xx/5xx javoblarni kod oralig'iga qarab tushunarli xabarga aylantiradi. Backend
+     * xato tanasida (`{"detail": "..."}`, odatiy FastAPI validatsiya formati) aniqroq
+     * xabar bo'lsa, o'shani ishlatadi. */
+    private fun httpErrorMessage(e: HttpException): String {
+        val app = getApplication<Application>()
+        val detail = runCatching {
+            e.response()?.errorBody()?.string()?.let { body ->
+                org.json.JSONObject(body).optString("detail").ifBlank { null }
+            }
+        }.getOrNull()
+        if (!detail.isNullOrBlank()) return detail
+
+        return when (e.code()) {
+            400, 422 -> app.getString(R.string.error_bad_request)
+            401, 403 -> app.getString(R.string.error_unauthorized)
+            404 -> app.getString(R.string.error_not_found)
+            429 -> app.getString(R.string.error_too_many_requests)
+            in 500..599 -> app.getString(R.string.error_server)
+            else -> app.getString(R.string.error_http_generic, e.code())
         }
     }
 }

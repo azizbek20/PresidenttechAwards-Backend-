@@ -121,6 +121,14 @@
     <string name="error_https_required">Требуется защищённое соединение (HTTPS), но адрес сервера его не поддерживает. Обратитесь к администратору.</string>
     <string name="error_unknown">Неизвестная ошибка</string>
     <string name="error_cannot_read_image">Не удалось прочитать снимок</string>
+    <string name="error_bad_request">Неверный формат или размер изображения. Попробуйте другой снимок.</string>
+    <string name="error_unauthorized">В доступе отказано. Обратитесь к администратору.</string>
+    <string name="error_not_found">Адрес сервера не найден. Проверьте настройки.</string>
+    <string name="error_too_many_requests">Слишком много запросов. Подождите немного и попробуйте снова.</string>
+    <string name="error_server">Ошибка на сервере. Попробуйте немного позже.</string>
+    <string name="error_http_generic">Ошибка сервера (код %1$d). Попробуйте ещё раз.</string>
+    <string name="error_retry_unavailable">Не удалось повторить попытку — снимок не найден. Сделайте новое фото.</string>
+    <string name="loading_uploading_percent">Загрузка: %1$d%%</string>
 
     <!-- Меню упражнений для глаз -->
     <string name="eyecare_menu_title">Упражнения для глаз</string>

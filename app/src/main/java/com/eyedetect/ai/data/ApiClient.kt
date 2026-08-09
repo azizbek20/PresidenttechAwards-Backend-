@@ -1,8 +1,11 @@
 package com.eyedetect.ai.data
 
 import com.eyedetect.ai.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -44,6 +47,21 @@ object ApiClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
+    }
+
+    // Asosiy `okHttp`dan alohida, qisqa muddatli klient — StatusBadge uchun tezkor
+    // ulanish tekshiruvi asosiy so'rovlarning (30s) uzoq timeoutini kutmasligi kerak.
+    private val pingClient = okHttp.newBuilder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(3, TimeUnit.SECONDS)
+        .build()
+
+    /** Backend manziliga yengil HEAD so'rovi yuboradi — istalgan HTTP javob (xato kodi
+     * bo'lsa ham) server tarmoqda borligini bildiradi; istisno esa yo'qligini. */
+    suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            pingClient.newCall(Request.Builder().url(baseUrl).head().build()).execute().use { true }
+        }.getOrDefault(false)
     }
 
     /** Nisbiy URL (masalan "/static/...") ni to'liq URL'ga aylantiradi. */

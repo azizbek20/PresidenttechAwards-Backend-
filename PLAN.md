@@ -79,16 +79,44 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
 
 ## 3. Tarmoq va ishonchlilik 🟡
 
-- [ ] HTTP xato kodlarini (4xx/5xx, Retrofit `HttpException`) alohida
-      ushlab, tushunarli xabar berish — hozir `friendly()` faqat
-      ulanish/timeout xatolarini biladi, qolgani xom `e.message`.
-- [ ] Qayta urinish (retry) tugmasi/logikasi tarmoq xatosida.
-- [ ] Ekrandan chiqishda so'rovni bekor qilish (coroutine cancellation) —
-      hozir foydalanuvchi orqaga qaytsa ham so'rov davom etadi.
-- [ ] Haqiqiy yuklash progressini ko'rsatish (hozir `LoadingState`
-      qadam-indikatori qattiq kodlangan, real progress emas).
-- [ ] `StatusBadge(online = true)`ni haqiqiy tarmoq/backend health-check
-      bilan almashtirish (`PatientScreen.kt`, hozir doim "online").
+- [x] HTTP xato kodlarini alohida ushlab, tushunarli xabar berish:
+      `friendly()` endi `retrofit2.HttpException`ni ham taniydi
+      (`httpErrorMessage()`) — avval backend xato tanasidagi
+      `{"detail": "..."}` (odatiy FastAPI validatsiya formati) bo'lsa
+      o'shani ko'rsatadi, bo'lmasa kod oralig'iga qarab (400/422, 401/403,
+      404, 429, 5xx, boshqa) lokalizatsiya qilingan xabar beradi
+      (`error_bad_request`/`error_unauthorized`/... `strings.xml`, uz/ru/en).
+- [x] Qayta urinish (retry): xato bo'lsa (`UiState.Error.canRetry`),
+      so'nggi yuborilgan fayl/URI o'chirilmay saqlanadi va `vm.retry()`
+      xuddi shu rasmni qayta suratga olmasdan qayta yuboradi — natija
+      ekranidagi "Qayta urinish" tugmasi endi shuni chaqiradi (faqat
+      manba topilmasa yoki muvaffaqiyatli/UNGRADABLE holatda eski
+      "kameraga qaytish" xulqiga qaytadi). `MainActivity.kt`dagi `AppRoot`
+      shu farqni `uiState`ga qarab hal qiladi.
+- [x] Ekrandan chiqishda so'rovni bekor qilish: `ScreeningViewModel`
+      `activeJob`ni kuzatadi; Natija ekranida (Loading paytida) orqaga
+      qaytilsa `vm.cancelUpload()` chaqiriladi (`AppRoot`dagi `pop()`),
+      `LoadingState`dagi (avvaldan mavjud, lekin ulanmagan) "Bekor qilish"
+      tugmasi endi ishlaydi. Fayl faqat fon ishi to'liq to'xtagach
+      o'chiriladi (`Job.join()` orqali) — aks holda hali o'qilayotgan
+      faylni o'chirishga urinish (masalan Windows'da) muvaffaqiyatsiz
+      tugashi mumkin edi.
+- [x] Haqiqiy yuklash progressi: `data/ProgressRequestBody.kt` (okio
+      `ForwardingSink` bilan) multipart so'rov baytlarini kuzatadi;
+      `ScreeningViewModel.uploadProgress` (0f..1f) orqali `LoadingState`ga
+      uzatiladi — yuklash davom etayotganda haqiqiy foiz (`LinearProgressIndicator`)
+      ko'rsatiladi, undan keyingi bosqichlar (sifat/tahlil/tayyorlash)
+      uchun backend'dan alohida signal yo'qligi sababli avvalgidek umumiy
+      spinner qoladi (soxta aniqlik da'vo qilinmaydi).
+- [x] `StatusBadge`ni haqiqiy health-check bilan almashtirdik:
+      `ApiClient.ping()` backend manziliga qisqa timeout (3s)li HEAD
+      so'rovi yuboradi; `PatientScreen` ekranga kirishda
+      `vm.checkBackendHealth()`ni chaqiradi, natija kelguncha "online"
+      (avvalgi xulq) ko'rsatiladi.
+
+Barchasi uchun testlar yozildi (`ScreeningViewModelTest` — HTTP kod
+xaritalash, retry, cancel+fayl o'chirish, health-check; jami 29/29 test
+yashil, `./gradlew testDebugUnitTest`).
 
 ## 4. Ma'lumotlarni saqlash (offline) 🟡
 
