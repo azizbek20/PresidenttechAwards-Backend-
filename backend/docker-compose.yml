@@ -33,7 +33,14 @@ x-eye-env: &eye-env
   QUALITY_BLUR_MIN_VAR: ${QUALITY_BLUR_MIN_VAR:-50.0}
   # Four slashes = absolute path. The sqlite file lives on the storage volume
   # so `compose down && up` does not silently empty the admin panel.
-  DATABASE_URL: ${DATABASE_URL:-sqlite:////app/storage/eye.db}
+  #
+  # FORCED, not defaulted — same reason as EYE_STORAGE_DIR above. `.env.example`
+  # ships the host-local `sqlite:///./eye.db` (correct for `uvicorn` on the Mac),
+  # and §6's G3 does `set -a; source .env`, so a `${DATABASE_URL:-...}` default
+  # was being overridden: the DB landed in the container layer and every exam
+  # row was destroyed by `compose down` while images survived on the volume as
+  # orphans. The admin panel — step 5 of the demo — came back empty.
+  DATABASE_URL: sqlite:////app/storage/eye.db
 
 services:
   api:
