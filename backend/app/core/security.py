@@ -41,7 +41,12 @@ def verify_api_key(provided: str | None, expected: str | None) -> bool:
         return True
     if not provided:
         return False
-    return compare_digest(provided, expected)
+    # Compare BYTES, not str: secrets.compare_digest rejects non-ASCII str with
+    # TypeError, so a header like "Cyrillic-а" crashed the dependency and the
+    # generic handler turned a wrong key into 500 inference_error instead of
+    # 401 unauthorized. Encoding first keeps the comparison constant-time and
+    # makes every malformed key a clean 401.
+    return compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
 
 
 def warn_if_unprotected(expected: str | None) -> None:

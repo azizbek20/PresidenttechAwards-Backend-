@@ -23,7 +23,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -124,6 +124,35 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=False,
     )
+
+    @app.middleware("http")
+    async def _reject_declared_oversize(request: Request, call_next):
+        """C11: answer 413 BEFORE the multipart parser buffers the body.
+
+        `file: UploadFile = File(...)` makes FastAPI parse — and spool to a
+        temp file — the entire upload before the endpoint body runs, so the
+        endpoint's chunked cap bounds how much we COPY, not how much the server
+        ingests. Middleware runs ahead of routing and body parsing, so checking
+        the declared Content-Length here turns an oversized upload away at the
+        door for any client that declares one honestly.
+
+        This is a partial C11 remedy: a chunked request that declares no
+        Content-Length still reaches the parser. Closing that fully needs a
+        streaming multipart reader instead of UploadFile.
+        """
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > settings.max_upload_bytes:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "error": "payload_too_large",
+                    "detail": (
+                        "Rasm hajmi juda katta — "
+                        f"{settings.max_upload_mb} MB dan oshmasin"
+                    ),
+                },
+            )
+        return await call_next(request)
 
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_api_key)])
     api.include_router(predict_api.router, tags=["predict"])

@@ -91,6 +91,20 @@ services:
       - --server.port=8501
       - --server.headless=true
       - --browser.gatherUsageStats=false
+    # Override the image's HEALTHCHECK: it probes the API's /health/ready on
+    # :8000, which Streamlit does not serve, so the admin container reported
+    # `unhealthy` forever and `docker compose up --wait` would fail on a
+    # perfectly working panel. Streamlit has its own liveness endpoint.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4).status == 200 else 1)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Not started by default: `docker compose --profile prod up -d`.
   # SQLite -> Postgres is code-portable by construction, but the migration

@@ -276,11 +276,17 @@ async def predict(
     pred = None
     tensor = None
     engine = engine_for(request.app)
+
+    # C9 / §4.9: an engine without a verified artifact refuses the request
+    # OUTRIGHT — "predict returns 503 model_unavailable". This check must sit
+    # OUTSIDE the `report.ok` branch: when it lived inside, a blurry image in
+    # shadow mode skipped it and came back 200 UNGRADABLE carrying
+    # model_version="mock-v0" and mode="shadow" — a model-less deployment
+    # answering as though a model were loaded.
+    if not getattr(engine, "model_loaded", False):
+        raise ApiError(503, "model_unavailable", _D_MODEL)
+
     if report.ok:
-        if not getattr(engine, "model_loaded", False):
-            # C9: shadow mode without a verified artifact refuses to answer.
-            # It never falls back to a mock prediction.
-            raise ApiError(503, "model_unavailable", _D_MODEL)
         try:
             tensor = await run_in_threadpool(
                 _to_tensor, img, settings.engine_input_size

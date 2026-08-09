@@ -113,13 +113,17 @@ def register_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         status = int(exc.status_code)
-        detail = exc.detail if isinstance(exc.detail, str) and exc.detail else None
-        # Starlette's stock detail strings ("Not Found") are English and leak
-        # framework wording to the user, so only keep a detail that was set
-        # deliberately to something other than the default phrase.
-        if detail in (None, "Not Found", "Method Not Allowed", "Forbidden"):
-            detail = _detail_for(status)
-        return _envelope(status, _name_for(status), detail or _detail_for(status))
+        # ALWAYS use the Uzbek table here — never `exc.detail`. Starlette and the
+        # multipart parser set English detail strings ("Not Found",
+        # "Missing boundary in multipart.", "The Content-Disposition header field
+        # \"name\" must be provided."), and ScreeningViewModel.kt:332 prints
+        # `detail` to the user verbatim, so any framework wording that survives
+        # is shown on the phone in English. That breaks C15.
+        #
+        # Blanket-replacing is safe because application code raises ApiError,
+        # never HTTPException — the ApiError handler above is what carries a
+        # deliberate, localized message.
+        return _envelope(status, _name_for(status), _detail_for(status))
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
