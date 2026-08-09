@@ -1,0 +1,60 @@
+# Build context hygiene — keep the image small and keep secrets/weights OUT.
+# The Dockerfile only needs requirements*.txt, app/, admin/ and scripts/.
+#
+# NOTE the `**/` prefixes. Unlike .gitignore, a .dockerignore pattern is NOT
+# implicitly recursive: bare `__pycache__/` matches only the context root, so
+# app/__pycache__ was shipping in the image until these were made explicit.
+
+# --- secrets: never, under any circumstance, in a layer -------------------
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+local.properties
+
+# --- model weights: delivered air-gapped via a read-only bind mount ------
+models/
+**/*.pt
+**/*.pth
+**/*.onnx
+**/*.safetensors
+
+# --- runtime state -------------------------------------------------------
+storage/
+**/*.db
+**/*.sqlite3
+**/*.sqlite
+scripts/out/
+
+# --- python ---------------------------------------------------------------
+venv/
+.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- vcs / editors / os ---------------------------------------------------
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+**/.DS_Store
+
+# --- not needed at runtime ------------------------------------------------
+tests/
+requirements-dev.txt
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+SPEC.md
+CLAUDE.md
+PLAN.md
+**/*.md
