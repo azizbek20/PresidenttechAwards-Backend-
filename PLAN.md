@@ -192,10 +192,16 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 6. Lokalizatsiya 🟢
 
-- [ ] Barcha qattiq kodlangan o'zbekcha matnlarni (`EyeComponents.kt`,
-      ekranlar) `strings.xml`ga chiqarish — hozir faqat `app_name`
-      tashqarida, qolgani Kotlin ichida qattiq yozilgan. Kelajakda rus/ingliz
-      tili qo'shilsa, bu qadam shart bo'ladi.
+- [x] Qolgan qattiq kodlangan matnlar `strings.xml`ga (uz/ru/en) chiqarildi:
+      `EyeComponents.kt` (`TrafficLightCard` va `EyeSelector`dagi
+      `contentDescription`lari — "Natija:/ishonch/foiz" va tanlangan ✓
+      belgisi), `EyeCareComponents.kt` (`MenuCard`/`GameCard`dagi sarlavha —
+      subtitle ajratkichi, `IntervalChipRow`dagi "N daqiqa"/"tanlangan"),
+      `HistoryScreen.kt` (ICDR daraja qatori formati, "—" bo'sh joy belgisi)
+      va `CameraScreen.kt` (`fileLabel()`dagi standart fayl nomi "rasm.jpg"
+      va hajm birligi ", MB"). Ekranlarning o'zi (matn/tugmalar) avvaldan
+      deyarli to'liq `stringResource` orqali edi — qolganlari asosan
+      TalkBack `contentDescription`lari va yordamchi formatlash edi.
 
 ## 7. Test qamrovi 🔴
 

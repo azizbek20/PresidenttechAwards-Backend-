@@ -50,12 +50,13 @@ fun MenuCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val titleSubtitleDesc = stringResource(R.string.content_desc_title_subtitle, title, subtitle)
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .height(120.dp)
-            .semantics { contentDescription = "$title — $subtitle" },
+            .semantics { contentDescription = titleSubtitleDesc },
         shape = RoundedCornerShape(Sizing.cardRadius),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -91,11 +92,16 @@ fun GameCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val titleSubtitleDesc = if (statusLabel != null) {
+        stringResource(R.string.content_desc_title_subtitle_status, title, subtitle, statusLabel)
+    } else {
+        stringResource(R.string.content_desc_title_subtitle, title, subtitle)
+    }
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .semantics { contentDescription = "$title — $subtitle" + (statusLabel?.let { ", $it" } ?: "") },
+            .semantics { contentDescription = titleSubtitleDesc },
         shape = RoundedCornerShape(Sizing.cardRadius),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -208,12 +214,17 @@ fun IntervalChipRow(
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         options.forEach { minutes ->
             val isSel = selected == minutes
+            val chipDesc = if (isSel) {
+                stringResource(R.string.interval_chip_content_desc_selected, minutes)
+            } else {
+                stringResource(R.string.interval_chip_content_desc, minutes)
+            }
             Card(
                 modifier = Modifier
                     .weight(1f)
                     .height(Sizing.touchMin)
                     .selectable(selected = isSel, onClick = { onSelect(minutes) })
-                    .semantics { contentDescription = "$minutes daqiqa${if (isSel) ", tanlangan" else ""}" },
+                    .semantics { contentDescription = chipDesc },
                 shape = RoundedCornerShape(Sizing.fieldRadius),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer

@@ -168,7 +168,7 @@ fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         listOf("right" to stringResource(R.string.common_eye_right), "left" to stringResource(R.string.common_eye_left)).forEach { (value, label) ->
             val isSel = selected == value
-            val contentDesc = if (isSel) "$label ✓" else label
+            val contentDesc = if (isSel) stringResource(R.string.common_content_desc_selected, label) else label
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -209,6 +209,11 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
     val bg = decisionColor(result.decision)
     val emoji = decisionEmoji(result.decision)
     val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
+    val resultContentDesc = if (ungradable) {
+        stringResource(R.string.result_content_desc_ungradable, result.decisionText)
+    } else {
+        stringResource(R.string.result_content_desc_graded, result.decisionText, (result.probability * 100).toInt())
+    }
 
     Column(
         modifier = modifier
@@ -216,10 +221,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(18.dp))
             .background(bg)
             .padding(Spacing.xl)
-            .semantics {
-                contentDescription = "Natija: ${result.decisionText}" +
-                    if (!ungradable) ", ishonch ${(result.probability * 100).toInt()} foiz" else ""
-            },
+            .semantics { contentDescription = resultContentDesc },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
