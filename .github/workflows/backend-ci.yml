@@ -1,0 +1,199 @@
+# EYE DETECT AI — backend CI (SPEC.md §5-D D5)
+#
+# Gate chain, in order:
+#   lint (ruff + mypy) -> pytest -m "not model and not perf" -> docker build
+#   -> compose up api (mock engine, sqlite) -> scripts/smoke_test.sh -> down
+#
+# NO SECRETS, NO PUSH, NO DEPLOY. Nothing here reads `secrets.*`, logs into a
+# registry, or touches an environment. The API key below is a literal CI value
+# so the smoke test's "wrong key -> 401" step is meaningful; it protects
+# nothing and guards no real deployment.
+#
+# Runners are x86_64. The dev machine builds linux/arm64 natively — neither
+# passes `--platform`, so each builds for itself. That is deliberate: an
+# emulated cross-build of torch is slow and proves nothing extra.
+
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  # Pinned to cpu everywhere (CLAUDE.md device policy): CI never gates on mps.
+  EYE_DEVICE: cpu
+  EYE_MODE: demo
+  EYE_MODEL_SOURCE: mock
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  # =========================================================================
+  lint:
+    name: lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/requirements-torch.txt
+
+      # Install order is IDENTICAL to the venv and the Dockerfile (SPEC §4.1):
+      # torch from its pinned index first, then everything else from PyPI.
+      # requirements-dev.txt starts with `-r requirements.txt`.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-torch.txt
+          pip install -r requirements-dev.txt
+
+      # Same packaging fix as the Dockerfile: grad-cam drags in the GUI
+      # `opencv-python`, which overwrites the same cv2 package directory and
+      # then fails on `libGL.so.1` wherever no OpenGL exists. Headless is force
+      # -reinstalled with --no-deps so numpy's pin is untouched.
+      - name: Fix opencv (grad-cam pulls in the GUI build)
+        run: |
+          pip uninstall -y opencv-python
+          pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
+          python -c "import cv2; print('cv2', cv2.__version__)"
+
+      # The RULE SET IS PINNED BY CONFIG, not by the linter's release defaults:
+      # `backend/ruff.toml` (select = E4,E7,E9,F) and `backend/mypy.ini`
+      # (ignore_missing_imports). SPEC.md §4.1 pins ruff and mypy unversioned,
+      # so a new release's defaults would otherwise start reporting findings
+      # against the FROZEN Phase 0 kit — which no agent is allowed to edit.
+      # Both tools discover their config from the working directory; do not add
+      # rule flags here, change the config file.
+      - name: ruff
+        run: ruff check
+
+      - name: mypy
+        run: mypy app
+
+  # =========================================================================
+  test:
+    name: pytest (mock engine)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/requirements-torch.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-torch.txt
+          pip install -r requirements-dev.txt
+
+      - name: Fix opencv (grad-cam pulls in the GUI build)
+        run: |
+          pip uninstall -y opencv-python
+          pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
+          python -c "import cv2; print('cv2', cv2.__version__)"
+
+      # `model` needs a licensed checkpoint that is never in CI; `perf` is a
+      # timing guard that a shared runner cannot measure honestly.
+      - name: pytest
+        run: pytest -q -m "not model and not perf"
+
+      # Built here, not in the docker job, so the smoke test runs against the
+      # exact bytes this suite was calibrated on — and so the docker job does
+      # not need numpy/opencv installed just to draw four JPEGs.
+      - name: Generate smoke-test fixtures
+        run: python scripts/make_test_images.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-fixtures
+          path: backend/scripts/out/
+          retention-days: 1
+          if-no-files-found: error
+
+  # =========================================================================
+  docker:
+    name: docker build + compose smoke
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      # Literal, non-secret, CI-only. Present so smoke step 7 (wrong key ->
+      # 401) actually exercises the auth dependency.
+      EYE_API_KEY: ci-not-a-secret
+      API_PORT: "8000"
+      DATABASE_URL: sqlite:////app/storage/eye.db
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker build
+        # No models present — the image must build without them.
+        run: docker build -t eye-backend:dev .
+
+      - name: docker compose config
+        run: docker compose config -q
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: smoke-fixtures
+          path: backend/scripts/out/
+
+      - name: compose up api (mock engine, sqlite)
+        run: |
+          # Bind-mount source for models:ro — compose will not create it for us
+          # in a way we want to depend on.
+          mkdir -p models
+          docker compose up -d api
+
+      - name: Wait for /health/ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS "http://localhost:${API_PORT}/health/ready" >/dev/null 2>&1; then
+              echo "ready after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::api never became ready"
+          docker compose ps
+          docker compose logs api
+          exit 1
+
+      - name: smoke test
+        run: bash scripts/smoke_test.sh "http://localhost:${API_PORT}" "$EYE_API_KEY"
+
+      - name: api logs (on failure)
+        if: failure()
+        run: docker compose logs api
+
+      - name: compose down
+        if: always()
+        run: docker compose down -v
