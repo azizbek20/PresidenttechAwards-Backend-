@@ -42,7 +42,10 @@
     <string name="status_content_desc">Server status: %1$s</string>
 
     <!-- Camera screen -->
-    <string name="camera_no_permission">No camera permission.\nYou can pick a photo from the gallery.</string>
+    <string name="camera_no_permission">No camera permission.\nYou can pick a photo from the gallery or enable it in settings.</string>
+    <string name="camera_request_permission">Request permission</string>
+    <string name="camera_open_settings">Open settings</string>
+    <string name="camera_capture_error">Something went wrong while taking the photo. Please try again.</string>
     <string name="camera_eye_tag">👁 %1$s</string>
     <string name="camera_center_guide">🟡 Center the retina inside the circle</string>
     <string name="camera_pick_gallery">🖼️ Choose from gallery (fallback)</string>

@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.exifinterface.media.ExifInterface
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
@@ -44,5 +45,32 @@ object BitmapLoader {
         val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
         if (rotated !== bitmap) bitmap.recycle()
         return rotated
+    }
+
+    /**
+     * Backendga yuborishdan oldin siqadi: uzun tomoni [maxDim]dan oshmaydigan qilib aniq
+     * kichraytiradi (avval [decodeBytesScaled] bilan xotira tejovchi taxminiy namunalash,
+     * so'ng [Bitmap.createScaledBitmap] bilan aniq o'lchamga moslash), keyin JPEG'ga
+     * [quality] sifat bilan siqadi. Dekodlab bo'lmasa (buzilgan fayl) `null` qaytaradi —
+     * chaqiruvchi asl baytlarni yuborishga tushishi kerak.
+     */
+    fun compressForUpload(bytes: ByteArray, maxDim: Int = 1500, quality: Int = 85): ByteArray? {
+        val sampled = decodeBytesScaled(bytes, maxDim) ?: return null
+        val longSide = maxOf(sampled.width, sampled.height)
+        val bitmap = if (longSide > maxDim) {
+            val scale = maxDim.toFloat() / longSide
+            val w = (sampled.width * scale).toInt().coerceAtLeast(1)
+            val h = (sampled.height * scale).toInt().coerceAtLeast(1)
+            Bitmap.createScaledBitmap(sampled, w, h, true).also { if (it !== sampled) sampled.recycle() }
+        } else sampled
+
+        return try {
+            ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                out.toByteArray()
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 }
