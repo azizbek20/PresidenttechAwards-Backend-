@@ -30,6 +30,24 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       (muvaffaqiyat ham, xato ham) + `MainActivity.cleanupStaleCaptures()`
       ilova ishga tushganda qolib ketgan eski `fundus_*.jpg` fayllarni
       tozalaydi (masalan, jarayon kutilmagan o'chishidan keyin).
+- [x] `allowBackup="false"` (`AndroidManifest.xml`) — avval `true` edi, ya'ni
+      Android'ning avtomatik bulut zaxirasi va `adb backup` bemor ID/skrining
+      tarixini (Room) hech qanday tekshiruvsiz qurilmadan tashqariga
+      chiqarishi mumkin edi.
+- [x] Room tarix bazasi (`ScreeningHistoryDatabase`) SQLCipher orqali
+      shifrlanadi (`net.zetetic:android-database-sqlcipher`). Parol
+      `DatabaseKeyProvider` orqali tasodifiy generatsiya qilinadi va faqat
+      Android Keystore'dagi apparat-himoyalangan AES-GCM kaliti bilan
+      shifrlangan holda saqlanadi — kodda hech qayerda literal parol yo'q,
+      Keystore kaliti esa qurilmadan hech qachon chiqmaydi. Eski
+      (shifrlanmagan) baza fayli topilsa, `deleteUnreadableLegacyDatabase()`
+      uni avtomatik o'chiradi (loyiha hali relizga chiqmagani uchun
+      migratsiya emas, tozalab qayta yaratish qabul qilingan).
+      Texnik eslatma: SQLCipher'ning native kutubxonasi Robolectric (JVM)
+      birlik testlarida yuklanmaydi, shu sababli `ScreeningViewModel` endi
+      `historyStore: ScreeningHistoryStore` parametrini ham in'eksiya qiladi
+      (`api`/`healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy
+      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi.
 
 ## 2. Kamera va sifat nazorati 🔴
 
@@ -294,24 +312,23 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [x] `isMinifyEnabled = true` release build turida yoqildi. Har bir
-      kutubxona AAR/jar'ining o'z consumer-rules/`META-INF/proguard`
-      qoidalarini olib kelishi tekshirildi (Gradle cache'dan AAR/jar'larni
-      ochib): Retrofit, OkHttp, Room, WorkManager, ML Kit — hammasi o'z
-      qoidalarini olib keladi, qo'shimcha kerak emas. Faqat **Gson**
-      (`converter-gson` ham) hech qanday consumer-rules olib kelmaydi —
-      shu sababli `proguard-rules.pro`ga qo'lda qo'shildi: `Signature`/
-      `*Annotation*` atributlarini saqlash (aks holda `@SerializedName`
-      va generic turlar yo'qoladi) + Gson'ning rasmiy tavsiya qilingan
-      `TypeAdapterFactory`/`TypeToken` himoyaviy qoidalari. Mavjud
-      `-keep class com.eyedetect.ai.data.** { *; }` (DTO/Room entity/DAO)
-      saqlab qolindi. `./gradlew assembleRelease` orqali haqiqiy R8
-      minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL, `missing_rules.txt`
-      yaratilmadi (R8 hech narsa yetishmayotganini aniqlamadi), `mapping.txt`da
-      `PredictResponse` maydonlari va uchta Worker klassi (`UploadWorker`,
-      `PomodoroWorker`, `ReminderWorker`) o'z nomlarini saqlab qolgani
-      tasdiqlandi (WorkManager ularni ism bo'yicha reflection orqali
-      qayta yuklaydi, nomi o'zgarsa ishlamay qoladi).
+- [x] `isMinifyEnabled = true` + `isShrinkResources = true` release build
+      turida yoqildi. Har bir kutubxona AAR/jar'ining o'z consumer-rules/
+      `META-INF/proguard` qoidalarini olib kelishi tekshirildi: Retrofit,
+      OkHttp, Room, WorkManager, ML Kit — hammasi o'z qoidalarini olib
+      keladi. **Gson** (`converter-gson` ham) hech qanday consumer-rules
+      olib kelmaydi — shu sababli `proguard-rules.pro`ga qo'lda qo'shildi:
+      Retrofit uchun rasmiy tavsiya qilingan qoidalar (dinamik proksi
+      interfeysi + suspend/generic signature saqlash), Gson'ning
+      `Signature`/`*Annotation*`/`TypeAdapterFactory`/`TypeToken` himoyaviy
+      qoidalari, va SQLCipher uchun JNI ko'prik klasslarini saqlash
+      (`net.sqlcipher.**`). Mavjud `-keep class com.eyedetect.ai.data.** { *; }`
+      (DTO/Room entity/DAO) saqlab qolindi. `./gradlew assembleRelease`
+      orqali haqiqiy R8 minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL,
+      `mapping.txt`da `PredictResponse` maydonlari va uchta Worker klassi
+      (`UploadWorker`, `PomodoroWorker`, `ReminderWorker`) o'z nomlarini
+      saqlab qolgani tasdiqlandi (WorkManager ularni ism bo'yicha
+      reflection orqali qayta yuklaydi, nomi o'zgarsa ishlamay qoladi).
       Hali qilinmagan: haqiqiy qurilmada release APK'ni ishga tushirib
       to'liq qo'lda sinash (bu muhitda emulyator/qurilma yo'q) —
       release'ga chiqishdan oldin tavsiya etiladi.

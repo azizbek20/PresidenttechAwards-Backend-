@@ -12,10 +12,10 @@
 
     <application
         android:name=".EyeCareApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.EyeDetectAI"
         android:usesCleartextTraffic="false"
@@ -24,6 +24,15 @@
         <!-- Cleartext (HTTP) faqat debug buildda ruxsat etiladi, ko'ring
              src/debug/res/xml/network_security_config.xml. Release faqat
              HTTPS. -->
+
+        <!-- allowBackup="false": Room bazasida bemor ID va skrining natijalari
+             (PHI) saqlanadi. true bo'lsa, Android'ning avtomatik bulut
+             zaxirasi (Google akkaunt) va `adb backup` ilova ma'lumotlarini
+             hech qanday tekshiruvsiz nusxalab olishi mumkin edi — bu
+             qurilmadan tashqariga PHI chiqishi degani. Ilova qurilmalar
+             o'rtasida sozlamalarni ko'chirishga muhtoj emas, shu sababli
+             to'liq o'chirish (dataExtractionRules o'rniga) eng oddiy va
+             ishonchli yechim. -->
 
         <!-- ML Kit yuz aniqlash modelini ilova o'rnatilganda oldindan yuklab
              qo'yadi (Google Play Services orqali) — birinchi ishlatishda

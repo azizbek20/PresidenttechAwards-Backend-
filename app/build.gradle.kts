@@ -90,6 +90,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiUrl\"")
         }
@@ -184,6 +185,13 @@ dependencies {
     implementation("androidx.room:room-runtime:$room")
     implementation("androidx.room:room-ktx:$room")
     kapt("androidx.room:room-compiler:$room")
+
+    // --- SQLCipher (Room bazasini shifrlash — PHI: bemor ID, skrining natijalari) ---
+    // `SupportFactory` Room'ning `openHelperFactory()`iga ulanadi, shu bilan
+    // bir xil DAO/entity kodi o'zgarishsiz shifrlangan faylga yozadi.
+    // Parolning o'zi `DatabaseKeyProvider` orqali Android Keystore'dagi
+    // apparat-himoyalangan AES kaliti bilan shifrlangan holda saqlanadi.
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
 
     // --- Fon rejimi: 20-20-20 eslatma ---
     implementation("androidx.work:work-runtime-ktx:2.9.1")
