@@ -1,0 +1,123 @@
+# EYE DETECT AI backend — SPEC.md §5-D / D1
+#
+#   docker compose up -d api admin        # the demo stack (default profile)
+#   docker compose --profile prod up -d   # + postgres
+#
+# `api` and `admin` run the SAME image; admin/ is inside it precisely so this
+# works. Build natively for the host arch (linux/arm64 here) — no `platform:`
+# override, ever.
+#
+# MinIO is deliberately ABSENT. An S3 service with no S3 adapter in the code is
+# decoration, not production support; it returns at pilot phase together with
+# the storage adapter that uses it (C7).
+#
+# No `version:` key — it has been obsolete since Compose v2 and only produces a
+# warning.
+
+x-eye-env: &eye-env
+  # Container-absolute paths win over whatever .env says, so a host-relative
+  # EYE_STORAGE_DIR can never point the container outside its volume.
+  EYE_STORAGE_DIR: /app/storage
+  EYE_MODEL_DIR: /app/models
+  EYE_MODE: ${EYE_MODE:-demo}
+  EYE_MODEL_SOURCE: ${EYE_MODEL_SOURCE:-mock}
+  EYE_MODEL_VERSION: ${EYE_MODEL_VERSION:-mock-v0}
+  EYE_MODEL_SHA256: ${EYE_MODEL_SHA256:-}
+  EYE_DEVICE: ${EYE_DEVICE:-cpu}
+  EYE_INPUT_SIZE: ${EYE_INPUT_SIZE:-224}
+  EYE_API_KEY: ${EYE_API_KEY:-}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+  INFERENCE_CONCURRENCY: ${INFERENCE_CONCURRENCY:-2}
+  DEDUP_WINDOW_MIN: ${DEDUP_WINDOW_MIN:-10}
+  EYE_REFERABLE_THRESHOLD: ${EYE_REFERABLE_THRESHOLD:-0.5}
+  QUALITY_BLUR_MIN_VAR: ${QUALITY_BLUR_MIN_VAR:-50.0}
+  # Four slashes = absolute path. The sqlite file lives on the storage volume
+  # so `compose down && up` does not silently empty the admin panel.
+  DATABASE_URL: ${DATABASE_URL:-sqlite:////app/storage/eye.db}
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eye-backend:dev
+    container_name: eye-api
+    restart: unless-stopped
+    environment: *eye-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Weights are delivered air-gapped and are never written by the app.
+      - ./models:/app/models:ro
+      - eye-storage:/app/storage
+    # Inherits the image HEALTHCHECK (/health/ready). Declared here too so the
+    # admin service can depend on readiness rather than on "process started".
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).status == 200 else 1)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  admin:
+    # Same image, different entrypoint (D1). No separate build.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eye-backend:dev
+    container_name: eye-admin
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      <<: *eye-env
+      API_URL: ${API_URL:-http://api:8000}
+    ports:
+      - "${ADMIN_PORT:-8501}:8501"
+    volumes:
+      # Read-only: the dashboard reads the API over HTTP, never the files. The
+      # mount only exists so a future local-file mode cannot corrupt storage.
+      - eye-storage:/app/storage:ro
+    command:
+      - streamlit
+      - run
+      - admin/dashboard.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+
+  # Not started by default: `docker compose --profile prod up -d`.
+  # SQLite -> Postgres is code-portable by construction, but the migration
+  # EVENT still needs an Alembic baseline and the integration suite re-run
+  # against real Postgres. This service exists so that gate can be rehearsed.
+  postgres:
+    profiles: ["prod"]
+    image: postgres:16-alpine
+    container_name: eye-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-eye}
+      POSTGRES_USER: ${POSTGRES_USER:-eye}
+      # Placeholder default, NOT a usable password. The stricter
+      # `${POSTGRES_PASSWORD:?...}` form was rejected: Compose interpolates the
+      # whole file before it filters profiles, so it breaks `docker compose
+      # config -q` (a DoD gate) even when the prod profile is off. Set a real
+      # value in .env before ever running `--profile prod`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME-IN-DOTENV}
+    volumes:
+      - eye-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eye} -d ${POSTGRES_DB:-eye}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  eye-storage:
+  eye-pgdata:

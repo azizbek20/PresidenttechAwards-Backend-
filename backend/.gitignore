@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.sqlite3
+# Anchored to backend/ on purpose: a bare `storage/` also matches app/storage/,
+# which silently dropped app/storage/local.py from `git add backend`.
+/storage/
+/models/
+/scripts/out/
+.env
+.coverage
+htmlcov/
