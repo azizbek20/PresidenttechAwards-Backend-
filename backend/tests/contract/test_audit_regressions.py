@@ -361,6 +361,60 @@ def test_shadow_never_replays_a_stored_mock_exam(
         assert "mock" not in replay.text.lower()
 
 
+@pytest.fixture
+def cyrillic_key_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Any]:
+    yield from build_client(monkeypatch, tmp_path, EYE_API_KEY="parol-ключ-2024")
+
+
+def test_a_correct_non_ascii_key_is_accepted(cyrillic_key_client: Any) -> None:
+    """The first compare_digest fix encoded BOTH sides as utf-8.
+
+    Starlette decodes header bytes as latin-1, so a correct non-ASCII key
+    arrived as mojibake, re-encoded to different bytes, and 401'd on every
+    request — a silent permanent lockout, worse than the 500 it replaced.
+    """
+    ok = cyrillic_key_client.get(
+        "/api/v1/exams", headers={"X-API-Key": "parol-ключ-2024".encode()}
+    )
+    assert ok.status_code == 200, ok.text
+
+    wrong = cyrillic_key_client.get(
+        "/api/v1/exams", headers={"X-API-Key": "parol-ключ-9999".encode()}
+    )
+    assert wrong.status_code == 401, wrong.text
+
+
+def test_static_serves_only_the_media_subdirs(
+    authed_client: Any, tmp_path: Path, refer_jpeg_bytes: bytes
+) -> None:
+    """/static is unauthenticated (C6), so it must expose ONLY media.
+
+    Mounting `storage_dir` itself served anything that landed there — and once
+    compose put the SQLite file on the storage volume, `GET /static/eye.db`
+    handed the entire patient database to an unauthenticated caller while
+    `GET /api/v1/exams` correctly returned 401.
+    """
+    storage = tmp_path / "storage"
+    planted = storage / "eye.db"
+    planted.write_bytes(b"SQLite format 3\x00P-SECRET-777")
+
+    leaked = authed_client.get("/static/eye.db")
+    assert leaked.status_code == 404, f"storage root is being served: {leaked.text[:120]}"
+    assert b"SECRET" not in leaked.content
+
+    # ...while genuine media is still served, and still without a key.
+    created = authed_client.post(
+        "/api/v1/predict", files=upload(refer_jpeg_bytes), data={"eye": "right"}
+    )
+    assert created.status_code == 200, created.text
+    image_url = created.json()["image_url"]
+    assert image_url.startswith("/static/images/")
+
+    served = authed_client.get(image_url, headers={"X-API-Key": ""})
+    assert served.status_code == 200
+    assert served.content[:3] == b"\xff\xd8\xff", "expected JPEG magic"
+
+
 def test_oversize_413_still_carries_cors_headers(small_cap_client: Any) -> None:
     """The cap middleware must sit INSIDE CORSMiddleware.
 

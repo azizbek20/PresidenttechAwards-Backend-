@@ -182,11 +182,26 @@ def create_app() -> FastAPI:
             content={"status": "ready" if ok else "not_ready", "checks": checks},
         )
 
-    # Mounted last so it can never shadow an API route. Unauthenticated (C6).
+    # Mounted last so these can never shadow an API route. Unauthenticated by
+    # design (C6: Coil sends no API key).
+    #
+    # The two MEDIA SUBDIRS are mounted individually rather than mounting
+    # `storage_dir` itself. The URLs are identical (/static/images/... and
+    # /static/heatmaps/...), but serving the parent handed out *anything* that
+    # landed in the storage directory — and once the compose file put the
+    # SQLite database on the storage volume, `GET /static/eye.db` returned the
+    # entire patient database to an unauthenticated caller while
+    # `GET /api/v1/exams` correctly answered 401. Serving only the media dirs
+    # makes that class of exposure structurally impossible.
     app.mount(
-        "/static",
-        StaticFiles(directory=settings.storage_dir),
-        name="static",
+        "/static/images",
+        StaticFiles(directory=settings.images_dir),
+        name="static-images",
+    )
+    app.mount(
+        "/static/heatmaps",
+        StaticFiles(directory=settings.heatmaps_dir),
+        name="static-heatmaps",
     )
     return app
 
