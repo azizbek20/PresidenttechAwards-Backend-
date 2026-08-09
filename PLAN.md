@@ -170,12 +170,22 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 5. Holatni saqlash va navigatsiya 🟡
 
-- [ ] `MainActivity.kt`dagi ekran holati (`Screen` enum) hozir faqat
-      `remember`da — ekran aylanishi yoki jarayon o'chishida yo'qoladi.
-      `rememberSaveable` yoki `SavedStateHandle`ga o'tkazish.
-- [ ] Compose Navigation (yoki hech bo'lmasa orqaga tugmasi/back-stack
-      mantiqi) qo'shishni ko'rib chiqish — hozir qo'lda `when` bilan
-      almashtiriladi, orqaga tugmasi tabiiy ishlamaydi.
+- [x] `MainActivity.kt`dagi ekran holati (`Screen` enum) `rememberSaveable`ga
+      o'tkazildi: `backStack: SnapshotStateList<Screen>` + `ScreenListSaver`
+      (enum nomlarini `List<String>` sifatida saqlaydi/tiklaydi) — ekran
+      aylanishida va jarayon o'chib qayta tiklanishida (process death,
+      `savedInstanceState`) yo'qolmaydi.
+      Eslatma: bu faqat navigatsiya holati (qaysi ekrandaligi) uchun —
+      `ScreeningViewModel`ning o'zi (bemor ID, `uiState`) hali
+      `SavedStateHandle`ga bog'lanmagan, process death'da yo'qoladi;
+      demo skrining oqimi uchun bu muhim emas deb topildi (masalan,
+      "Loading" holatida jarayon o'chsa, baribir asl rasm yo'qolgan
+      bo'ladi — qaytadan boshlash tabiiy yechim).
+- [x] To'liq Compose Navigation kutubxonasiz, lekin haqiqiy back-stack
+      mantiqi bilan: `push`/`pop`/`resetTo` + `BackHandler(enabled =
+      backStack.size > 1)` — tizim orqaga tugmasi endi to'g'ri ishlaydi
+      (har bir ichki ekrandan bir qadam orqaga, Bosh ekranda ilovadan
+      chiqadi).
 
 ## 6. Lokalizatsiya 🟢
 
