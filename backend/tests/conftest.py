@@ -18,12 +18,29 @@ discarded import.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
-import pytest
+# HERMETICITY — must happen before app.config is imported anywhere.
+#
+# app/config.py loads `.env` by default. The app fixtures below set most vars
+# explicitly (which outranks dotenv), but the unauthenticated `client` fixture
+# *deletes* EYE_API_KEY — and deletion only removes the environment source, so
+# a developer's backend/.env would silently re-supply it and every anonymous
+# request would 401. Observed for real: creating .env for the G3 compose gate
+# turned "217 passed" into "48 failed, 22 errors".
+#
+# Setting it here rather than in a fixture makes the whole pytest process
+# hermetic, including tests that build their app through their own helper
+# instead of these fixtures. It also covers every other key, not just the API
+# key: a stray EYE_REFERABLE_THRESHOLD in .env would otherwise change clinical
+# verdicts mid-suite.
+os.environ["EYE_ENV_FILE"] = ""
 
-from tests import synthetic
+import pytest  # noqa: E402
+
+from tests import synthetic  # noqa: E402
 
 TEST_API_KEY = "testkey"
 

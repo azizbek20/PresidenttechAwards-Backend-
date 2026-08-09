@@ -24,6 +24,7 @@ Grad-CAM always runs on cpu regardless of this setting (see gradcam.py).
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -31,10 +32,17 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#: Which dotenv file to load, if any. Production leaves this unset and gets
+#: ``.env``. Setting ``EYE_ENV_FILE=""`` disables dotenv loading entirely — the
+#: test suite does exactly that, because `monkeypatch.delenv("EYE_API_KEY")`
+#: only removes the *environment* source and a developer's backend/.env would
+#: then silently re-supply the key (and the threshold, and the mode...).
+_ENV_FILE = os.getenv("EYE_ENV_FILE", ".env") or None
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
