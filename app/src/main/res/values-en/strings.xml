@@ -15,6 +15,10 @@
     <string name="common_eye_left_short">left</string>
     <string name="common_exercise_done_title">Great! Exercise complete.</string>
     <string name="common_language">Language</string>
+    <string name="common_dash">—</string>
+    <string name="common_content_desc_selected">%1$s ✓</string>
+    <string name="content_desc_title_subtitle">%1$s — %2$s</string>
+    <string name="content_desc_title_subtitle_status">%1$s — %2$s, %3$s</string>
 
     <!-- Language names — always shown in their own language -->
     <string name="lang_uz">O\'zbekcha</string>
@@ -61,6 +65,8 @@
     <string name="capture_review_body">Check focus, lighting and centering. If you\'re confident, submit it.</string>
     <string name="capture_review_quality_warning">Focus or lighting may be poor — retaking is recommended for a more accurate result.</string>
     <string name="capture_review_confirm">Submit ✓</string>
+    <string name="gallery_default_file_name">image.jpg</string>
+    <string name="gallery_file_size_suffix"> · %1$.1f MB</string>
 
     <!-- Result screen -->
     <string name="result_none">No result.</string>
@@ -84,6 +90,8 @@
     <string name="result_symmetry_disclaimer">This eye was compared with the other eye\'s previous result — a significant difference may warrant extra attention. Not a diagnosis.</string>
     <string name="result_symmetry_row">Symmetry</string>
     <string name="result_symmetry_compared_with">Compared with: %1$s eye, %2$s</string>
+    <string name="result_content_desc_graded">Result: %1$s, confidence %2$d percent</string>
+    <string name="result_content_desc_ungradable">Result: %1$s</string>
 
     <!-- History screen -->
     <string name="history_title">Screening history</string>
@@ -91,6 +99,7 @@
     <string name="history_delete_content_desc">Delete entry</string>
     <string name="history_patient_eye_row">Patient / eye: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Local: opacity — %1$s, red reflex — %2$s</string>
+    <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
     <string name="result_heatmap_title">Where the AI looked (heatmap)</string>
     <string name="result_original_image">Original image</string>
     <string name="result_original_image_content_desc">Original fundus image</string>
@@ -180,6 +189,8 @@
     <string name="reminder_settings_background_info">Reminders work even if the app is closed — roughly every %1$d min (the system\'s battery saver may delay them slightly).</string>
     <string name="reminder_settings_total_exercises">Total exercises completed: %1$d</string>
     <string name="reminder_settings_streak_days">Day streak: %1$d</string>
+    <string name="interval_chip_content_desc">%1$d min</string>
+    <string name="interval_chip_content_desc_selected">%1$d min, selected</string>
 
     <!-- Notification -->
     <string name="notification_channel_name">Eye rest reminder</string>

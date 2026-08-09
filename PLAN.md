@@ -68,14 +68,17 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       refleks testi flash bilan olingan suratda ancha ishonchli). Faqat
       surat olish payti bir marta yonadi (doimiy torch emas) — shu tarzda
       batareya/qizib ketishdan saqlanadi.
-- [ ] `imageCapture.takePicture`ning `onError` holatida foydalanuvchiga xato
-      ko'rsatish, natija ekraniga o'tmaslik (hozir xato bo'lsa ham yuborishga
-      urinadi).
-- [ ] Rasmni yuborishdan oldin siqish/kichraytirish (masalan, uzun tomoni
-      ~1500px gacha, JPEG quality ~85%) — hozir to'liq o'lchamdagi rasm
-      yuboriladi, sekin/qimmat mobil internetga mos emas.
-- [ ] Kamera ruxsati rad etilganda tushuntirish + "Sozlamalarga o'tish"
-      tugmasi (hozir faqat statik matn).
+- [x] `imageCapture.takePicture`ning `onError` holatida foydalanuvchiga xato
+      ko'rsatiladi (`CameraScreen.kt` — `captureError` holati, `WarningBanner`
+      + `camera_capture_error` matni), fayl o'chiriladi va natija ekraniga
+      o'tilmaydi — foydalanuvchi qayta bosishi kerak.
+- [x] Rasmni yuborishdan oldin siqish/kichraytirish qo'shildi:
+      `vision/BitmapLoader.compressForUpload()` (uzun tomoni ~1500px gacha,
+      JPEG quality ~85%) `ScreeningViewModel`da yuborishdan oldin chaqiriladi;
+      birlik testlar bilan qoplangan (`BitmapLoaderTest`).
+- [x] Kamera ruxsati rad etilganda tushuntirish matni + "Sozlamalarga o'tish"
+      tugmasi qo'shildi (`CameraScreen.kt` — `camera_open_settings`,
+      `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`ga olib boradi).
 
 ## 3. Tarmoq va ishonchlilik 🟡
 
@@ -189,10 +192,16 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 6. Lokalizatsiya 🟢
 
-- [ ] Barcha qattiq kodlangan o'zbekcha matnlarni (`EyeComponents.kt`,
-      ekranlar) `strings.xml`ga chiqarish — hozir faqat `app_name`
-      tashqarida, qolgani Kotlin ichida qattiq yozilgan. Kelajakda rus/ingliz
-      tili qo'shilsa, bu qadam shart bo'ladi.
+- [x] Qolgan qattiq kodlangan matnlar `strings.xml`ga (uz/ru/en) chiqarildi:
+      `EyeComponents.kt` (`TrafficLightCard` va `EyeSelector`dagi
+      `contentDescription`lari — "Natija:/ishonch/foiz" va tanlangan ✓
+      belgisi), `EyeCareComponents.kt` (`MenuCard`/`GameCard`dagi sarlavha —
+      subtitle ajratkichi, `IntervalChipRow`dagi "N daqiqa"/"tanlangan"),
+      `HistoryScreen.kt` (ICDR daraja qatori formati, "—" bo'sh joy belgisi)
+      va `CameraScreen.kt` (`fileLabel()`dagi standart fayl nomi "rasm.jpg"
+      va hajm birligi ", MB"). Ekranlarning o'zi (matn/tugmalar) avvaldan
+      deyarli to'liq `stringResource` orqali edi — qolganlari asosan
+      TalkBack `contentDescription`lari va yordamchi formatlash edi.
 
 ## 7. Test qamrovi 🔴
 

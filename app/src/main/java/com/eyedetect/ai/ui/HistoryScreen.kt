@@ -52,7 +52,7 @@ private fun localizedQuality(name: String?): String {
         QualityLevel.GOOD -> stringResource(R.string.quality_good)
         QualityLevel.WARN -> stringResource(R.string.quality_warn)
         QualityLevel.BAD -> stringResource(R.string.quality_bad)
-        null -> "—"
+        null -> stringResource(R.string.common_dash)
     }
 }
 
@@ -101,7 +101,7 @@ private fun HistoryEntryCard(entry: ScreeningHistoryEntity, onDelete: () -> Unit
     val eyeLabel = when (entry.eye) {
         "left" -> stringResource(R.string.common_eye_left_short)
         "right" -> stringResource(R.string.common_eye_right_short)
-        else -> entry.eye ?: "—"
+        else -> entry.eye ?: stringResource(R.string.common_dash)
     }
     val dateLabel = remember(entry.savedAtMs) {
         SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(entry.savedAtMs))
@@ -146,8 +146,13 @@ private fun HistoryEntryCard(entry: ScreeningHistoryEntity, onDelete: () -> Unit
             )
             if (!ungradable) {
                 Text(
-                    "${stringResource(R.string.result_icdr_grade)}: ${entry.icdrGrade} — ${entry.gradeLabel} " +
-                        "(${(entry.probability * 100).toInt()}%)",
+                    stringResource(
+                        R.string.history_icdr_grade_row,
+                        stringResource(R.string.result_icdr_grade),
+                        entry.icdrGrade,
+                        entry.gradeLabel,
+                        (entry.probability * 100).toInt(),
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
