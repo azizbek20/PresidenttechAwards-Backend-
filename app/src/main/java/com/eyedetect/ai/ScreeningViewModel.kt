@@ -12,6 +12,7 @@ import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.data.ProgressRequestBody
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
+import com.eyedetect.ai.data.history.ScreeningHistoryStore
 import com.eyedetect.ai.ui.components.QualityLevel
 import com.eyedetect.ai.vision.BitmapLoader
 import com.eyedetect.ai.vision.EyeSymmetryAnalyzer
@@ -55,17 +56,19 @@ data class EyeSymmetryUiState(
 
 /**
  * Skrining oqimi ViewModel'i: bemor ID, rasm yuborish va natija holatini boshqaradi.
- * [api] va [healthCheck] standart holatda [ApiClient]ga bog'lanadi — testlarda soxta
- * implementatsiya berish uchun almashtiriladi (`@JvmOverloads` androidx `viewModel()`
- * factory'si `Application`dan qurish uchun konstruktorni topa olishi kerak).
+ * [api], [healthCheck] va [historyStore] standart holatda haqiqiy implementatsiyalarga
+ * bog'lanadi — testlarda soxta implementatsiya berish uchun almashtiriladi
+ * (`@JvmOverloads` androidx `viewModel()` factory'si `Application`dan qurish uchun
+ * konstruktorni topa olishi kerak). [historyStore] alohida in'eksiya qilinadi, chunki
+ * haqiqiy [ScreeningHistoryRepository] SQLCipher orqali shifrlangan Room bazasini
+ * ochadi — uning native kutubxonasi Robolectric (JVM) birlik testlarida yuklanmaydi.
  */
 class ScreeningViewModel @JvmOverloads constructor(
     application: Application,
     private val api: ApiService = ApiClient.service,
     private val healthCheck: suspend () -> Boolean = { ApiClient.ping() },
+    private val historyStore: ScreeningHistoryStore = ScreeningHistoryRepository(application),
 ) : AndroidViewModel(application) {
-
-    private val historyRepo = ScreeningHistoryRepository(application)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -256,7 +259,7 @@ class ScreeningViewModel @JvmOverloads constructor(
 
             val id = withTimeoutOrNull(15_000) { rowId.await() }
             if (id != null) {
-                runCatching { historyRepo.updateHeuristic(id, result) }
+                runCatching { historyStore.updateHeuristic(id, result) }
             }
             computeSymmetry(result)
         }
@@ -268,7 +271,7 @@ class ScreeningViewModel @JvmOverloads constructor(
         val pid = patientId.trim()
         if (pid.isBlank() || !current.regionFound) return
         val otherEye = if (eye == "left") "right" else "left"
-        val previous = runCatching { historyRepo.latestFor(pid, otherEye) }.getOrNull() ?: return
+        val previous = runCatching { historyStore.latestFor(pid, otherEye) }.getOrNull() ?: return
         val previousSample = previous.toSymmetrySample() ?: return
 
         val currentSample = EyeSymmetrySample(
@@ -299,7 +302,7 @@ class ScreeningViewModel @JvmOverloads constructor(
         // Tarixga saqlash — shu payt mahalliy evristika hali tayyor bo'lmasa (odatda
         // sekinroq, backend javobidan keyin ham kelishi mumkin), holsiz saqlanadi;
         // tayyor bo'lgach `runHeuristicAsync` shu ID orqali to'ldiradi.
-        val id = runCatching { historyRepo.saveResult(result, _localHeuristic.value) }.getOrNull()
+        val id = runCatching { historyStore.saveResult(result, _localHeuristic.value) }.getOrNull()
         if (!rowId.isCompleted) rowId.complete(id)
     }
 

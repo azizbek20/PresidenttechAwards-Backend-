@@ -30,6 +30,24 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       (muvaffaqiyat ham, xato ham) + `MainActivity.cleanupStaleCaptures()`
       ilova ishga tushganda qolib ketgan eski `fundus_*.jpg` fayllarni
       tozalaydi (masalan, jarayon kutilmagan o'chishidan keyin).
+- [x] `allowBackup="false"` (`AndroidManifest.xml`) — avval `true` edi, ya'ni
+      Android'ning avtomatik bulut zaxirasi va `adb backup` bemor ID/skrining
+      tarixini (Room) hech qanday tekshiruvsiz qurilmadan tashqariga
+      chiqarishi mumkin edi.
+- [x] Room tarix bazasi (`ScreeningHistoryDatabase`) SQLCipher orqali
+      shifrlanadi (`net.zetetic:android-database-sqlcipher`). Parol
+      `DatabaseKeyProvider` orqali tasodifiy generatsiya qilinadi va faqat
+      Android Keystore'dagi apparat-himoyalangan AES-GCM kaliti bilan
+      shifrlangan holda saqlanadi — kodda hech qayerda literal parol yo'q,
+      Keystore kaliti esa qurilmadan hech qachon chiqmaydi. Eski
+      (shifrlanmagan) baza fayli topilsa, `deleteUnreadableLegacyDatabase()`
+      uni avtomatik o'chiradi (loyiha hali relizga chiqmagani uchun
+      migratsiya emas, tozalab qayta yaratish qabul qilingan).
+      Texnik eslatma: SQLCipher'ning native kutubxonasi Robolectric (JVM)
+      birlik testlarida yuklanmaydi, shu sababli `ScreeningViewModel` endi
+      `historyStore: ScreeningHistoryStore` parametrini ham in'eksiya qiladi
+      (`api`/`healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy
+      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi.
 
 ## 2. Kamera va sifat nazorati 🔴
 
@@ -235,15 +253,31 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [ ] `isMinifyEnabled = true` + to'liq ProGuard qoidalarini tekshirish
-      (`app/build.gradle.kts:29`, hozir R8 o'chirilgan).
-- [ ] Haqiqiy ilova ikonkasi qo'shish (hozir standart tizim ikonkasi
-      ishlatilmoqda).
+- [x] `isMinifyEnabled = true` + `isShrinkResources = true` yoqildi
+      (`app/build.gradle.kts`). `proguard-rules.pro`ga Retrofit (dinamik
+      proksi interfeysi + suspend/generic signature saqlash) va Gson uchun
+      rasmiy tavsiya qilingan qoidalar qo'shildi; `com.eyedetect.ai.data.**`
+      (JSON model klasslari) to'liq saqlanadi. Tekshirildi:
+      `./gradlew minifyReleaseWithR8` va `convertShrunkResourcesToBinaryRelease`
+      xatosiz o'tadi (R8 "missing classes" xatosi yo'q).
+- [x] Haqiqiy ilova ikonkasi qo'shildi: brend teal foni (`#00696E`,
+      `Color.kt`dagi `Primary` bilan mos) ustida oq "ko'z" shakli (adaptive
+      icon, `mipmap-anydpi-v26/ic_launcher(.xml/_round.xml)` +
+      `drawable/ic_launcher_foreground.xml`); API 24-25 uchun tekis zaxira
+      (`drawable/ic_launcher_flat.xml`, `mipmap-anydpi/ic_launcher*.xml`
+      orqali ulangan). `AndroidManifest.xml`da `android:icon`/`roundIcon`
+      belgilandi. Faqat vektor (raster export/dizayner kerak bo'lmadi).
 - [x] `API_BASE_URL`ni build-turlariga (debug/staging/release) ajratish —
       release endi `local.properties`dagi `RELEASE_API_URL`ni ishlatadi
       (HTTPS majburiy), `assembleRelease`/`bundleRelease` oldidan
       `checkReleaseSecrets` orqali tekshiriladi.
-- [ ] Versiya nomlash strategiyasi (`versionName = "0.1.0"` dan keyin).
+- [x] Versiya nomlash strategiyasi qo'shildi (`app/build.gradle.kts`):
+      Semantic Versioning (MAJOR.MINOR.PATCH) — PATCH xato tuzatish, MINOR
+      orqaga mos yangi funksiya, MAJOR katta/orqaga mos kelmaydigan
+      o'zgarish (birinchi relizda 1.0.0ga o'tish tavsiya etiladi).
+      `versionCode` endi `versionName`dan avtomatik hisoblanadi
+      (`major*10000 + minor*100 + patch`) — kelajakda faqat `appVersionName`
+      qatorini yangilash kifoya, `versionCode`ni qo'lda ko'tarish shart emas.
 
 ---
 
