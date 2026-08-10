@@ -258,8 +258,27 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [ ] `isMinifyEnabled = true` + to'liq ProGuard qoidalarini tekshirish
-      (`app/build.gradle.kts:29`, hozir R8 o'chirilgan).
+- [x] `isMinifyEnabled = true` release build turida yoqildi. Har bir
+      kutubxona AAR/jar'ining o'z consumer-rules/`META-INF/proguard`
+      qoidalarini olib kelishi tekshirildi (Gradle cache'dan AAR/jar'larni
+      ochib): Retrofit, OkHttp, Room, WorkManager, ML Kit — hammasi o'z
+      qoidalarini olib keladi, qo'shimcha kerak emas. Faqat **Gson**
+      (`converter-gson` ham) hech qanday consumer-rules olib kelmaydi —
+      shu sababli `proguard-rules.pro`ga qo'lda qo'shildi: `Signature`/
+      `*Annotation*` atributlarini saqlash (aks holda `@SerializedName`
+      va generic turlar yo'qoladi) + Gson'ning rasmiy tavsiya qilingan
+      `TypeAdapterFactory`/`TypeToken` himoyaviy qoidalari. Mavjud
+      `-keep class com.eyedetect.ai.data.** { *; }` (DTO/Room entity/DAO)
+      saqlab qolindi. `./gradlew assembleRelease` orqali haqiqiy R8
+      minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL, `missing_rules.txt`
+      yaratilmadi (R8 hech narsa yetishmayotganini aniqlamadi), `mapping.txt`da
+      `PredictResponse` maydonlari va uchta Worker klassi (`UploadWorker`,
+      `PomodoroWorker`, `ReminderWorker`) o'z nomlarini saqlab qolgani
+      tasdiqlandi (WorkManager ularni ism bo'yicha reflection orqali
+      qayta yuklaydi, nomi o'zgarsa ishlamay qoladi).
+      Hali qilinmagan: haqiqiy qurilmada release APK'ni ishga tushirib
+      to'liq qo'lda sinash (bu muhitda emulyator/qurilma yo'q) —
+      release'ga chiqishdan oldin tavsiya etiladi.
 - [ ] Haqiqiy ilova ikonkasi qo'shish (hozir standart tizim ikonkasi
       ishlatilmoqda).
 - [x] `API_BASE_URL`ni build-turlariga (debug/staging/release) ajratish —
