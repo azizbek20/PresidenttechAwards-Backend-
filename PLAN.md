@@ -279,8 +279,18 @@ yashil, `./gradlew testDebugUnitTest`).
       Hali qilinmagan: haqiqiy qurilmada release APK'ni ishga tushirib
       to'liq qo'lda sinash (bu muhitda emulyator/qurilma yo'q) —
       release'ga chiqishdan oldin tavsiya etiladi.
-- [ ] Haqiqiy ilova ikonkasi qo'shish (hozir standart tizim ikonkasi
-      ishlatilmoqda).
+- [x] Haqiqiy ilova ikonkasi qo'shildi: brend rangida (`Color.kt`dagi
+      `Primary` teal fon, oq ko'z shakli, qorong'i iris, oq refleks nuqtasi)
+      ko'z glifi — dasturiy ravishda (Python/Pillow, ikkita doira kesishmasi
+      orqali vesica shakl + supersample AA) barcha kerakli o'lchamlarda
+      generatsiya qilindi: adaptiv ikonka (API 26+, `mipmap-anydpi-v26/
+      ic_launcher.xml` + `ic_launcher_round.xml`, background/foreground/
+      monochrome qatlamlari `mipmap-*dpi`da), eski qurilmalar uchun
+      to'g'ridan-to'g'ri kvadrat/dumaloq PNG fallback (`ic_launcher.png`/
+      `ic_launcher_round.png`, minSdk 24 API 24-25 uchun), va Play Store
+      uchun 512x512 versiya (`docs/app_icon_play_store_512.png`).
+      `AndroidManifest.xml`ga `android:icon`/`android:roundIcon` ulandi.
+      `./gradlew assembleDebug` bilan tekshirildi.
 - [x] `API_BASE_URL`ni build-turlariga (debug/staging/release) ajratish —
       release endi `local.properties`dagi `RELEASE_API_URL`ni ishlatadi
       (HTTPS majburiy), `assembleRelease`/`bundleRelease` oldidan
