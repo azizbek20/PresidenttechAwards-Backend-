@@ -109,6 +109,9 @@
     <string name="result_recommendation_refer">Keyingi qadam: bemorni oftalmologga yo\'llang.</string>
     <string name="result_recommendation_no_refer">Keyingi qadam: 12 oydan keyin qayta chaqiring.</string>
     <string name="result_recommendation_ungradable">Keyingi qadam: rasmni qayta oling (fokus/yorug\'likka e\'tibor bering) yoki mutaxassisga yo\'llang.</string>
+    <string name="result_share_button">Ulashish</string>
+    <string name="result_share_chooser_title">Natijani ulashish</string>
+    <string name="result_share_text">%1$s — skrining natijasi\n\nBemor: %2$s\nKo\'z: %3$s\nQaror: %4$s\nIshonch: %5$s\nICDR daraja: %6$s\nSana: %7$s\n\n%8$s</string>
 
     <!-- Yuklanish / xato holatlari -->
     <string name="loading_title">Tahlil qilinmoqda…</string>
@@ -159,6 +162,19 @@
     <string name="reminder_row_configure">Sozlash →</string>
     <string name="reminder_row_enable">Yoqish →</string>
 
+    <!-- Pomodoro -->
+    <string name="pomodoro_title">Pomodoro</string>
+    <string name="pomodoro_card_subtitle">Ekran vaqtini kuzatib, dam olish vaqtini eslatadi</string>
+    <string name="pomodoro_description">Fokus va tanaffus davrlarini kuzatib boradi — ekrandan dam olish vaqti kelganda ogohlantiradi, ilova yopiq bo\'lsa ham.</string>
+    <string name="pomodoro_phase_focus">Fokus</string>
+    <string name="pomodoro_phase_break">Tanaffus</string>
+    <string name="pomodoro_status_running">Faol · %1$s</string>
+    <string name="pomodoro_focus_label">Fokus (daqiqa)</string>
+    <string name="pomodoro_break_label">Tanaffus (daqiqa)</string>
+    <string name="pomodoro_start">Boshlash</string>
+    <string name="pomodoro_stop">To\'xtatish</string>
+    <string name="pomodoro_background_info">Fon rejimida ishlaydi — ilovadan chiqsangiz yoki ekranni qulflasangiz ham, bosqich tugaganda ogohlantiradi.</string>
+
     <!-- Nuqtani kuzatish -->
     <string name="followdot_instructions">Boshingizni qimirlatmasdan, faqat ko\'zingiz bilan nuqtani kuzating.</string>
     <string name="followdot_seconds_left">%1$d soniya qoldi</string>
@@ -197,4 +213,8 @@
     <string name="notification_channel_description">20-20-20 qoidasi bo\'yicha davriy eslatma</string>
     <string name="notification_title">Ko\'zingizga dam bering</string>
     <string name="notification_text">6 metr uzoqlikka 20 soniya qarang (20-20-20 qoidasi).</string>
+    <string name="notification_pomodoro_focus_done_title">Vaqt keldi!</string>
+    <string name="notification_pomodoro_focus_done_text">Ekrandan dam oling — tanaffus boshlandi.</string>
+    <string name="notification_pomodoro_break_done_title">Tanaffus tugadi</string>
+    <string name="notification_pomodoro_break_done_text">Davom etishga tayyor bo\'lsangiz, ekranga qayting.</string>
 </resources>

@@ -30,6 +30,8 @@ import com.eyedetect.ai.R
 import com.eyedetect.ai.data.eyecare.EyeCarePreferencesRepository
 import com.eyedetect.ai.data.eyecare.ExerciseStats
 import com.eyedetect.ai.data.eyecare.ExerciseType
+import com.eyedetect.ai.data.eyecare.PomodoroPhase
+import com.eyedetect.ai.data.eyecare.PomodoroState
 import com.eyedetect.ai.data.eyecare.ReminderSettings
 import com.eyedetect.ai.data.eyecare.isToday
 import com.eyedetect.ai.ui.components.GameCard
@@ -51,6 +53,7 @@ fun EyeCareMenuScreen(
     onFollowDot: () -> Unit,
     onFocusShift: () -> Unit,
     onBlinkPalm: () -> Unit,
+    onPomodoro: () -> Unit,
     onReminderSettings: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -58,6 +61,7 @@ fun EyeCareMenuScreen(
     val repo = remember { EyeCarePreferencesRepository(context) }
     val stats by repo.stats.collectAsState(initial = ExerciseStats())
     val settings by repo.settings.collectAsState(initial = ReminderSettings())
+    val pomodoro by repo.pomodoroState.collectAsState(initial = PomodoroState())
 
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xl),
@@ -95,6 +99,25 @@ fun EyeCareMenuScreen(
                         ExerciseType.FocusShift -> onFocusShift
                         ExerciseType.BlinkPalm -> onBlinkPalm
                     },
+                )
+            }
+            item {
+                val pomodoroStatus = if (pomodoro.running) {
+                    val phaseLabel = if (pomodoro.phase == PomodoroPhase.FOCUS) {
+                        stringResource(R.string.pomodoro_phase_focus)
+                    } else {
+                        stringResource(R.string.pomodoro_phase_break)
+                    }
+                    stringResource(R.string.pomodoro_status_running, phaseLabel)
+                } else {
+                    null
+                }
+                GameCard(
+                    title = stringResource(R.string.pomodoro_title),
+                    subtitle = stringResource(R.string.pomodoro_card_subtitle),
+                    emoji = "🍅",
+                    statusLabel = pomodoroStatus,
+                    onClick = onPomodoro,
                 )
             }
         }

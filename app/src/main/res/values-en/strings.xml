@@ -109,6 +109,9 @@
     <string name="result_recommendation_refer">Next step: refer the patient to an ophthalmologist.</string>
     <string name="result_recommendation_no_refer">Next step: recall in 12 months.</string>
     <string name="result_recommendation_ungradable">Next step: retake the photo (mind focus/lighting) or refer to a specialist.</string>
+    <string name="result_share_button">Share</string>
+    <string name="result_share_chooser_title">Share result</string>
+    <string name="result_share_text">%1$s — screening result\n\nPatient: %2$s\nEye: %3$s\nDecision: %4$s\nConfidence: %5$s\nICDR grade: %6$s\nDate: %7$s\n\n%8$s</string>
 
     <!-- Loading / error states -->
     <string name="loading_title">Analyzing…</string>
@@ -159,6 +162,19 @@
     <string name="reminder_row_configure">Configure →</string>
     <string name="reminder_row_enable">Turn on →</string>
 
+    <!-- Pomodoro -->
+    <string name="pomodoro_title">Pomodoro</string>
+    <string name="pomodoro_card_subtitle">Tracks screen time and reminds you to rest</string>
+    <string name="pomodoro_description">Tracks focus and break periods — alerts you when it\'s time to rest your eyes from the screen, even if the app is closed.</string>
+    <string name="pomodoro_phase_focus">Focus</string>
+    <string name="pomodoro_phase_break">Break</string>
+    <string name="pomodoro_status_running">Active · %1$s</string>
+    <string name="pomodoro_focus_label">Focus (minutes)</string>
+    <string name="pomodoro_break_label">Break (minutes)</string>
+    <string name="pomodoro_start">Start</string>
+    <string name="pomodoro_stop">Stop</string>
+    <string name="pomodoro_background_info">Runs in the background — even if you leave the app or lock the screen, you\'ll get an alert when the period ends.</string>
+
     <!-- Follow the dot -->
     <string name="followdot_instructions">Without moving your head, track the dot with your eyes only.</string>
     <string name="followdot_seconds_left">%1$d seconds left</string>
@@ -197,4 +213,8 @@
     <string name="notification_channel_description">Periodic reminder for the 20-20-20 rule</string>
     <string name="notification_title">Give your eyes a rest</string>
     <string name="notification_text">Look at something 6 meters away for 20 seconds (20-20-20 rule).</string>
+    <string name="notification_pomodoro_focus_done_title">Time\'s up!</string>
+    <string name="notification_pomodoro_focus_done_text">Rest your eyes from the screen — break time started.</string>
+    <string name="notification_pomodoro_break_done_title">Break\'s over</string>
+    <string name="notification_pomodoro_break_done_text">Come back to the screen whenever you\'re ready to continue.</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.eyedetect.ai.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.eyedetect.ai.EyeSymmetryUiState
 import com.eyedetect.ai.R
@@ -29,6 +32,7 @@ import com.eyedetect.ai.ui.components.PrimaryButton
 import com.eyedetect.ai.ui.components.PupilHeuristicCard
 import com.eyedetect.ai.ui.components.RecommendationCard
 import com.eyedetect.ai.ui.components.SecondaryButton
+import com.eyedetect.ai.ui.components.TextActionButton
 import com.eyedetect.ai.ui.components.TrafficLightCard
 import com.eyedetect.ai.ui.components.WarningBanner
 import com.eyedetect.ai.ui.theme.Spacing
@@ -74,6 +78,7 @@ private fun SuccessContent(
     onNewPatient: () -> Unit,
 ) {
     val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -122,6 +127,13 @@ private fun SuccessContent(
         // 5) Disklaymer
         DisclaimerText(r.disclaimer)
 
+        // 5b) Ulashish — foydalanuvchi tanlagan ilova orqali (Telegram, SMS, email va h.k.);
+        // hech narsa avtomatik yuborilmaydi, faqat tizim ulashish oynasi ochiladi.
+        TextActionButton(
+            text = "🔗 " + stringResource(R.string.result_share_button),
+            onClick = { shareResult(context, r) },
+        )
+
         // 6) Harakat tugmalari
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -139,4 +151,35 @@ private fun SuccessContent(
             )
         }
     }
+}
+
+/** Tizim ulashish oynasini (ACTION_SEND) ochadi — foydalanuvchi o'zi ilova va qabul qiluvchini tanlaydi. */
+private fun shareResult(context: Context, r: PredictResponse) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, buildShareText(context, r))
+    }
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.result_share_chooser_title)))
+}
+
+private fun buildShareText(context: Context, r: PredictResponse): String {
+    val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
+    val eyeLabel = when (r.eye) {
+        "right" -> context.getString(R.string.common_eye_right)
+        "left" -> context.getString(R.string.common_eye_left)
+        else -> "—"
+    }
+    val probabilityText = if (ungradable) "—" else "${(r.probability * 100).toInt()}%"
+    val gradeText = if (ungradable) "—" else "${r.icdrGrade} — ${r.gradeLabel}"
+    return context.getString(
+        R.string.result_share_text,
+        context.getString(R.string.app_name),
+        r.patientId ?: context.getString(R.string.result_unknown_patient),
+        eyeLabel,
+        r.decisionText,
+        probabilityText,
+        gradeText,
+        r.processedAt,
+        r.disclaimer,
+    )
 }

@@ -13,11 +13,13 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.eyedetect.ai.MainActivity
 import com.eyedetect.ai.R
+import com.eyedetect.ai.data.eyecare.PomodoroPhase
 
-/** 20-20-20 eslatma bildirishnoma kanali va tuzilishi. */
+/** 20-20-20 va Pomodoro eslatmalari uchun umumiy bildirishnoma kanali va tuzilishi. */
 object NotificationHelper {
     const val CHANNEL_ID = "eyecare_reminder_channel"
     private const val NOTIFICATION_ID = 1001
+    private const val NOTIFICATION_ID_POMODORO = 1002
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -34,6 +36,25 @@ object NotificationHelper {
     }
 
     fun showReminder(context: Context) {
+        notify(context, NOTIFICATION_ID, context.getString(R.string.notification_title), context.getString(R.string.notification_text))
+    }
+
+    /** [endedPhase] — hozirgina tugagan bosqich; xabar keyingi bosqichga taklif sifatida yoziladi. */
+    fun showPomodoroAlert(context: Context, endedPhase: PomodoroPhase) {
+        val title = if (endedPhase == PomodoroPhase.FOCUS) {
+            context.getString(R.string.notification_pomodoro_focus_done_title)
+        } else {
+            context.getString(R.string.notification_pomodoro_break_done_title)
+        }
+        val text = if (endedPhase == PomodoroPhase.FOCUS) {
+            context.getString(R.string.notification_pomodoro_focus_done_text)
+        } else {
+            context.getString(R.string.notification_pomodoro_break_done_text)
+        }
+        notify(context, NOTIFICATION_ID_POMODORO, title, text)
+    }
+
+    private fun notify(context: Context, notificationId: Int, title: String, text: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -52,13 +73,13 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setContentTitle(context.getString(R.string.notification_title))
-            .setContentText(context.getString(R.string.notification_text))
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        NotificationManagerCompat.from(context).notify(notificationId, notification)
     }
 }

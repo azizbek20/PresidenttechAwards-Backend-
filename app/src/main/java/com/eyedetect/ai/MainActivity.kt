@@ -29,6 +29,7 @@ import com.eyedetect.ai.ui.eyecare.BlinkPalmScreen
 import com.eyedetect.ai.ui.eyecare.EyeCareMenuScreen
 import com.eyedetect.ai.ui.eyecare.FocusShiftScreen
 import com.eyedetect.ai.ui.eyecare.FollowDotScreen
+import com.eyedetect.ai.ui.eyecare.PomodoroScreen
 import com.eyedetect.ai.ui.eyecare.ReminderSettingsScreen
 import com.eyedetect.ai.ui.theme.EyeDetectTheme
 
@@ -37,7 +38,7 @@ enum class Screen {
     Home,
     Patient, Camera, Result,
     EyeCareMenu, ReminderSettings,
-    FollowDot, FocusShift, BlinkPalm,
+    FollowDot, FocusShift, BlinkPalm, Pomodoro,
     History,
 }
 
@@ -154,12 +155,14 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
             onFollowDot = { push(Screen.FollowDot) },
             onFocusShift = { push(Screen.FocusShift) },
             onBlinkPalm = { push(Screen.BlinkPalm) },
+            onPomodoro = { push(Screen.Pomodoro) },
             onReminderSettings = { push(Screen.ReminderSettings) },
             onBack = { pop() },
         )
         Screen.FollowDot -> FollowDotScreen(onBack = { pop() })
         Screen.FocusShift -> FocusShiftScreen(onBack = { pop() })
         Screen.BlinkPalm -> BlinkPalmScreen(onBack = { pop() })
+        Screen.Pomodoro -> PomodoroScreen(onBack = { pop() })
         Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
         Screen.History -> HistoryScreen(onBack = { pop() })
     }

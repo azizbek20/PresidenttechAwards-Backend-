@@ -30,6 +30,12 @@ private object Keys {
 
     val STREAK_DAYS = intPreferencesKey("eyecare_streak_days")
     val STREAK_LAST_ACTIVE_DAY = stringPreferencesKey("eyecare_streak_last_active_day")
+
+    val POMODORO_RUNNING = booleanPreferencesKey("pomodoro_running")
+    val POMODORO_PHASE = stringPreferencesKey("pomodoro_phase")
+    val POMODORO_PHASE_END_MS = longPreferencesKey("pomodoro_phase_end_epoch")
+    val POMODORO_FOCUS_MIN = intPreferencesKey("pomodoro_focus_minutes")
+    val POMODORO_BREAK_MIN = intPreferencesKey("pomodoro_break_minutes")
 }
 
 /** Ko'z mashqlari sozlamalari va statistikasi uchun DataStore ombori (ilovadagi birinchi persistensiya). */
@@ -107,6 +113,38 @@ class EyeCarePreferencesRepository(private val context: Context) {
     }
 
     suspend fun settingsSnapshot(): ReminderSettings = settings.first()
+
+    val pomodoroState: Flow<PomodoroState> = context.eyeCareDataStore.data.map { p ->
+        PomodoroState(
+            running = p[Keys.POMODORO_RUNNING] ?: false,
+            phase = p[Keys.POMODORO_PHASE]?.let { runCatching { PomodoroPhase.valueOf(it) }.getOrNull() } ?: PomodoroPhase.FOCUS,
+            phaseEndEpochMs = p[Keys.POMODORO_PHASE_END_MS] ?: 0L,
+            focusMinutes = p[Keys.POMODORO_FOCUS_MIN] ?: 25,
+            breakMinutes = p[Keys.POMODORO_BREAK_MIN] ?: 5,
+        )
+    }
+
+    suspend fun pomodoroSnapshot(): PomodoroState = pomodoroState.first()
+
+    suspend fun setPomodoroMinutes(focusMinutes: Int, breakMinutes: Int) {
+        context.eyeCareDataStore.edit {
+            it[Keys.POMODORO_FOCUS_MIN] = focusMinutes
+            it[Keys.POMODORO_BREAK_MIN] = breakMinutes
+        }
+    }
+
+    /** Yangi davrni boshlaydi (Boshlash tugmasi yoki [com.eyedetect.ai.eyecare.PomodoroWorker] navbatdagi bosqichga o'tishda chaqiradi). */
+    suspend fun startPomodoroPhase(phase: PomodoroPhase, phaseEndEpochMs: Long) {
+        context.eyeCareDataStore.edit {
+            it[Keys.POMODORO_RUNNING] = true
+            it[Keys.POMODORO_PHASE] = phase.name
+            it[Keys.POMODORO_PHASE_END_MS] = phaseEndEpochMs
+        }
+    }
+
+    suspend fun stopPomodoro() {
+        context.eyeCareDataStore.edit { it[Keys.POMODORO_RUNNING] = false }
+    }
 
     /** "yyyy-DDD" ko'rinishidagi kun kaliti — java.time o'rniga (minSdk 24, desugaring yo'q). */
     private fun dayKey(epochMs: Long): String {

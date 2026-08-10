@@ -109,6 +109,9 @@
     <string name="result_recommendation_refer">Следующий шаг: направьте пациента к офтальмологу.</string>
     <string name="result_recommendation_no_refer">Следующий шаг: повторный вызов через 12 месяцев.</string>
     <string name="result_recommendation_ungradable">Следующий шаг: переснимите (обратите внимание на фокус/свет) или направьте к специалисту.</string>
+    <string name="result_share_button">Поделиться</string>
+    <string name="result_share_chooser_title">Поделиться результатом</string>
+    <string name="result_share_text">%1$s — результат скрининга\n\nПациент: %2$s\nГлаз: %3$s\nРешение: %4$s\nУверенность: %5$s\nСтепень ICDR: %6$s\nДата: %7$s\n\n%8$s</string>
 
     <!-- Загрузка / ошибки -->
     <string name="loading_title">Анализ…</string>
@@ -159,6 +162,19 @@
     <string name="reminder_row_configure">Настроить →</string>
     <string name="reminder_row_enable">Включить →</string>
 
+    <!-- Помодоро -->
+    <string name="pomodoro_title">Помодоро</string>
+    <string name="pomodoro_card_subtitle">Отслеживает время у экрана и напоминает отдохнуть</string>
+    <string name="pomodoro_description">Отслеживает периоды фокуса и отдыха — предупреждает, когда пора отдохнуть от экрана, даже если приложение закрыто.</string>
+    <string name="pomodoro_phase_focus">Фокус</string>
+    <string name="pomodoro_phase_break">Отдых</string>
+    <string name="pomodoro_status_running">Активно · %1$s</string>
+    <string name="pomodoro_focus_label">Фокус (минуты)</string>
+    <string name="pomodoro_break_label">Отдых (минуты)</string>
+    <string name="pomodoro_start">Начать</string>
+    <string name="pomodoro_stop">Остановить</string>
+    <string name="pomodoro_background_info">Работает в фоне — даже если вы выйдете из приложения или заблокируете экран, вы получите уведомление по окончании периода.</string>
+
     <!-- Слежение за точкой -->
     <string name="followdot_instructions">Не двигая головой, следите за точкой только глазами.</string>
     <string name="followdot_seconds_left">Осталось %1$d сек</string>
@@ -197,4 +213,8 @@
     <string name="notification_channel_description">Периодическое напоминание по правилу 20-20-20</string>
     <string name="notification_title">Дайте отдых глазам</string>
     <string name="notification_text">Посмотрите на 6 метров вдаль в течение 20 секунд (правило 20-20-20).</string>
+    <string name="notification_pomodoro_focus_done_title">Время вышло!</string>
+    <string name="notification_pomodoro_focus_done_text">Отдохните от экрана — начался перерыв.</string>
+    <string name="notification_pomodoro_break_done_title">Перерыв закончен</string>
+    <string name="notification_pomodoro_break_done_text">Возвращайтесь к экрану, когда будете готовы продолжить.</string>
 </resources>
