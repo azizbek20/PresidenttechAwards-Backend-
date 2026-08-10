@@ -30,6 +30,7 @@ import com.eyedetect.ai.ui.components.HeatmapCard
 import com.eyedetect.ai.ui.components.LoadingState
 import com.eyedetect.ai.ui.components.PrimaryButton
 import com.eyedetect.ai.ui.components.PupilHeuristicCard
+import com.eyedetect.ai.ui.components.QueuedState
 import com.eyedetect.ai.ui.components.RecommendationCard
 import com.eyedetect.ai.ui.components.SecondaryButton
 import com.eyedetect.ai.ui.components.TextActionButton
@@ -62,6 +63,10 @@ fun ResultScreen(
         }
 
         is UiState.Success -> SuccessContent(uiState.result, localHeuristic, symmetry, onRetry, onNewPatient)
+
+        UiState.Queued -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            QueuedState(onDone = onNewPatient)
+        }
 
         UiState.Idle -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.result_none), style = MaterialTheme.typography.bodyLarge)

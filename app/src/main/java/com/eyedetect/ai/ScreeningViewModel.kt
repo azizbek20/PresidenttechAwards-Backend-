@@ -12,7 +12,9 @@ import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.data.ProgressRequestBody
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
+import com.eyedetect.ai.data.upload.PendingUploadRepository
 import com.eyedetect.ai.ui.components.QualityLevel
+import com.eyedetect.ai.upload.UploadScheduler
 import com.eyedetect.ai.vision.BitmapLoader
 import com.eyedetect.ai.vision.EyeSymmetryAnalyzer
 import com.eyedetect.ai.vision.EyeSymmetryResult
@@ -35,6 +37,8 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.io.File
+import java.net.ConnectException
+import java.net.UnknownHostException
 
 /** UI holati (ekranlar shu holatga qarab chiziladi). */
 sealed interface UiState {
@@ -44,6 +48,9 @@ sealed interface UiState {
     /** [canRetry] true bo'lsa, so'nggi so'rov manbai (fayl/URI) hali mavjud — foydalanuvchi
      * qaytadan suratga olmasdan xuddi shu rasmni qayta yuborishi mumkin ([retry]). */
     data class Error(val message: String, val canRetry: Boolean = false) : UiState
+    /** Internet yo'qligi sababli so'rov navbatga qo'yildi ([WorkManager][com.eyedetect.ai.upload.UploadWorker]
+     * ulanish tiklangach avtomatik yuboradi) — qayta suratga olish shart emas. */
+    data object Queued : UiState
 }
 
 /** Ikki ko'z simmetriyasini solishtirish natijasi + qaysi ko'z/qachon bilan solishtirilgani. */
@@ -63,9 +70,14 @@ class ScreeningViewModel @JvmOverloads constructor(
     application: Application,
     private val api: ApiService = ApiClient.service,
     private val healthCheck: suspend () -> Boolean = { ApiClient.ping() },
+    // `WorkManager`ni to'g'ridan-to'g'ri chaqirish o'rniga inject qilinadi — `healthCheck`dagi
+    // kabi sabab bilan: birlik testlarida haqiqiy WorkManager infratuzilmasi (va u orqali
+    // `UploadWorker`ning haqiqiy tarmoq so'rovi yuborishga urinishi) kerak emas.
+    private val scheduleUpload: (Long) -> Unit = { id -> UploadScheduler.enqueue(application, id) },
 ) : AndroidViewModel(application) {
 
     private val historyRepo = ScreeningHistoryRepository(application)
+    private val pendingRepo = PendingUploadRepository(application)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -197,7 +209,14 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                if (isOfflineError(e) && file.exists()) {
+                    queueForOffline(withContext(Dispatchers.IO) { file.readBytes() }, "image/jpeg")
+                    file.delete()
+                    currentSource = null
+                    _uiState.value = UiState.Queued
+                } else {
+                    _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                }
                 if (!rowId.isCompleted) rowId.complete(null)
             } finally {
                 _uploadProgress.value = null
@@ -216,10 +235,12 @@ class ScreeningViewModel @JvmOverloads constructor(
             _localHeuristic.value = null
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
+            var readBytes: ByteArray? = null
             try {
                 val bytes = withContext(Dispatchers.IO) {
                     appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 } ?: throw IllegalStateException(appContext.getString(R.string.error_cannot_read_image))
+                readBytes = bytes
 
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(bytes) }
                 if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
@@ -232,12 +253,37 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                val bytesForQueue = readBytes
+                if (isOfflineError(e) && bytesForQueue != null) {
+                    queueForOffline(bytesForQueue, "image/*")
+                    currentSource = null
+                    _uiState.value = UiState.Queued
+                } else {
+                    _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                }
                 if (!rowId.isCompleted) rowId.complete(null)
             } finally {
                 _uploadProgress.value = null
             }
         }
+    }
+
+    /** Ulanish umuman yo'qligi (DNS topilmadi / ulanib bo'lmadi) — bunday holatlarda so'rovni
+     * xato sifatida ko'rsatib qayta urinishni foydalanuvchiga qoldirish o'rniga darhol
+     * navbatga qo'yish ma'noliroq (ulanish tiklanmaguncha qayta urinish baribir
+     * muvaffaqiyatsiz bo'ladi). [SocketTimeoutException] atayin bunga kirmaydi — bu server
+     * sekin javob berayotganini ham bildirishi mumkin (tarmoq mavjud), shu sababli oddiy
+     * "Qayta urinish" xato holati saqlanib qoladi. HTTPS/sertifikat xatosi
+     * ([java.net.UnknownServiceException]) ham kirmaydi — bu konfiguratsiya muammosi, qayta
+     * urinish (yoki navbatga qo'yish) yordam bermaydi. */
+    private fun isOfflineError(e: Exception): Boolean =
+        e is UnknownHostException || e is ConnectException
+
+    /** Rasmni doimiy saqlash joyiga yozadi va [UploadScheduler] orqali WorkManager vazifasini
+     * rejalashtiradi — ulanish tiklangach [com.eyedetect.ai.upload.UploadWorker] avtomatik yuboradi. */
+    private suspend fun queueForOffline(bytes: ByteArray, fallbackMediaType: String) {
+        val id = pendingRepo.enqueue(bytes, patientId.ifBlank { null }, eye, fallbackMediaType)
+        scheduleUpload(id)
     }
 
     /**

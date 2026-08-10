@@ -145,6 +145,17 @@
     <string name="error_retry_unavailable">Не удалось повторить попытку — снимок не найден. Сделайте новое фото.</string>
     <string name="loading_uploading_percent">Загрузка: %1$d%%</string>
 
+    <!-- Офлайн-очередь (отправка позже через WorkManager при отсутствии интернета) -->
+    <string name="queued_title">Добавлено в очередь</string>
+    <string name="queued_message">Нет подключения к интернету. Снимок добавлен в очередь — он будет отправлен автоматически, как только связь восстановится. Результат позже можно посмотреть в разделе \"История\".</string>
+    <string name="queued_ok_button">Понятно</string>
+    <string name="history_pending_section_title">В очереди — ожидание интернета</string>
+    <string name="history_pending_status_queued">В очереди</string>
+    <string name="history_pending_status_failed">Не отправлено</string>
+    <string name="history_pending_queued_at_row">Добавлено в очередь: %1$s</string>
+    <string name="history_pending_cancel_content_desc">Убрать из очереди</string>
+    <string name="history_pending_retry_content_desc">Повторить попытку</string>
+
     <!-- Меню упражнений для глаз -->
     <string name="eyecare_menu_title">Упражнения для глаз</string>
     <string name="eyecare_streak">Серия дней подряд: %1$d</string>
@@ -217,4 +228,9 @@
     <string name="notification_pomodoro_focus_done_text">Отдохните от экрана — начался перерыв.</string>
     <string name="notification_pomodoro_break_done_title">Перерыв закончен</string>
     <string name="notification_pomodoro_break_done_text">Возвращайтесь к экрану, когда будете готовы продолжить.</string>
+    <string name="notification_upload_success_title">Результат скрининга готов</string>
+    <string name="notification_upload_success_text">Снимок из очереди отправлен. Посмотрите результат в разделе \"История\".</string>
+    <string name="notification_upload_success_text_patient">Результат пациента %1$s готов. Смотрите в разделе \"История\".</string>
+    <string name="notification_upload_failed_title">Не удалось отправить</string>
+    <string name="notification_upload_failed_text">Не удалось отправить снимок из очереди. Вы можете повторить попытку в разделе \"История\".</string>
 </resources>

@@ -145,6 +145,17 @@
     <string name="error_retry_unavailable">Qayta urinib bo\'lmadi — rasm topilmadi. Iltimos, qaytadan suratga oling.</string>
     <string name="loading_uploading_percent">Yuklanmoqda: %1$d%%</string>
 
+    <!-- Offline navbat (internet yo'q paytda WorkManager orqali keyinroq yuborish) -->
+    <string name="queued_title">Navbatga qo\'yildi</string>
+    <string name="queued_message">Internet aloqasi yo\'q. Rasm navbatga qo\'yildi — ulanish tiklanganda avtomatik yuboriladi. Natijani keyinroq \"Tarix\" bo\'limidan ko\'rishingiz mumkin.</string>
+    <string name="queued_ok_button">Tushunarli</string>
+    <string name="history_pending_section_title">Navbatda — internet kutilmoqda</string>
+    <string name="history_pending_status_queued">Navbatda</string>
+    <string name="history_pending_status_failed">Yuborilmadi</string>
+    <string name="history_pending_queued_at_row">Navbatga qo\'yildi: %1$s</string>
+    <string name="history_pending_cancel_content_desc">Navbatdan bekor qilish</string>
+    <string name="history_pending_retry_content_desc">Qayta urinish</string>
+
     <!-- Ko\'z mashqlari menyusi -->
     <string name="eyecare_menu_title">Ko\'z mashqlari</string>
     <string name="eyecare_streak">Kunlik ketma-ketlik: %1$d kun</string>
@@ -217,4 +228,9 @@
     <string name="notification_pomodoro_focus_done_text">Ekrandan dam oling — tanaffus boshlandi.</string>
     <string name="notification_pomodoro_break_done_title">Tanaffus tugadi</string>
     <string name="notification_pomodoro_break_done_text">Davom etishga tayyor bo\'lsangiz, ekranga qayting.</string>
+    <string name="notification_upload_success_title">Skrining natijasi tayyor</string>
+    <string name="notification_upload_success_text">Navbatdagi rasm yuborildi. Natijani \"Tarix\" bo\'limidan ko\'ring.</string>
+    <string name="notification_upload_success_text_patient">%1$s bemor natijasi tayyor. \"Tarix\" bo\'limidan ko\'ring.</string>
+    <string name="notification_upload_failed_title">Yuborib bo\'lmadi</string>
+    <string name="notification_upload_failed_text">Navbatdagi rasmni yuborishda xatolik yuz berdi. \"Tarix\" bo\'limidan qayta urinib ko\'rishingiz mumkin.</string>
 </resources>

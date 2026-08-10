@@ -5,14 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -26,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,12 +37,19 @@ import androidx.compose.ui.unit.dp
 import com.eyedetect.ai.R
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
+import com.eyedetect.ai.data.upload.PendingUploadEntity
+import com.eyedetect.ai.data.upload.PendingUploadRepository
 import com.eyedetect.ai.ui.components.QualityLevel
 import com.eyedetect.ai.ui.components.TextActionButton
 import com.eyedetect.ai.ui.theme.Sizing
 import com.eyedetect.ai.ui.theme.Spacing
+import com.eyedetect.ai.ui.theme.TrafficRed
+import com.eyedetect.ai.ui.theme.TrafficRedContainer
+import com.eyedetect.ai.ui.theme.TrafficYellow
+import com.eyedetect.ai.ui.theme.TrafficYellowContainer
 import com.eyedetect.ai.ui.theme.decisionColor
 import com.eyedetect.ai.ui.theme.decisionEmoji
+import com.eyedetect.ai.upload.UploadScheduler
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,7 +72,9 @@ private fun localizedQuality(name: String?): String {
 fun HistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { ScreeningHistoryRepository(context) }
+    val pendingRepo = remember { PendingUploadRepository(context) }
     val entries by repo.history.collectAsState(initial = null)
+    val pending by pendingRepo.pending.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(Spacing.xl)) {
@@ -72,6 +85,34 @@ fun HistoryScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.lg),
         )
+
+        if (pending.isNotEmpty()) {
+            Text(
+                stringResource(R.string.history_pending_section_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = Spacing.sm),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                pending.forEach { entry ->
+                    PendingUploadCard(
+                        entry = entry,
+                        onCancel = {
+                            scope.launch {
+                                UploadScheduler.cancel(context, entry.id)
+                                pendingRepo.delete(entry)
+                            }
+                        },
+                        onRetryNow = {
+                            scope.launch {
+                                pendingRepo.resetFailed(entry.id)
+                                UploadScheduler.enqueue(context, entry.id)
+                            }
+                        },
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.lg))
+        }
 
         val list = entries
         when {
@@ -169,6 +210,75 @@ private fun HistoryEntryCard(entry: ScreeningHistoryEntity, onDelete: () -> Unit
                 )
             }
             Text(dateLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Navbatdagi (hali yuborilmagan) yoki doimiy xato bilan yakunlangan skrining — [onRetryNow]
+ * faqat [PendingUploadEntity.failed] true bo'lganda ko'rsatiladi ([HistoryScreen], PLAN.md
+ * 4-band, offline navbat). */
+@Composable
+private fun PendingUploadCard(entry: PendingUploadEntity, onCancel: () -> Unit, onRetryNow: () -> Unit) {
+    val eyeLabel = when (entry.eye) {
+        "left" -> stringResource(R.string.common_eye_left_short)
+        "right" -> stringResource(R.string.common_eye_right_short)
+        else -> entry.eye
+    }
+    val pid = entry.patientId?.takeIf { it.isNotBlank() } ?: stringResource(R.string.result_unknown_patient)
+    val dateLabel = remember(entry.queuedAtMs) {
+        SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(entry.queuedAtMs))
+    }
+    val statusColor: Color = if (entry.failed) TrafficRed else TrafficYellow
+    val containerColor: Color = if (entry.failed) TrafficRedContainer else TrafficYellowContainer
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Sizing.cardRadius),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (entry.failed) stringResource(R.string.history_pending_status_failed)
+                    else stringResource(R.string.history_pending_status_queued),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = statusColor,
+                )
+                Row {
+                    if (entry.failed) {
+                        IconButton(onClick = onRetryNow) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = stringResource(R.string.history_pending_retry_content_desc),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.history_pending_cancel_content_desc),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            Text(
+                stringResource(R.string.history_patient_eye_row, pid, eyeLabel),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(R.string.history_pending_queued_at_row, dateLabel),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -549,6 +549,28 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
     }
 }
 
+/** Internet yo'qligi sababli rasm navbatga qo'yilgan holat — WorkManager ulanish tiklangach
+ * o'zi yuboradi, foydalanuvchi hech narsa qilishi shart emas (PLAN.md 4-band, offline navbat). */
+@Composable
+fun QueuedState(onDone: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
+    ) {
+        Text("📶", fontSize = 48.sp)
+        Text(stringResource(R.string.queued_title), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.queued_message),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        PrimaryButton(stringResource(R.string.queued_ok_button), onDone)
+    }
+}
+
 // =====================================================================
 //  KAMERA KOMPONENTLARI (6-hujjat, 6.B)
 // =====================================================================

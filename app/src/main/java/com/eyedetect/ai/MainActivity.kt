@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Bildirishnoma tap qilinganda ko'z mashqlari bo'limiga to'g'ridan-to'g'ri o'tish uchun. */
         const val EXTRA_OPEN_EYECARE = "open_eyecare"
+        /** Navbatga qo'yilgan yuklash yakunlanganda (muvaffaqiyat/xato) bildirishnoma tap
+         * qilinsa Tarix ekraniga to'g'ridan-to'g'ri o'tish uchun. */
+        const val EXTRA_OPEN_HISTORY = "open_history"
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -89,10 +92,12 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(vm: ScreeningViewModel = viewModel()) {
     val activity = LocalContext.current as? Activity
     val openEyeCareOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_EYECARE, false) ?: false
+    val openHistoryOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_HISTORY, false) ?: false
 
     val backStack = rememberSaveable(saver = ScreenListSaver) {
         mutableStateListOf(Screen.Home).apply {
             if (openEyeCareOnStart) add(Screen.EyeCareMenu)
+            if (openHistoryOnStart) add(Screen.History)
         }
     }
     val current = backStack.last()

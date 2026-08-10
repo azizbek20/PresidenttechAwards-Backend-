@@ -162,8 +162,31 @@ yashil, `./gradlew testDebugUnitTest`).
       Hali qilinmagan: solishtirish yoshi/muddatiga chegara yo'q (masalan,
       6 oy oldingi natija bilan solishtirilishi mumkin — foydalanuvchi
       buni faqat ko'rsatilgan sanadan bilib oladi).
-- [ ] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
-      tiklanganda avtomatik yuborish.
+- [x] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
+      tiklanganda avtomatik yuborish. `ScreeningViewModel.uploadFile()`/`uploadUri()`da
+      `UnknownHostException`/`ConnectException` (haqiqiy "ulanish yo'q" holatlari —
+      `SocketTimeoutException` ataylab kirmaydi, sekin server bilan aralashmasin deb,
+      o'sha holatda odatdagidek "Qayta urinish" xato ekrani chiqadi) ushlanganda rasm
+      xato ko'rsatish o'rniga avtomatik navbatga qo'yiladi: baytlar doimiy saqlash
+      joyiga (`filesDir/pending_uploads/`, cacheDir emas) yoziladi, yangi
+      `pending_uploads` Room jadvaliga (`data/upload/` — `PendingUploadEntity`,
+      `PendingUploadDao`, `PendingUploadRepository`; `ScreeningHistoryDatabase`
+      v2→v3) yozuv qo'shiladi va `upload/UploadScheduler.enqueue()` orqali
+      `NetworkType.CONNECTED` cheklovli, nomlangan (unique, ID bo'yicha) WorkManager
+      vazifasi rejalashtiriladi. `upload/UploadWorker.kt` ulanish tiklangach
+      `ApiClient.service.predict()`ni chaqiradi — muvaffaqiyat bo'lsa tarixga
+      saqlanadi (mahalliy evristikasiz) va bildirishnoma ko'rsatiladi
+      (`NotificationHelper.showUploadSuccess`, tap qilinsa Tarix ekraniga —
+      `MainActivity.EXTRA_OPEN_HISTORY`); tarmoq xatosi yoki 5xx bo'lsa
+      eksponensial orqaga chekinish bilan qayta uriniladi (`Result.retry()`,
+      8 urinishgacha); boshqa doimiy xato (masalan 4xx) bo'lsa yozuv
+      o'chirilmaydi, `failed = true` bilan belgilanadi va foydalanuvchi
+      Tarix ekranidagi "Navbatda" bo'limidan qo'lda qayta urinishi yoki bekor
+      qilishi mumkin (`HistoryScreen.kt`). Natija ekranida navbatga qo'yilgan
+      holat uchun alohida `UiState.Queued` + `QueuedState` composable qo'shildi.
+      `ScreeningViewModel`ga WorkManager chaqiruvi `scheduleUpload` parametri
+      orqali inject qilinadi (`healthCheck`dagi kabi sabab — birlik testida
+      haqiqiy WorkManager/tarmoq kerak emas).
 - [x] Bemor tarixini ko'rish ekrani qo'shildi: Bosh ekrandan "Tarix" kartasi
       orqali ochiladi (`ui/HistoryScreen.kt`) — barcha saqlangan
       skrininglarni sana bo'yicha kamayish tartibida, qaror/ICDR/mahalliy

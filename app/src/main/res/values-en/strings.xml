@@ -145,6 +145,17 @@
     <string name="error_retry_unavailable">Couldn\'t retry — the photo is no longer available. Please take a new one.</string>
     <string name="loading_uploading_percent">Uploading: %1$d%%</string>
 
+    <!-- Offline queue (send later via WorkManager when there is no internet) -->
+    <string name="queued_title">Queued</string>
+    <string name="queued_message">No internet connection. The photo has been queued — it will be sent automatically once the connection is back. You can check the result later in \"History\".</string>
+    <string name="queued_ok_button">Got it</string>
+    <string name="history_pending_section_title">Queued — waiting for internet</string>
+    <string name="history_pending_status_queued">Queued</string>
+    <string name="history_pending_status_failed">Failed to send</string>
+    <string name="history_pending_queued_at_row">Queued: %1$s</string>
+    <string name="history_pending_cancel_content_desc">Remove from queue</string>
+    <string name="history_pending_retry_content_desc">Retry</string>
+
     <!-- Eye exercises menu -->
     <string name="eyecare_menu_title">Eye exercises</string>
     <string name="eyecare_streak">Daily streak: %1$d days</string>
@@ -217,4 +228,9 @@
     <string name="notification_pomodoro_focus_done_text">Rest your eyes from the screen — break time started.</string>
     <string name="notification_pomodoro_break_done_title">Break\'s over</string>
     <string name="notification_pomodoro_break_done_text">Come back to the screen whenever you\'re ready to continue.</string>
+    <string name="notification_upload_success_title">Screening result ready</string>
+    <string name="notification_upload_success_text">The queued photo was sent. Check the result in \"History\".</string>
+    <string name="notification_upload_success_text_patient">Patient %1$s\'s result is ready. Check \"History\".</string>
+    <string name="notification_upload_failed_title">Couldn\'t send</string>
+    <string name="notification_upload_failed_text">Sending the queued photo failed. You can retry it from \"History\".</string>
 </resources>

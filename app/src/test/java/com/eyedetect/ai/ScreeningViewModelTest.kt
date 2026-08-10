@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.data.upload.PendingUploadRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -290,14 +292,32 @@ class ScreeningViewModelTest {
     }
 
     @Test
-    fun `uploadFile maps UnknownHostException to the no-connection message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw UnknownHostException("no dns") })
+    fun `uploadFile queues the photo instead of showing an error when there is no connection`() {
+        // `scheduleUpload` inject qilinadi — birlik testida haqiqiy WorkManager/tarmoq kerak emas
+        // (`healthCheck`dagi kabi sabab). [scheduledId] orqali navbat yozuvi ID'si bilan
+        // chaqirilganini ham tekshiramiz.
+        var scheduledId: Long? = null
+        val vm = ScreeningViewModel(
+            app(),
+            FakeApiService { throw UnknownHostException("no dns") },
+            scheduleUpload = { id -> scheduledId = id },
+        )
+        vm.patientId = "p-42"
+        vm.eye = "left"
+        val file = newFile()
 
-        vm.uploadFile(newFile())
+        vm.uploadFile(file)
         val state = awaitTerminalState(vm)
 
-        assertTrue(state is UiState.Error)
-        assertEquals(app().getString(R.string.error_no_connection), (state as UiState.Error).message)
+        assertEquals(UiState.Queued, state)
+        awaitFileDeleted(file)
+
+        val pendingRepo = PendingUploadRepository(app())
+        val pending = kotlinx.coroutines.runBlocking { pendingRepo.pending.first() }
+        assertEquals(1, pending.size)
+        assertEquals(scheduledId, pending[0].id)
+        assertEquals("p-42", pending[0].patientId)
+        assertEquals("left", pending[0].eye)
     }
 
     @Test
