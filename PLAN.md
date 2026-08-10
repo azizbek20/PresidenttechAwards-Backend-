@@ -266,7 +266,12 @@ yashil, `./gradlew testDebugUnitTest`).
       release endi `local.properties`dagi `RELEASE_API_URL`ni ishlatadi
       (HTTPS majburiy), `assembleRelease`/`bundleRelease` oldidan
       `checkReleaseSecrets` orqali tekshiriladi.
-- [ ] Versiya nomlash strategiyasi (`versionName = "0.1.0"` dan keyin).
+- [x] Versiya nomlash strategiyasi: semver (`versionMajor.versionMinor.versionPatch`,
+      `app/build.gradle.kts`) yagona manba, `versionCode` shulardan avtomatik
+      hisoblanadi (`major*10000 + minor*100 + patch`) — ikkalasi qo'lda
+      alohida yangilanib bir-biridan uzilib qolmasligi uchun (versionCode
+      unutilsa Play Store yangilanishni jimgina bloklaydi). Har bir maydon
+      2 xonagacha (0-99) bo'lishi shart, aks holda yuqori xonaga kirib ketadi.
 
 ---
 

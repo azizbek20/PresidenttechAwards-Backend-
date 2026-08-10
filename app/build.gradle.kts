@@ -51,6 +51,17 @@ val debugApiUrl: String =
             }
         }
 
+// Semantic version is the single source of truth; versionCode is derived so the
+// two can never drift apart (e.g. someone bumping versionName and forgetting
+// versionCode, which silently blocks Play Store updates). Bump one of these
+// three on each release — patch for fixes, minor for features, major for
+// breaking/incompatible changes — and versionCode follows automatically.
+// Cap: each field must stay below 100 (2 digits) or versionCode collides with
+// the next field up.
+val versionMajor = 0
+val versionMinor = 1
+val versionPatch = 0
+
 android {
     namespace = "com.eyedetect.ai"
     compileSdk = 34
@@ -59,8 +70,8 @@ android {
         applicationId = "com.eyedetect.ai"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionMajor * 10_000 + versionMinor * 100 + versionPatch
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
 
         // ===================================================================
         // MUHIM: backend manzili. local.properties'da API_BASE_URL bilan
