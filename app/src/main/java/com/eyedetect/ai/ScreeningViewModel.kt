@@ -294,8 +294,9 @@ class ScreeningViewModel @JvmOverloads constructor(
      * Xato bo'lsa jim o'tkazib yuboriladi — bu ixtiyoriy qo'shimcha ko'rsatkich.
      */
     private fun runHeuristicAsync(bitmap: Bitmap, rowId: CompletableDeferred<Long?>) {
+        val appContext = getApplication<Application>()
         viewModelScope.launch(Dispatchers.Default) {
-            val result = runCatching { PupilHeuristics.analyze(bitmap, eye) }.getOrNull()
+            val result = runCatching { PupilHeuristics.analyze(appContext, bitmap, eye) }.getOrNull()
             bitmap.recycle()
             if (result == null) return@launch
             _localHeuristic.value = result

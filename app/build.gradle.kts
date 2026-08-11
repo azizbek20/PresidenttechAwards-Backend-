@@ -158,6 +158,10 @@ dependencies {
     // --- ML Kit (ko'z/iris joylashuvini aniqlash — kamera sifat nazorati uchun) ---
     implementation("com.google.mlkit:face-detection:16.1.7")
 
+    // --- MediaPipe (haqiqiy iris landmarklari — PupilHeuristics ROI aniqligi uchun,
+    // ML Kit'ning taxminiy fixed-radius o'rniga; ML Kit hamon zaxira sifatida qoladi) ---
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
+
     // --- Olingan suratni EXIF burilishini hisobga olib dekodlash (mahalliy CV evristikasi uchun) ---
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 

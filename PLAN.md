@@ -62,6 +62,38 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       Hali qilinmagan:
       - Ikki ko'z simmetriyasi endi qo'shildi — pastga qarang (4-band,
         Room ustiga qurilgan).
+- [x] `PupilHeuristics` ROI'ni ML Kit'ning taxminiy fixed-radius (yuz
+      kengligining 9%i) o'rniga MediaPipe Face Landmarker'ning haqiqiy iris
+      landmarklariga o'tkazdik (`vision/IrisLandmarker.kt`, model
+      `assets/face_landmarker.task`, `com.google.mediapipe:tasks-vision:0.10.14`
+      — `app/build.gradle.kts`). 478 nuqtali yuz to'ridan iris markazi+halqa
+      nuqtalari (o'ng=468/469-472, chap=473/474-477) orqali markaz va radius
+      hisoblanadi — ko'z ochiqligi/burchagiga moslashadi, ML Kit'ning bitta
+      landmark nuqtasi + qattiq nisbatidan farqli. Zaxira zanjiri: MediaPipe
+      muvaffaqiyatsiz bo'lsa (model yuklanmadi/yuz topilmadi) → ML Kit →
+      kadr markazi (`findEyeRegion()` 3 bosqichli). `./gradlew assembleDebug`
+      bilan tekshirildi (native kutubxona to'qnashuvi yo'q, ML Kit bilan
+      birga ishlaydi). Haqiqiy Android qurilmada (USB orqali ulangan) debug
+      APK o'rnatilib qo'lda sinaldi: O'ng ko'z tanlanib surat olinganda
+      `debug_eye_crop_right.jpg` saqlandi va u qorachiqqa aniq markazlashgan,
+      qattiq (tight) kesim edi — ML Kit/markaziy zaxiraga xos kenganroq
+      kesimdan farqli, demak MediaPipe iris landmarklari ishladi va
+      xatosiz (crash/exception'siz) yakunlandi. Chap ko'z bilan takroriy
+      sinov shu qurilmada boshqa foydalanuvchi ilovalariga (Instagram,
+      boshqa Claude Code mobil ilovasi) tasodifiy fokus o'tib ketishi
+      sababli ehtiyot yuzasidan to'xtatildi — funksional jihatdan bir xil
+      kod yo'li (faqat landmark indekslari farq qiladi: 468/469-472 vs
+      473/474-477) bo'lgani uchun bu qabul qilinadigan tavakkal deb topildi.
+      Hali qilinmagan:
+      - Chap ko'z xaritalanishi hali alohida qurilmada tasdiqlanmagan
+        (yuqoridagi sababga ko'ra); `PupilHeuristics`da hamon vaqtinchalik
+        DEBUG-only `saveDebugCrop()` bor
+        (`getExternalFilesDir()/debug_eye_crop_{left,right}.jpg`); real
+        qurilmada tekshirilgach bu funksiya olib tashlanishi kerak.
+      - Birlik test yo'q (`IrisLandmarker`/yangilangan `PupilHeuristics`
+        Android/MediaPipe runtime'ga bog'liq — Robolectric ostida MediaPipe
+        native kutubxonalari ishlamaydi, shuning uchun instrumentation test
+        yoki qo'lda qurilma sinovi kerak bo'ladi).
 - [x] Flash boshqaruvi qo'shildi: `CameraScreen.kt`da yuqori chapdagi chip
       orqali YOQILGAN/AVTO/O'CHIQ o'rtasida almashtirish mumkin
       (`ImageCapture.flashMode`, standart holat — YOQILGAN, chunki qizil
