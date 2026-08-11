@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.eyecare.EyeCarePreferencesRepository
 import com.eyedetect.ai.data.eyecare.ExerciseType
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,10 +29,7 @@ class FollowDotViewModel(application: Application) : AndroidViewModel(applicatio
     fun start() {
         job?.cancel()
         job = viewModelScope.launch {
-            val startTime = System.currentTimeMillis()
-            while (true) {
-                val elapsed = System.currentTimeMillis() - startTime
-                if (elapsed >= SESSION_MS) break
+            runPhase(SESSION_MS) { elapsed ->
                 val t = elapsed / 1000f
                 val x = 0.5f + 0.36f * sin(t * 0.9f)
                 val y = 0.5f + 0.28f * sin(t * 1.4f + 1.1f)
@@ -42,7 +38,6 @@ class FollowDotViewModel(application: Application) : AndroidViewModel(applicatio
                     dot = Offset(x, y),
                     remainingSeconds = ((SESSION_MS - elapsed) / 1000L).toInt() + 1,
                 )
-                delay(16L)
             }
             _uiState.value = FollowDotUiState.Completed
             repo.recordCompletion(ExerciseType.FollowDot)

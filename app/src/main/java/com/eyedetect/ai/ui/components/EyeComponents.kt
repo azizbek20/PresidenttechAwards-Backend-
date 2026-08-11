@@ -43,6 +43,7 @@ import com.eyedetect.ai.R
 import com.eyedetect.ai.EyeSymmetryUiState
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.ui.eyeShortLabel
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,6 +57,7 @@ import com.eyedetect.ai.ui.theme.TrafficRed
 import com.eyedetect.ai.ui.theme.TrafficYellow
 import com.eyedetect.ai.ui.theme.decisionColor
 import com.eyedetect.ai.ui.theme.decisionEmoji
+import com.eyedetect.ai.ui.theme.isUngradableDecision
 
 // =====================================================================
 //  TUGMALAR — dala uchun kattalashtirilgan (6-hujjat, 4.2)
@@ -208,7 +210,7 @@ fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier
 fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
     val bg = decisionColor(result.decision)
     val emoji = decisionEmoji(result.decision)
-    val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
+    val ungradable = isUngradableDecision(result.decision)
     val resultContentDesc = if (ungradable) {
         stringResource(R.string.result_content_desc_ungradable, result.decisionText)
     } else {
@@ -289,7 +291,7 @@ private fun KeyValueRow(key: String, value: String, valueColor: Color = Material
 @Composable
 fun ClinicalDetailCard(result: PredictResponse) {
     SectionCard(stringResource(R.string.result_clinical_details)) {
-        val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
+        val ungradable = isUngradableDecision(result.decision)
         if (!ungradable) {
             KeyValueRow(stringResource(R.string.result_icdr_grade), "${result.icdrGrade} — ${result.gradeLabel}")
         }
@@ -299,11 +301,7 @@ fun ClinicalDetailCard(result: PredictResponse) {
             valueColor = if (ungradable) TrafficGrey else MaterialTheme.colorScheme.onSurface,
         )
         val pid = result.patientId ?: stringResource(R.string.result_unknown_patient)
-        val eye = when (result.eye) {
-            "right" -> stringResource(R.string.common_eye_right_short)
-            "left" -> stringResource(R.string.common_eye_left_short)
-            else -> result.eye ?: stringResource(R.string.result_unknown_patient)
-        }
+        val eye = eyeShortLabel(result.eye)
         KeyValueRow(stringResource(R.string.result_patient_eye), "$pid · $eye")
         KeyValueRow(stringResource(R.string.result_model), result.modelVersion)
     }
@@ -346,11 +344,7 @@ fun PupilHeuristicCard(result: PupilHeuristicResult?) {
 @Composable
 fun EyeSymmetryCard(state: EyeSymmetryUiState?) {
     if (state == null) return
-    val comparedEyeLabel = when (state.comparedEye) {
-        "left" -> stringResource(R.string.common_eye_left_short)
-        "right" -> stringResource(R.string.common_eye_right_short)
-        else -> "—"
-    }
+    val comparedEyeLabel = eyeShortLabel(state.comparedEye)
     val dateLabel = remember(state.comparedAtMs) {
         SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(state.comparedAtMs))
     }

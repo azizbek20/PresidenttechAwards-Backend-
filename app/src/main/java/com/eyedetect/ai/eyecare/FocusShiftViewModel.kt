@@ -10,7 +10,6 @@ import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.eyecare.EyeCarePreferencesRepository
 import com.eyedetect.ai.data.eyecare.ExerciseType
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,10 +42,7 @@ class FocusShiftViewModel(application: Application) : AndroidViewModel(applicati
             for (cycle in 0 until TOTAL_CYCLES) {
                 for (phase in listOf(FocusPhase.Near, FocusPhase.Far)) {
                     vibrate()
-                    val phaseStart = System.currentTimeMillis()
-                    while (true) {
-                        val elapsed = System.currentTimeMillis() - phaseStart
-                        if (elapsed >= PHASE_MS) break
+                    runPhase(PHASE_MS) { elapsed ->
                         _uiState.value = FocusShiftUiState.Running(
                             phase = phase,
                             cycleIndex = cycle,
@@ -54,7 +50,6 @@ class FocusShiftViewModel(application: Application) : AndroidViewModel(applicati
                             phaseProgress = elapsed / PHASE_MS.toFloat(),
                             secondsLeftInPhase = ((PHASE_MS - elapsed) / 1000L).toInt() + 1,
                         )
-                        delay(16L)
                     }
                 }
             }

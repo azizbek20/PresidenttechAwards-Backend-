@@ -100,6 +100,17 @@
     <string name="history_patient_eye_row">Patient / eye: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Local: opacity — %1$s, red reflex — %2$s</string>
     <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_search_placeholder">Search by patient ID</string>
+    <string name="history_search_empty">No results found.</string>
+    <string name="history_select_button">Select</string>
+    <string name="history_select_cancel_content_desc">Cancel selection</string>
+    <string name="history_select_all">Select all</string>
+    <string name="history_selected_count">%1$d selected</string>
+    <string name="history_delete_selected_content_desc">Delete selected entries</string>
+    <string name="history_delete_selected_dialog_title">Delete entries?</string>
+    <string name="history_delete_selected_dialog_message">%1$d screening record(s) will be permanently deleted. This can\'t be undone.</string>
+    <string name="history_delete_confirm">Delete</string>
+    <string name="history_checkbox_content_desc">Select</string>
     <string name="result_heatmap_title">Where the AI looked (heatmap)</string>
     <string name="result_original_image">Original image</string>
     <string name="result_original_image_content_desc">Original fundus image</string>

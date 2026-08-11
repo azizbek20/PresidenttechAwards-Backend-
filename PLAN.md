@@ -191,8 +191,12 @@ yashil, `./gradlew testDebugUnitTest`).
       orqali ochiladi (`ui/HistoryScreen.kt`) — barcha saqlangan
       skrininglarni sana bo'yicha kamayish tartibida, qaror/ICDR/mahalliy
       evristika bilan ko'rsatadi, har bir yozuvni o'chirish imkoniyati bilan.
-      Hali qilinmagan: bemor bo'yicha filtrlash/qidirish (hozir faqat
-      to'liq ro'yxat), massaviy tozalash (faqat bittalab o'chirish bor).
+- [x] Tarix ekraniga bemor ID bo'yicha qidiruv (`OutlinedTextField`, mahalliy
+      `contains`-filtr, DB so'rovisiz — ro'yxat hajmi kichik deb topildi) va
+      massaviy o'chirish (yuqoridagi "Tanlash" tugmasi → checkbox rejimi →
+      "Hammasini tanlash"/o'chirish, `AlertDialog` bilan tasdiqlash) qo'shildi.
+      Hali qilinmagan: eski yozuvlarni avtomatik tozalash siyosati (pastga
+      qarang) va simmetriya solishtirish uchun muddat chegarasi.
 
 ## 5. Holatni saqlash va navigatsiya 🟡
 

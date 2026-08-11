@@ -37,6 +37,7 @@ import com.eyedetect.ai.ui.components.TextActionButton
 import com.eyedetect.ai.ui.components.TrafficLightCard
 import com.eyedetect.ai.ui.components.WarningBanner
 import com.eyedetect.ai.ui.theme.Spacing
+import com.eyedetect.ai.ui.theme.isUngradableDecision
 import com.eyedetect.ai.vision.PupilHeuristicResult
 
 /**
@@ -82,7 +83,7 @@ private fun SuccessContent(
     onRetry: () -> Unit,
     onNewPatient: () -> Unit,
 ) {
-    val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
+    val ungradable = isUngradableDecision(r.decision)
     val context = LocalContext.current
 
     Column(
@@ -168,12 +169,8 @@ private fun shareResult(context: Context, r: PredictResponse) {
 }
 
 private fun buildShareText(context: Context, r: PredictResponse): String {
-    val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
-    val eyeLabel = when (r.eye) {
-        "right" -> context.getString(R.string.common_eye_right)
-        "left" -> context.getString(R.string.common_eye_left)
-        else -> "—"
-    }
+    val ungradable = isUngradableDecision(r.decision)
+    val eyeLabel = eyeLabel(context, r.eye)
     val probabilityText = if (ungradable) "—" else "${(r.probability * 100).toInt()}%"
     val gradeText = if (ungradable) "—" else "${r.icdrGrade} — ${r.gradeLabel}"
     return context.getString(

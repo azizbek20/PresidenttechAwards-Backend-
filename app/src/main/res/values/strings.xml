@@ -100,6 +100,17 @@
     <string name="history_patient_eye_row">Bemor / ko\'z: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Mahalliy: xiralik — %1$s, qizil refleks — %2$s</string>
     <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_search_placeholder">Bemor ID bo\'yicha qidirish</string>
+    <string name="history_search_empty">Qidiruv bo\'yicha hech narsa topilmadi.</string>
+    <string name="history_select_button">Tanlash</string>
+    <string name="history_select_cancel_content_desc">Tanlashni bekor qilish</string>
+    <string name="history_select_all">Hammasini tanlash</string>
+    <string name="history_selected_count">%1$d ta tanlandi</string>
+    <string name="history_delete_selected_content_desc">Tanlangan yozuvlarni o\'chirish</string>
+    <string name="history_delete_selected_dialog_title">Yozuvlarni o\'chirish?</string>
+    <string name="history_delete_selected_dialog_message">%1$d ta skrining yozuvi butunlay o\'chiriladi. Bu amalni bekor qilib bo\'lmaydi.</string>
+    <string name="history_delete_confirm">O\'chirish</string>
+    <string name="history_checkbox_content_desc">Tanlash</string>
     <string name="result_heatmap_title">SI qayerga qaradi (issiqlik xaritasi)</string>
     <string name="result_original_image">Asl rasm</string>
     <string name="result_original_image_content_desc">Asl fundus rasm</string>

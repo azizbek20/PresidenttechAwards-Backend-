@@ -100,6 +100,17 @@
     <string name="history_patient_eye_row">Пациент / глаз: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Локально: помутнение — %1$s, красный рефлекс — %2$s</string>
     <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_search_placeholder">Поиск по ID пациента</string>
+    <string name="history_search_empty">По запросу ничего не найдено.</string>
+    <string name="history_select_button">Выбрать</string>
+    <string name="history_select_cancel_content_desc">Отменить выбор</string>
+    <string name="history_select_all">Выбрать все</string>
+    <string name="history_selected_count">Выбрано: %1$d</string>
+    <string name="history_delete_selected_content_desc">Удалить выбранные записи</string>
+    <string name="history_delete_selected_dialog_title">Удалить записи?</string>
+    <string name="history_delete_selected_dialog_message">%1$d записей скрининга будут удалены безвозвратно. Это действие нельзя отменить.</string>
+    <string name="history_delete_confirm">Удалить</string>
+    <string name="history_checkbox_content_desc">Выбрать</string>
     <string name="result_heatmap_title">Куда смотрел ИИ (тепловая карта)</string>
     <string name="result_original_image">Исходный снимок</string>
     <string name="result_original_image_content_desc">Исходный снимок глазного дна</string>

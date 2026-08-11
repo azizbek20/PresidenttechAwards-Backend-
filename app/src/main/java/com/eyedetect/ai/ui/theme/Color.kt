@@ -63,3 +63,8 @@ fun decisionEmoji(decision: String): String = when (decision) {
     "NO_REFER" -> "🟢"   // 🟢
     else -> "⚪"               // ⚪
 }
+
+/** REFER/NO_REFER'dan boshqa har qanday qiymat (masalan sifat yetarli emasligi sababli
+ * baholab bo'lmagan holat) ungradable hisoblanadi — bir nechta ekranda takrorlangan
+ * tekshiruv shu yerga jamlangan. */
+fun isUngradableDecision(decision: String?): Boolean = decision != "REFER" && decision != "NO_REFER"
