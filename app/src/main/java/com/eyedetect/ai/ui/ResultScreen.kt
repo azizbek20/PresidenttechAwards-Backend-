@@ -107,40 +107,33 @@ private fun SuccessContent(
             )
         }
 
-        // 1) Svetofor qaror kartasi
         TrafficLightCard(r)
 
-        // UNGRADABLE uchun ogohlantirish
         if (ungradable) {
             WarningBanner(stringResource(R.string.result_ungradable_warning))
         }
 
-        // 2) Klinik tafsilot
         ClinicalDetailCard(r)
 
-        // 2b) Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
+        // Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
         PupilHeuristicCard(localHeuristic)
 
-        // 2c) Ikki ko'z simmetriyasi — qarshi ko'z uchun oldingi natija topilgan bo'lsa
+        // Ikki ko'z simmetriyasi — qarshi ko'z uchun oldingi natija topilgan bo'lsa
         EyeSymmetryCard(symmetry)
 
-        // 3) Heatmap (asl + Grad-CAM)
         HeatmapCard(r)
 
-        // 4) Tavsiya
         RecommendationCard(r.decision)
 
-        // 5) Disklaymer
         DisclaimerText(r.disclaimer)
 
-        // 5b) Ulashish — foydalanuvchi tanlagan ilova orqali (Telegram, SMS, email va h.k.);
+        // Ulashish — foydalanuvchi tanlagan ilova orqali (Telegram, SMS, email va h.k.);
         // hech narsa avtomatik yuborilmaydi, faqat tizim ulashish oynasi ochiladi.
         TextActionButton(
             text = "🔗 " + stringResource(R.string.result_share_button),
             onClick = { shareResult(context, r) },
         )
 
-        // 6) Harakat tugmalari
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),

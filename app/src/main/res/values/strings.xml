@@ -14,16 +14,10 @@
     <string name="common_eye_right_short">o\'ng</string>
     <string name="common_eye_left_short">chap</string>
     <string name="common_exercise_done_title">Ajoyib! Mashq tugadi.</string>
-    <string name="common_language">Til</string>
     <string name="common_dash">—</string>
     <string name="common_content_desc_selected">%1$s ✓</string>
     <string name="content_desc_title_subtitle">%1$s — %2$s</string>
     <string name="content_desc_title_subtitle_status">%1$s — %2$s, %3$s</string>
-
-    <!-- Til nomlari — har doim o\'z tilida ko\'rsatiladi -->
-    <string name="lang_uz">O\'zbekcha</string>
-    <string name="lang_ru">Русский</string>
-    <string name="lang_en">English</string>
 
     <!-- Bosh sahifa -->
     <string name="home_subtitle">Nima qilmoqchisiz?</string>
