@@ -6,6 +6,10 @@ import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
+import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.math.sqrt
 
 /**
@@ -31,8 +35,14 @@ object IrisLandmarker {
     private const val LEFT_IRIS_CENTER = 473
     private val LEFT_IRIS_RING = intArrayOf(474, 475, 476, 477)
 
+    private const val DETECT_TIMEOUT_SECONDS = 3L
+
     @Volatile
     private var landmarker: FaceLandmarker? = null
+
+    // detect() past kutilmagan holatlarda (masalan, xotira bosimi ostida) uzoq bloklanib
+    // qolishi mumkin — chegaralangan kutish uchun alohida ip.
+    private val detectExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "IrisLandmarkerDetect") }
 
     private fun getOrCreate(context: Context): FaceLandmarker =
         landmarker ?: synchronized(this) {
@@ -55,17 +65,31 @@ object IrisLandmarker {
 
     /**
      * @return (markazX, markazY, radius) bitmap piksel koordinatalarida, yoki yuz/iris
-     * topilmasa (yoki model muvaffaqiyatsiz yuklansa) `null`. Sinxron — chaqiruvchi fon
-     * ipida (Dispatchers.Default) ishga tushirishi shart. Bir vaqtda faqat bitta chaqiruv
-     * ishlaydi (`@Synchronized`) — [FaceLandmarker] ko'p ipli parallel `detect()` chaqiruvini
-     * kafolatlamaydi, hozircha esa yagona chaqiruvchi ([com.eyedetect.ai.ScreeningViewModel])
-     * baribir ketma-ket ishlaydi, shuning uchun bu amalda bloklashga olib kelmaydi.
+     * topilmasa, model muvaffaqiyatsiz yuklansa, yoki `detect()` [DETECT_TIMEOUT_SECONDS]
+     * ichida qaytmasa `null`. Sinxron — chaqiruvchi fon ipida (Dispatchers.Default) ishga
+     * tushirishi shart. Bir vaqtda faqat bitta chaqiruv ishlaydi (`@Synchronized`) —
+     * [FaceLandmarker] ko'p ipli parallel `detect()` chaqiruvini kafolatlamaydi, hozircha
+     * esa yagona chaqiruvchi ([com.eyedetect.ai.ScreeningViewModel]) baribir ketma-ket
+     * ishlaydi, shuning uchun bu amalda bloklashga olib kelmaydi.
+     *
+     * `detect()` chegaralangan kutish bilan ([detectExecutor] + timeout) chaqiriladi —
+     * ML Kit zaxira yo'lidagi `Tasks.await(..., 3, TimeUnit.SECONDS)`ga o'xshab: xotira
+     * bosimi yoki boshqa kutilmagan holat ostida native chaqiruv cheksiz bloklanib qolsa
+     * ham, chaqiruvchi ip abadiy osilib qolmaydi (past ip esa fon rejimida davom etadi).
      */
     @Synchronized
     fun detectIris(context: Context, bitmap: Bitmap, eye: String): Triple<Float, Float, Float>? {
         val result = runCatching {
             val faceLandmarker = getOrCreate(context)
-            faceLandmarker.detect(BitmapImageBuilder(bitmap).build())
+            val future = detectExecutor.submit<FaceLandmarkerResult> {
+                faceLandmarker.detect(BitmapImageBuilder(bitmap).build())
+            }
+            try {
+                future.get(DETECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            } catch (e: TimeoutException) {
+                future.cancel(true)
+                null
+            }
         }.getOrNull() ?: return null
 
         if (result.faceLandmarks().isEmpty()) return null
