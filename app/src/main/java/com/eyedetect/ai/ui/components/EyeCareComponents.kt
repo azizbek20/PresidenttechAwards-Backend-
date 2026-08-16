@@ -41,7 +41,10 @@ import com.eyedetect.ai.ui.theme.Spacing
 //  KO'Z MASHQLARI — bosh sahifa / menyu kartalari
 // =====================================================================
 
-/** Bosh sahifadagi katta bo'lim kartasi ("Skrining" / "Ko'z mashqlari"). */
+/** Bosh sahifadagi katta bo'lim kartasi ("Skrining" / "Ko'z mashqlari"). [badge] — masalan
+ * ko'z mashqlari ketma-ketligi ("🔥 3 kun") — ekranga kirmasdan ham ko'rinib turishi uchun,
+ * bo'lmasa hech narsa chizmaydi (bosh sahifadan bir necha bosishda yashiringan gamifikatsiya
+ * kamroq ishlatilishiga olib kelishi mumkin edi). */
 @Composable
 fun MenuCard(
     title: String,
@@ -49,6 +52,7 @@ fun MenuCard(
     emoji: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badge: String? = null,
 ) {
     val titleSubtitleDesc = stringResource(R.string.content_desc_title_subtitle, title, subtitle)
     Card(
@@ -65,18 +69,38 @@ fun MenuCard(
         Row(
             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) { Text(emoji, fontSize = 26.sp) }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Box(
+                    Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) { Text(emoji, fontSize = 26.sp) }
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (badge != null) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                ) {
+                    Text(
+                        badge,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
             }
         }
     }
