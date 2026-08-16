@@ -14,16 +14,10 @@
     <string name="common_eye_right_short">o\'ng</string>
     <string name="common_eye_left_short">chap</string>
     <string name="common_exercise_done_title">Ajoyib! Mashq tugadi.</string>
-    <string name="common_language">Til</string>
     <string name="common_dash">—</string>
     <string name="common_content_desc_selected">%1$s ✓</string>
     <string name="content_desc_title_subtitle">%1$s — %2$s</string>
     <string name="content_desc_title_subtitle_status">%1$s — %2$s, %3$s</string>
-
-    <!-- Til nomlari — har doim o\'z tilida ko\'rsatiladi -->
-    <string name="lang_uz">O\'zbekcha</string>
-    <string name="lang_ru">Русский</string>
-    <string name="lang_en">English</string>
 
     <!-- Bosh sahifa -->
     <string name="home_subtitle">Nima qilmoqchisiz?</string>
@@ -100,6 +94,17 @@
     <string name="history_patient_eye_row">Bemor / ko\'z: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Mahalliy: xiralik — %1$s, qizil refleks — %2$s</string>
     <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_search_placeholder">Bemor ID bo\'yicha qidirish</string>
+    <string name="history_search_empty">Qidiruv bo\'yicha hech narsa topilmadi.</string>
+    <string name="history_select_button">Tanlash</string>
+    <string name="history_select_cancel_content_desc">Tanlashni bekor qilish</string>
+    <string name="history_select_all">Hammasini tanlash</string>
+    <string name="history_selected_count">%1$d ta tanlandi</string>
+    <string name="history_delete_selected_content_desc">Tanlangan yozuvlarni o\'chirish</string>
+    <string name="history_delete_selected_dialog_title">Yozuvlarni o\'chirish?</string>
+    <string name="history_delete_selected_dialog_message">%1$d ta skrining yozuvi butunlay o\'chiriladi. Bu amalni bekor qilib bo\'lmaydi.</string>
+    <string name="history_delete_confirm">O\'chirish</string>
+    <string name="history_checkbox_content_desc">Tanlash</string>
     <string name="result_heatmap_title">SI qayerga qaradi (issiqlik xaritasi)</string>
     <string name="result_original_image">Asl rasm</string>
     <string name="result_original_image_content_desc">Asl fundus rasm</string>
@@ -109,6 +114,9 @@
     <string name="result_recommendation_refer">Keyingi qadam: bemorni oftalmologga yo\'llang.</string>
     <string name="result_recommendation_no_refer">Keyingi qadam: 12 oydan keyin qayta chaqiring.</string>
     <string name="result_recommendation_ungradable">Keyingi qadam: rasmni qayta oling (fokus/yorug\'likka e\'tibor bering) yoki mutaxassisga yo\'llang.</string>
+    <string name="result_share_button">Ulashish</string>
+    <string name="result_share_chooser_title">Natijani ulashish</string>
+    <string name="result_share_text">%1$s — skrining natijasi\n\nBemor: %2$s\nKo\'z: %3$s\nQaror: %4$s\nIshonch: %5$s\nICDR daraja: %6$s\nSana: %7$s\n\n%8$s</string>
 
     <!-- Yuklanish / xato holatlari -->
     <string name="loading_title">Tahlil qilinmoqda…</string>
@@ -142,6 +150,17 @@
     <string name="error_retry_unavailable">Qayta urinib bo\'lmadi — rasm topilmadi. Iltimos, qaytadan suratga oling.</string>
     <string name="loading_uploading_percent">Yuklanmoqda: %1$d%%</string>
 
+    <!-- Offline navbat (internet yo'q paytda WorkManager orqali keyinroq yuborish) -->
+    <string name="queued_title">Navbatga qo\'yildi</string>
+    <string name="queued_message">Internet aloqasi yo\'q. Rasm navbatga qo\'yildi — ulanish tiklanganda avtomatik yuboriladi. Natijani keyinroq \"Tarix\" bo\'limidan ko\'rishingiz mumkin.</string>
+    <string name="queued_ok_button">Tushunarli</string>
+    <string name="history_pending_section_title">Navbatda — internet kutilmoqda</string>
+    <string name="history_pending_status_queued">Navbatda</string>
+    <string name="history_pending_status_failed">Yuborilmadi</string>
+    <string name="history_pending_queued_at_row">Navbatga qo\'yildi: %1$s</string>
+    <string name="history_pending_cancel_content_desc">Navbatdan bekor qilish</string>
+    <string name="history_pending_retry_content_desc">Qayta urinish</string>
+
     <!-- Ko\'z mashqlari menyusi -->
     <string name="eyecare_menu_title">Ko\'z mashqlari</string>
     <string name="eyecare_streak">Kunlik ketma-ketlik: %1$d kun</string>
@@ -158,6 +177,19 @@
     <string name="reminder_row_disabled">O\'chirilgan</string>
     <string name="reminder_row_configure">Sozlash →</string>
     <string name="reminder_row_enable">Yoqish →</string>
+
+    <!-- Pomodoro -->
+    <string name="pomodoro_title">Pomodoro</string>
+    <string name="pomodoro_card_subtitle">Ekran vaqtini kuzatib, dam olish vaqtini eslatadi</string>
+    <string name="pomodoro_description">Fokus va tanaffus davrlarini kuzatib boradi — ekrandan dam olish vaqti kelganda ogohlantiradi, ilova yopiq bo\'lsa ham.</string>
+    <string name="pomodoro_phase_focus">Fokus</string>
+    <string name="pomodoro_phase_break">Tanaffus</string>
+    <string name="pomodoro_status_running">Faol · %1$s</string>
+    <string name="pomodoro_focus_label">Fokus (daqiqa)</string>
+    <string name="pomodoro_break_label">Tanaffus (daqiqa)</string>
+    <string name="pomodoro_start">Boshlash</string>
+    <string name="pomodoro_stop">To\'xtatish</string>
+    <string name="pomodoro_background_info">Fon rejimida ishlaydi — ilovadan chiqsangiz yoki ekranni qulflasangiz ham, bosqich tugaganda ogohlantiradi.</string>
 
     <!-- Nuqtani kuzatish -->
     <string name="followdot_instructions">Boshingizni qimirlatmasdan, faqat ko\'zingiz bilan nuqtani kuzating.</string>
@@ -197,4 +229,13 @@
     <string name="notification_channel_description">20-20-20 qoidasi bo\'yicha davriy eslatma</string>
     <string name="notification_title">Ko\'zingizga dam bering</string>
     <string name="notification_text">6 metr uzoqlikka 20 soniya qarang (20-20-20 qoidasi).</string>
+    <string name="notification_pomodoro_focus_done_title">Vaqt keldi!</string>
+    <string name="notification_pomodoro_focus_done_text">Ekrandan dam oling — tanaffus boshlandi.</string>
+    <string name="notification_pomodoro_break_done_title">Tanaffus tugadi</string>
+    <string name="notification_pomodoro_break_done_text">Davom etishga tayyor bo\'lsangiz, ekranga qayting.</string>
+    <string name="notification_upload_success_title">Skrining natijasi tayyor</string>
+    <string name="notification_upload_success_text">Navbatdagi rasm yuborildi. Natijani \"Tarix\" bo\'limidan ko\'ring.</string>
+    <string name="notification_upload_success_text_patient">%1$s bemor natijasi tayyor. \"Tarix\" bo\'limidan ko\'ring.</string>
+    <string name="notification_upload_failed_title">Yuborib bo\'lmadi</string>
+    <string name="notification_upload_failed_text">Navbatdagi rasmni yuborishda xatolik yuz berdi. \"Tarix\" bo\'limidan qayta urinib ko\'rishingiz mumkin.</string>
 </resources>

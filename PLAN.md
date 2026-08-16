@@ -80,6 +80,38 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       Hali qilinmagan:
       - Ikki ko'z simmetriyasi endi qo'shildi — pastga qarang (4-band,
         Room ustiga qurilgan).
+- [x] `PupilHeuristics` ROI'ni ML Kit'ning taxminiy fixed-radius (yuz
+      kengligining 9%i) o'rniga MediaPipe Face Landmarker'ning haqiqiy iris
+      landmarklariga o'tkazdik (`vision/IrisLandmarker.kt`, model
+      `assets/face_landmarker.task`, `com.google.mediapipe:tasks-vision:0.10.14`
+      — `app/build.gradle.kts`). 478 nuqtali yuz to'ridan iris markazi+halqa
+      nuqtalari (o'ng=468/469-472, chap=473/474-477) orqali markaz va radius
+      hisoblanadi — ko'z ochiqligi/burchagiga moslashadi, ML Kit'ning bitta
+      landmark nuqtasi + qattiq nisbatidan farqli. Zaxira zanjiri: MediaPipe
+      muvaffaqiyatsiz bo'lsa (model yuklanmadi/yuz topilmadi) → ML Kit →
+      kadr markazi (`findEyeRegion()` 3 bosqichli). `./gradlew assembleDebug`
+      bilan tekshirildi (native kutubxona to'qnashuvi yo'q, ML Kit bilan
+      birga ishlaydi). Haqiqiy Android qurilmada (USB orqali ulangan) debug
+      APK o'rnatilib qo'lda sinaldi: O'ng ko'z tanlanib surat olinganda
+      `debug_eye_crop_right.jpg` saqlandi va u qorachiqqa aniq markazlashgan,
+      qattiq (tight) kesim edi — ML Kit/markaziy zaxiraga xos kenganroq
+      kesimdan farqli, demak MediaPipe iris landmarklari ishladi va
+      xatosiz (crash/exception'siz) yakunlandi. Chap ko'z bilan takroriy
+      sinov shu qurilmada boshqa foydalanuvchi ilovalariga (Instagram,
+      boshqa Claude Code mobil ilovasi) tasodifiy fokus o'tib ketishi
+      sababli ehtiyot yuzasidan to'xtatildi — funksional jihatdan bir xil
+      kod yo'li (faqat landmark indekslari farq qiladi: 468/469-472 vs
+      473/474-477) bo'lgani uchun bu qabul qilinadigan tavakkal deb topildi.
+      Hali qilinmagan:
+      - Chap ko'z xaritalanishi hali alohida qurilmada tasdiqlanmagan
+        (yuqoridagi sababga ko'ra); `PupilHeuristics`da hamon vaqtinchalik
+        DEBUG-only `saveDebugCrop()` bor
+        (`getExternalFilesDir()/debug_eye_crop_{left,right}.jpg`); real
+        qurilmada tekshirilgach bu funksiya olib tashlanishi kerak.
+      - Birlik test yo'q (`IrisLandmarker`/yangilangan `PupilHeuristics`
+        Android/MediaPipe runtime'ga bog'liq — Robolectric ostida MediaPipe
+        native kutubxonalari ishlamaydi, shuning uchun instrumentation test
+        yoki qo'lda qurilma sinovi kerak bo'ladi).
 - [x] Flash boshqaruvi qo'shildi: `CameraScreen.kt`da yuqori chapdagi chip
       orqali YOQILGAN/AVTO/O'CHIQ o'rtasida almashtirish mumkin
       (`ImageCapture.flashMode`, standart holat — YOQILGAN, chunki qizil
@@ -180,14 +212,41 @@ yashil, `./gradlew testDebugUnitTest`).
       Hali qilinmagan: solishtirish yoshi/muddatiga chegara yo'q (masalan,
       6 oy oldingi natija bilan solishtirilishi mumkin — foydalanuvchi
       buni faqat ko'rsatilgan sanadan bilib oladi).
-- [ ] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
-      tiklanganda avtomatik yuborish.
+- [x] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
+      tiklanganda avtomatik yuborish. `ScreeningViewModel.uploadFile()`/`uploadUri()`da
+      `UnknownHostException`/`ConnectException` (haqiqiy "ulanish yo'q" holatlari —
+      `SocketTimeoutException` ataylab kirmaydi, sekin server bilan aralashmasin deb,
+      o'sha holatda odatdagidek "Qayta urinish" xato ekrani chiqadi) ushlanganda rasm
+      xato ko'rsatish o'rniga avtomatik navbatga qo'yiladi: baytlar doimiy saqlash
+      joyiga (`filesDir/pending_uploads/`, cacheDir emas) yoziladi, yangi
+      `pending_uploads` Room jadvaliga (`data/upload/` — `PendingUploadEntity`,
+      `PendingUploadDao`, `PendingUploadRepository`; `ScreeningHistoryDatabase`
+      v2→v3) yozuv qo'shiladi va `upload/UploadScheduler.enqueue()` orqali
+      `NetworkType.CONNECTED` cheklovli, nomlangan (unique, ID bo'yicha) WorkManager
+      vazifasi rejalashtiriladi. `upload/UploadWorker.kt` ulanish tiklangach
+      `ApiClient.service.predict()`ni chaqiradi — muvaffaqiyat bo'lsa tarixga
+      saqlanadi (mahalliy evristikasiz) va bildirishnoma ko'rsatiladi
+      (`NotificationHelper.showUploadSuccess`, tap qilinsa Tarix ekraniga —
+      `MainActivity.EXTRA_OPEN_HISTORY`); tarmoq xatosi yoki 5xx bo'lsa
+      eksponensial orqaga chekinish bilan qayta uriniladi (`Result.retry()`,
+      8 urinishgacha); boshqa doimiy xato (masalan 4xx) bo'lsa yozuv
+      o'chirilmaydi, `failed = true` bilan belgilanadi va foydalanuvchi
+      Tarix ekranidagi "Navbatda" bo'limidan qo'lda qayta urinishi yoki bekor
+      qilishi mumkin (`HistoryScreen.kt`). Natija ekranida navbatga qo'yilgan
+      holat uchun alohida `UiState.Queued` + `QueuedState` composable qo'shildi.
+      `ScreeningViewModel`ga WorkManager chaqiruvi `scheduleUpload` parametri
+      orqali inject qilinadi (`healthCheck`dagi kabi sabab — birlik testida
+      haqiqiy WorkManager/tarmoq kerak emas).
 - [x] Bemor tarixini ko'rish ekrani qo'shildi: Bosh ekrandan "Tarix" kartasi
       orqali ochiladi (`ui/HistoryScreen.kt`) — barcha saqlangan
       skrininglarni sana bo'yicha kamayish tartibida, qaror/ICDR/mahalliy
       evristika bilan ko'rsatadi, har bir yozuvni o'chirish imkoniyati bilan.
-      Hali qilinmagan: bemor bo'yicha filtrlash/qidirish (hozir faqat
-      to'liq ro'yxat), massaviy tozalash (faqat bittalab o'chirish bor).
+- [x] Tarix ekraniga bemor ID bo'yicha qidiruv (`OutlinedTextField`, mahalliy
+      `contains`-filtr, DB so'rovisiz — ro'yxat hajmi kichik deb topildi) va
+      massaviy o'chirish (yuqoridagi "Tanlash" tugmasi → checkbox rejimi →
+      "Hammasini tanlash"/o'chirish, `AlertDialog` bilan tasdiqlash) qo'shildi.
+      Hali qilinmagan: eski yozuvlarni avtomatik tozalash siyosati (pastga
+      qarang) va simmetriya solishtirish uchun muddat chegarasi.
 
 ## 5. Holatni saqlash va navigatsiya 🟡
 
@@ -253,31 +312,52 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [x] `isMinifyEnabled = true` + `isShrinkResources = true` yoqildi
-      (`app/build.gradle.kts`). `proguard-rules.pro`ga Retrofit (dinamik
-      proksi interfeysi + suspend/generic signature saqlash) va Gson uchun
-      rasmiy tavsiya qilingan qoidalar qo'shildi; `com.eyedetect.ai.data.**`
-      (JSON model klasslari) to'liq saqlanadi. Tekshirildi:
-      `./gradlew minifyReleaseWithR8` va `convertShrunkResourcesToBinaryRelease`
-      xatosiz o'tadi (R8 "missing classes" xatosi yo'q).
-- [x] Haqiqiy ilova ikonkasi qo'shildi: brend teal foni (`#00696E`,
-      `Color.kt`dagi `Primary` bilan mos) ustida oq "ko'z" shakli (adaptive
-      icon, `mipmap-anydpi-v26/ic_launcher(.xml/_round.xml)` +
-      `drawable/ic_launcher_foreground.xml`); API 24-25 uchun tekis zaxira
-      (`drawable/ic_launcher_flat.xml`, `mipmap-anydpi/ic_launcher*.xml`
-      orqali ulangan). `AndroidManifest.xml`da `android:icon`/`roundIcon`
-      belgilandi. Faqat vektor (raster export/dizayner kerak bo'lmadi).
+- [x] `isMinifyEnabled = true` + `isShrinkResources = true` release build turida
+      yoqildi. Har bir
+      kutubxona AAR/jar'ining o'z consumer-rules/`META-INF/proguard`
+      qoidalarini olib kelishi tekshirildi (Gradle cache'dan AAR/jar'larni
+      ochib): Retrofit, OkHttp, Room, WorkManager, ML Kit — hammasi o'z
+      qoidalarini olib keladi, qo'shimcha kerak emas. Faqat **Gson**
+      (`converter-gson` ham) hech qanday consumer-rules olib kelmaydi —
+      shu sababli `proguard-rules.pro`ga qo'lda qo'shildi: `Signature`/
+      `*Annotation*` atributlarini saqlash (aks holda `@SerializedName`
+      va generic turlar yo'qoladi) + Gson'ning rasmiy tavsiya qilingan
+      `TypeAdapterFactory`/`TypeToken` himoyaviy qoidalari. Mavjud
+      `-keep class com.eyedetect.ai.data.** { *; }` (DTO/Room entity/DAO)
+      saqlab qolindi. `./gradlew assembleRelease` orqali haqiqiy R8
+      minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL, `missing_rules.txt`
+      yaratilmadi (R8 hech narsa yetishmayotganini aniqlamadi), `mapping.txt`da
+      `PredictResponse` maydonlari va uchta Worker klassi (`UploadWorker`,
+      `PomodoroWorker`, `ReminderWorker`) o'z nomlarini saqlab qolgani
+      tasdiqlandi (WorkManager ularni ism bo'yicha reflection orqali
+      qayta yuklaydi, nomi o'zgarsa ishlamay qoladi). SQLCipher (Room bazasini
+      shifrlash) uchun ham alohida qoida saqlab qolindi — uning JNI/native
+      ko'prik klasslari reflektsiya orqali chaqirilgani uchun.
+      Hali qilinmagan: haqiqiy qurilmada release APK'ni ishga tushirib
+      to'liq qo'lda sinash (bu muhitda emulyator/qurilma yo'q) —
+      release'ga chiqishdan oldin tavsiya etiladi.
+- [x] Haqiqiy ilova ikonkasi qo'shildi: brend rangida (`Color.kt`dagi
+      `Primary` teal fon, oq ko'z shakli, qorong'i iris, oq refleks nuqtasi)
+      ko'z glifi — dasturiy ravishda (Python/Pillow, ikkita doira kesishmasi
+      orqali vesica shakl + supersample AA) barcha kerakli o'lchamlarda
+      generatsiya qilindi: adaptiv ikonka (API 26+, `mipmap-anydpi-v26/
+      ic_launcher.xml` + `ic_launcher_round.xml`, background/foreground/
+      monochrome qatlamlari `mipmap-*dpi`da), eski qurilmalar uchun
+      to'g'ridan-to'g'ri kvadrat/dumaloq PNG fallback (`ic_launcher.png`/
+      `ic_launcher_round.png`, minSdk 24 API 24-25 uchun), va Play Store
+      uchun 512x512 versiya (`docs/app_icon_play_store_512.png`).
+      `AndroidManifest.xml`ga `android:icon`/`android:roundIcon` ulandi.
+      `./gradlew assembleDebug` bilan tekshirildi.
 - [x] `API_BASE_URL`ni build-turlariga (debug/staging/release) ajratish —
       release endi `local.properties`dagi `RELEASE_API_URL`ni ishlatadi
       (HTTPS majburiy), `assembleRelease`/`bundleRelease` oldidan
       `checkReleaseSecrets` orqali tekshiriladi.
-- [x] Versiya nomlash strategiyasi qo'shildi (`app/build.gradle.kts`):
-      Semantic Versioning (MAJOR.MINOR.PATCH) — PATCH xato tuzatish, MINOR
-      orqaga mos yangi funksiya, MAJOR katta/orqaga mos kelmaydigan
-      o'zgarish (birinchi relizda 1.0.0ga o'tish tavsiya etiladi).
-      `versionCode` endi `versionName`dan avtomatik hisoblanadi
-      (`major*10000 + minor*100 + patch`) — kelajakda faqat `appVersionName`
-      qatorini yangilash kifoya, `versionCode`ni qo'lda ko'tarish shart emas.
+- [x] Versiya nomlash strategiyasi: semver (`versionMajor.versionMinor.versionPatch`,
+      `app/build.gradle.kts`) yagona manba, `versionCode` shulardan avtomatik
+      hisoblanadi (`major*10000 + minor*100 + patch`) — ikkalasi qo'lda
+      alohida yangilanib bir-biridan uzilib qolmasligi uchun (versionCode
+      unutilsa Play Store yangilanishni jimgina bloklaydi). Har bir maydon
+      2 xonagacha (0-99) bo'lishi shart, aks holda yuqori xonaga kirib ketadi.
 
 ---
 

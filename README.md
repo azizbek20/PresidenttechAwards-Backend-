@@ -59,6 +59,17 @@ android/
 
 Bemor ID/ko'z → Kamera (rasm olish yoki galereyadan tanlash) → Natija (svetofor + % + heatmap).
 
+## Qo'shimcha funksiyalar
+
+- **Ko'z mashqlari** (`ui/eyecare/`) — 3 ta interaktiv mashq (Nuqtani kuzatish, Yaqin-uzoq
+  fokus, Pilpirash + Palming), 20-20-20 fon eslatmasi va **Pomodoro** — ekran vaqtini
+  kuzatib, fokus/tanaffus davrlari almashganda ogohlantiradigan taymer
+  (`eyecare/PomodoroWorker.kt`). Ilova yopiq yoki ekran qulflangan bo'lsa ham WorkManager
+  orqali fon rejimida ishlaydi va bildirishnoma chiqaradi.
+- **Natijani ulashish** — Natija ekranida "🔗 Ulashish" tugmasi tizimning standart
+  ulashish oynasini (`Intent.ACTION_SEND`) ochadi; foydalanuvchi natijani istalgan ilova
+  (Telegram, SMS, email) orqali o'zi yuboradi — hech narsa avtomatik jo'natilmaydi.
+
 ## Bog'lamalar (asosiy)
 
 Jetpack Compose (Material3), CameraX (1.3.4), Retrofit + OkHttp (multipart),

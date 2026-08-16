@@ -17,20 +17,6 @@ val localProperties = Properties().apply {
 val backendApiKey: String = localProperties.getProperty("API_KEY") ?: "dev-key-CHANGE-ME"
 val releaseApiUrl: String = localProperties.getProperty("RELEASE_API_URL") ?: ""
 
-// ===========================================================================
-// Versiyalash strategiyasi: Semantic Versioning (MAJOR.MINOR.PATCH).
-//   - PATCH: xato tuzatish, xulq o'zgarmaydi (masalan, 0.1.0 -> 0.1.1).
-//   - MINOR: orqaga mos yangi funksiya (masalan, 0.1.0 -> 0.2.0).
-//   - MAJOR: katta bosqich / orqaga mos kelmaydigan o'zgarish (1.0.0 —
-//     birinchi relizga chiqqanda MAJORni 1ga o'tkazish tavsiya etiladi).
-// `versionCode` shu uchtasidan avtomatik hisoblanadi (Play Console har doim
-// avvalgisidan katta versionCode talab qiladi) — versionName'ni yangilash
-// yetarli, versionCode'ni qo'lda ko'tarish shart emas.
-// ===========================================================================
-val appVersionName = "0.1.0"
-val versionParts = appVersionName.split(".").map { it.toInt() }
-val appVersionCode = versionParts[0] * 10_000 + versionParts[1] * 100 + versionParts[2]
-
 // Debug backend address. Overridable from local.properties (which is gitignored)
 // so pointing the app at a laptop on the LAN is a config edit, not a source
 // change: the previous hardcoded value meant every network change required
@@ -65,6 +51,17 @@ val debugApiUrl: String =
             }
         }
 
+// Semantic version is the single source of truth; versionCode is derived so the
+// two can never drift apart (e.g. someone bumping versionName and forgetting
+// versionCode, which silently blocks Play Store updates). Bump one of these
+// three on each release — patch for fixes, minor for features, major for
+// breaking/incompatible changes — and versionCode follows automatically.
+// Cap: each field must stay below 100 (2 digits) or versionCode collides with
+// the next field up.
+val versionMajor = 0
+val versionMinor = 1
+val versionPatch = 0
+
 android {
     namespace = "com.eyedetect.ai"
     compileSdk = 34
@@ -73,8 +70,8 @@ android {
         applicationId = "com.eyedetect.ai"
         minSdk = 24
         targetSdk = 34
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = versionMajor * 10_000 + versionMinor * 100 + versionPatch
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
 
         // ===================================================================
         // MUHIM: backend manzili. local.properties'da API_BASE_URL bilan
@@ -161,6 +158,10 @@ dependencies {
 
     // --- ML Kit (ko'z/iris joylashuvini aniqlash — kamera sifat nazorati uchun) ---
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // --- MediaPipe (haqiqiy iris landmarklari — PupilHeuristics ROI aniqligi uchun,
+    // ML Kit'ning taxminiy fixed-radius o'rniga; ML Kit hamon zaxira sifatida qoladi) ---
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 
     // --- Olingan suratni EXIF burilishini hisobga olib dekodlash (mahalliy CV evristikasi uchun) ---
     implementation("androidx.exifinterface:exifinterface:1.3.7")

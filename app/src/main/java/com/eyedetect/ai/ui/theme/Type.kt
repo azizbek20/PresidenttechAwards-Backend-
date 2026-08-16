@@ -17,5 +17,6 @@ val AppTypography = Typography(
     titleMedium    = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
     bodyLarge      = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal),     // asosiy matn
     bodyMedium     = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),     // disklaymer/metadata
+    bodySmall      = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),     // qo'shimcha disklaymer (15sp — pastki chegara)
     labelLarge     = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),     // tugma matni
 )

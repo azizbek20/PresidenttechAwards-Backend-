@@ -29,6 +29,7 @@ import com.eyedetect.ai.ui.eyecare.BlinkPalmScreen
 import com.eyedetect.ai.ui.eyecare.EyeCareMenuScreen
 import com.eyedetect.ai.ui.eyecare.FocusShiftScreen
 import com.eyedetect.ai.ui.eyecare.FollowDotScreen
+import com.eyedetect.ai.ui.eyecare.PomodoroScreen
 import com.eyedetect.ai.ui.eyecare.ReminderSettingsScreen
 import com.eyedetect.ai.ui.theme.EyeDetectTheme
 
@@ -37,7 +38,7 @@ enum class Screen {
     Home,
     Patient, Camera, Result,
     EyeCareMenu, ReminderSettings,
-    FollowDot, FocusShift, BlinkPalm,
+    FollowDot, FocusShift, BlinkPalm, Pomodoro,
     History,
 }
 
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Bildirishnoma tap qilinganda ko'z mashqlari bo'limiga to'g'ridan-to'g'ri o'tish uchun. */
         const val EXTRA_OPEN_EYECARE = "open_eyecare"
+        /** Navbatga qo'yilgan yuklash yakunlanganda (muvaffaqiyat/xato) bildirishnoma tap
+         * qilinsa Tarix ekraniga to'g'ridan-to'g'ri o'tish uchun. */
+        const val EXTRA_OPEN_HISTORY = "open_history"
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -88,10 +92,12 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(vm: ScreeningViewModel = viewModel()) {
     val activity = LocalContext.current as? Activity
     val openEyeCareOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_EYECARE, false) ?: false
+    val openHistoryOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_HISTORY, false) ?: false
 
     val backStack = rememberSaveable(saver = ScreenListSaver) {
         mutableStateListOf(Screen.Home).apply {
             if (openEyeCareOnStart) add(Screen.EyeCareMenu)
+            if (openHistoryOnStart) add(Screen.History)
         }
     }
     val current = backStack.last()
@@ -154,12 +160,14 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
             onFollowDot = { push(Screen.FollowDot) },
             onFocusShift = { push(Screen.FocusShift) },
             onBlinkPalm = { push(Screen.BlinkPalm) },
+            onPomodoro = { push(Screen.Pomodoro) },
             onReminderSettings = { push(Screen.ReminderSettings) },
             onBack = { pop() },
         )
         Screen.FollowDot -> FollowDotScreen(onBack = { pop() })
         Screen.FocusShift -> FocusShiftScreen(onBack = { pop() })
         Screen.BlinkPalm -> BlinkPalmScreen(onBack = { pop() })
+        Screen.Pomodoro -> PomodoroScreen(onBack = { pop() })
         Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
         Screen.History -> HistoryScreen(onBack = { pop() })
     }

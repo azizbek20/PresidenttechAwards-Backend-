@@ -1,5 +1,6 @@
 package com.eyedetect.ai.vision
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
@@ -39,10 +40,13 @@ object PupilHeuristics {
 
     private const val DARK_PERCENTILE = 0.12 // eng qorong'i ~12% piksel = qorachiqqa yaqin taxmin
 
-    /** [bitmap]ning [eye] ("left"/"right") mos hududini tahlil qiladi. Sekin (ML Kit ACCURATE
-     * rejimi) — chaqiruvchi fon ipida (Dispatchers.IO/Default) ishga tushirishi shart. */
-    fun analyze(bitmap: Bitmap, eye: String): PupilHeuristicResult {
-        val region = findEyeRegion(bitmap, eye)
+    /** [bitmap]ning [eye] ("left"/"right") mos hududini tahlil qiladi. Sekin (MediaPipe/ML Kit
+     * ACCURATE rejimi) — chaqiruvchi fon ipida (Dispatchers.IO/Default) ishga tushirishi shart. */
+    fun analyze(context: Context, bitmap: Bitmap, eye: String): PupilHeuristicResult {
+        val region = findEyeRegion(context, bitmap, eye)
+        if (com.eyedetect.ai.BuildConfig.DEBUG) {
+            runCatching { saveDebugCrop(context, bitmap, region.rect, eye) }
+        }
         val samples = sampleHsv(bitmap, region.rect)
         if (samples.size < 12) {
             return PupilHeuristicResult(
@@ -97,13 +101,21 @@ object PupilHeuristics {
 
     private data class EyeRegion(val rect: Rect, val usedLandmark: Boolean)
 
-    private fun findEyeRegion(bitmap: Bitmap, eye: String): EyeRegion {
+    private fun findEyeRegion(context: Context, bitmap: Bitmap, eye: String): EyeRegion {
+        // 1) Afzal: MediaPipe haqiqiy iris landmarklari (aniq markaz+radius, ML Kit'ning
+        // taxminiy fixed-radius'idan farqli o'laroq ko'z ochiqligi/burchagiga moslashadi).
+        val fromIris = runCatching { IrisLandmarker.detectIris(context, bitmap, eye) }.getOrNull()
+        if (fromIris != null) {
+            return EyeRegion(squareRect(bitmap, fromIris.first, fromIris.second, fromIris.third), usedLandmark = true)
+        }
+        // 2) Zaxira: MediaPipe muvaffaqiyatsiz (model yuklanmadi, yuz topilmadi) — ML Kit.
         val fromFace = runCatching { detectEyeCenterViaFace(bitmap, eye) }.getOrNull()
         if (fromFace != null) {
             return EyeRegion(squareRect(bitmap, fromFace.first, fromFace.second, fromFace.third), usedLandmark = true)
         }
-        // Zaxira: yuz aniqlanmadi (masalan, juda yaqin makro surat — faqat ko'z kadrni to'ldirgan) —
-        // kadr markazini ishlatamiz (FrameQualityAnalyzer'dagi markaziy ROI mantig'iga o'xshash).
+        // 3) Oxirgi zaxira: yuz ham aniqlanmadi (masalan, juda yaqin makro surat — faqat ko'z
+        // kadrni to'ldirgan) — kadr markazini ishlatamiz (FrameQualityAnalyzer'dagi markaziy
+        // ROI mantig'iga o'xshash).
         val minDim = minOf(bitmap.width, bitmap.height)
         return EyeRegion(
             squareRect(bitmap, bitmap.width / 2f, bitmap.height / 2f, minDim * 0.18f),
@@ -134,6 +146,15 @@ object PupilHeuristics {
         } finally {
             detector.close()
         }
+    }
+
+    // VAQTINCHALIQ: chap/o'ng xaritalanishini real qurilmada tasdiqlash uchun — tekshiruv
+    // tugagach olib tashlanadi. Faqat DEBUG buildda ishlaydi.
+    private fun saveDebugCrop(context: Context, bitmap: Bitmap, rect: Rect, eye: String) {
+        val crop = Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
+        val dir = context.getExternalFilesDir(null) ?: return
+        val out = java.io.File(dir, "debug_eye_crop_$eye.jpg")
+        java.io.FileOutputStream(out).use { crop.compress(Bitmap.CompressFormat.JPEG, 95, it) }
     }
 
     private fun squareRect(bitmap: Bitmap, cx: Float, cy: Float, radius: Float): Rect {

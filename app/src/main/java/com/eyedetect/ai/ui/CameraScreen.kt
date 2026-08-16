@@ -166,7 +166,7 @@ fun CameraScreen(
     // o'tmasdan, shu yerda ogohlantirib, qayta urinishga taklif qilinadi.
     var captureError by remember { mutableStateOf(false) }
 
-    val eyeLabel = if (vm.eye == "left") stringResource(R.string.common_eye_left) else stringResource(R.string.common_eye_right)
+    val eyeLabelText = eyeLabel(vm.eye)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -257,7 +257,7 @@ fun CameraScreen(
                         .background(Color.Black.copy(alpha = 0.55f))
                         .padding(horizontal = Spacing.md, vertical = 6.dp),
                 ) {
-                    Text(stringResource(R.string.camera_eye_tag, eyeLabel), color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                    Text(stringResource(R.string.camera_eye_tag, eyeLabelText), color = Color.White, style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold)
                 }
                 FlashModeChip(

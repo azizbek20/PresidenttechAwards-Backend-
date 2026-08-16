@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.eyecare.EyeCarePreferencesRepository
 import com.eyedetect.ai.data.eyecare.ExerciseType
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,30 +30,22 @@ class BlinkPalmViewModel(application: Application) : AndroidViewModel(applicatio
         job = viewModelScope.launch {
             for (cycle in 0 until BLINK_CYCLES) {
                 for (closed in listOf(true, false)) {
-                    val phaseStart = System.currentTimeMillis()
-                    while (true) {
-                        val elapsed = System.currentTimeMillis() - phaseStart
-                        if (elapsed >= BLINK_STEP_MS) break
+                    runPhase(BLINK_STEP_MS) { elapsed ->
                         _uiState.value = BlinkPalmUiState.BlinkingRunning(
                             cycleIndex = cycle,
                             totalCycles = BLINK_CYCLES,
                             eyesClosed = closed,
                             phaseProgress = elapsed / BLINK_STEP_MS.toFloat(),
                         )
-                        delay(16L)
                     }
                 }
             }
 
-            val palmStart = System.currentTimeMillis()
-            while (true) {
-                val elapsed = System.currentTimeMillis() - palmStart
-                if (elapsed >= PALM_MS) break
+            runPhase(PALM_MS) { elapsed ->
                 _uiState.value = BlinkPalmUiState.PalmingRunning(
                     progress = elapsed / PALM_MS.toFloat(),
                     secondsLeft = ((PALM_MS - elapsed) / 1000L).toInt() + 1,
                 )
-                delay(16L)
             }
 
             _uiState.value = BlinkPalmUiState.Completed

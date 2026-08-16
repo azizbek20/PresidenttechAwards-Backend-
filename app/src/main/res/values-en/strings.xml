@@ -14,16 +14,10 @@
     <string name="common_eye_right_short">right</string>
     <string name="common_eye_left_short">left</string>
     <string name="common_exercise_done_title">Great! Exercise complete.</string>
-    <string name="common_language">Language</string>
     <string name="common_dash">—</string>
     <string name="common_content_desc_selected">%1$s ✓</string>
     <string name="content_desc_title_subtitle">%1$s — %2$s</string>
     <string name="content_desc_title_subtitle_status">%1$s — %2$s, %3$s</string>
-
-    <!-- Language names — always shown in their own language -->
-    <string name="lang_uz">O\'zbekcha</string>
-    <string name="lang_ru">Русский</string>
-    <string name="lang_en">English</string>
 
     <!-- Home screen -->
     <string name="home_subtitle">What would you like to do?</string>
@@ -100,6 +94,17 @@
     <string name="history_patient_eye_row">Patient / eye: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Local: opacity — %1$s, red reflex — %2$s</string>
     <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_search_placeholder">Search by patient ID</string>
+    <string name="history_search_empty">No results found.</string>
+    <string name="history_select_button">Select</string>
+    <string name="history_select_cancel_content_desc">Cancel selection</string>
+    <string name="history_select_all">Select all</string>
+    <string name="history_selected_count">%1$d selected</string>
+    <string name="history_delete_selected_content_desc">Delete selected entries</string>
+    <string name="history_delete_selected_dialog_title">Delete entries?</string>
+    <string name="history_delete_selected_dialog_message">%1$d screening record(s) will be permanently deleted. This can\'t be undone.</string>
+    <string name="history_delete_confirm">Delete</string>
+    <string name="history_checkbox_content_desc">Select</string>
     <string name="result_heatmap_title">Where the AI looked (heatmap)</string>
     <string name="result_original_image">Original image</string>
     <string name="result_original_image_content_desc">Original fundus image</string>
@@ -109,6 +114,9 @@
     <string name="result_recommendation_refer">Next step: refer the patient to an ophthalmologist.</string>
     <string name="result_recommendation_no_refer">Next step: recall in 12 months.</string>
     <string name="result_recommendation_ungradable">Next step: retake the photo (mind focus/lighting) or refer to a specialist.</string>
+    <string name="result_share_button">Share</string>
+    <string name="result_share_chooser_title">Share result</string>
+    <string name="result_share_text">%1$s — screening result\n\nPatient: %2$s\nEye: %3$s\nDecision: %4$s\nConfidence: %5$s\nICDR grade: %6$s\nDate: %7$s\n\n%8$s</string>
 
     <!-- Loading / error states -->
     <string name="loading_title">Analyzing…</string>
@@ -142,6 +150,17 @@
     <string name="error_retry_unavailable">Couldn\'t retry — the photo is no longer available. Please take a new one.</string>
     <string name="loading_uploading_percent">Uploading: %1$d%%</string>
 
+    <!-- Offline queue (send later via WorkManager when there is no internet) -->
+    <string name="queued_title">Queued</string>
+    <string name="queued_message">No internet connection. The photo has been queued — it will be sent automatically once the connection is back. You can check the result later in \"History\".</string>
+    <string name="queued_ok_button">Got it</string>
+    <string name="history_pending_section_title">Queued — waiting for internet</string>
+    <string name="history_pending_status_queued">Queued</string>
+    <string name="history_pending_status_failed">Failed to send</string>
+    <string name="history_pending_queued_at_row">Queued: %1$s</string>
+    <string name="history_pending_cancel_content_desc">Remove from queue</string>
+    <string name="history_pending_retry_content_desc">Retry</string>
+
     <!-- Eye exercises menu -->
     <string name="eyecare_menu_title">Eye exercises</string>
     <string name="eyecare_streak">Daily streak: %1$d days</string>
@@ -158,6 +177,19 @@
     <string name="reminder_row_disabled">Off</string>
     <string name="reminder_row_configure">Configure →</string>
     <string name="reminder_row_enable">Turn on →</string>
+
+    <!-- Pomodoro -->
+    <string name="pomodoro_title">Pomodoro</string>
+    <string name="pomodoro_card_subtitle">Tracks screen time and reminds you to rest</string>
+    <string name="pomodoro_description">Tracks focus and break periods — alerts you when it\'s time to rest your eyes from the screen, even if the app is closed.</string>
+    <string name="pomodoro_phase_focus">Focus</string>
+    <string name="pomodoro_phase_break">Break</string>
+    <string name="pomodoro_status_running">Active · %1$s</string>
+    <string name="pomodoro_focus_label">Focus (minutes)</string>
+    <string name="pomodoro_break_label">Break (minutes)</string>
+    <string name="pomodoro_start">Start</string>
+    <string name="pomodoro_stop">Stop</string>
+    <string name="pomodoro_background_info">Runs in the background — even if you leave the app or lock the screen, you\'ll get an alert when the period ends.</string>
 
     <!-- Follow the dot -->
     <string name="followdot_instructions">Without moving your head, track the dot with your eyes only.</string>
@@ -197,4 +229,13 @@
     <string name="notification_channel_description">Periodic reminder for the 20-20-20 rule</string>
     <string name="notification_title">Give your eyes a rest</string>
     <string name="notification_text">Look at something 6 meters away for 20 seconds (20-20-20 rule).</string>
+    <string name="notification_pomodoro_focus_done_title">Time\'s up!</string>
+    <string name="notification_pomodoro_focus_done_text">Rest your eyes from the screen — break time started.</string>
+    <string name="notification_pomodoro_break_done_title">Break\'s over</string>
+    <string name="notification_pomodoro_break_done_text">Come back to the screen whenever you\'re ready to continue.</string>
+    <string name="notification_upload_success_title">Screening result ready</string>
+    <string name="notification_upload_success_text">The queued photo was sent. Check the result in \"History\".</string>
+    <string name="notification_upload_success_text_patient">Patient %1$s\'s result is ready. Check \"History\".</string>
+    <string name="notification_upload_failed_title">Couldn\'t send</string>
+    <string name="notification_upload_failed_text">Sending the queued photo failed. You can retry it from \"History\".</string>
 </resources>
