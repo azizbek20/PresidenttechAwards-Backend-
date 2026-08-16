@@ -2,6 +2,11 @@ package com.eyedetect.ai.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,8 +60,14 @@ import com.eyedetect.ai.ui.theme.TrafficGreenContainer
 import com.eyedetect.ai.ui.theme.TrafficGrey
 import com.eyedetect.ai.ui.theme.TrafficRed
 import com.eyedetect.ai.ui.theme.TrafficYellow
+import com.eyedetect.ai.ui.theme.OnTrafficGreenContainer
+import com.eyedetect.ai.ui.theme.OnTrafficGreenContainerDark
+import com.eyedetect.ai.ui.theme.OnTrafficYellowContainer
+import com.eyedetect.ai.ui.theme.OnTrafficYellowContainerDark
+import com.eyedetect.ai.ui.theme.TrafficGreenContainerDark
+import com.eyedetect.ai.ui.theme.TrafficYellowContainerDark
 import com.eyedetect.ai.ui.theme.decisionColor
-import com.eyedetect.ai.ui.theme.decisionEmoji
+import com.eyedetect.ai.ui.theme.decisionIcon
 import com.eyedetect.ai.ui.theme.isUngradableDecision
 
 // =====================================================================
@@ -109,19 +120,25 @@ fun TextActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Mod
 //  STATUS / HOLAT
 // =====================================================================
 
-/** Ijobiy/axborot banneri — yashil (galereya tanlovi kabi neytral eslatmalar uchun). */
+/** Ijobiy/axborot banneri — yashil (galereya tanlovi kabi neytral eslatmalar uchun).
+ * Qorong'i rejimda och pastel fon (yorug' rejim tovushi) sirt bilan mos kelmasligi
+ * uchun to'q, kam to'yingan variant ishlatiladi. */
 @Composable
 fun InfoBanner(text: String, modifier: Modifier = Modifier) {
+    val dark = isSystemInDarkTheme()
+    val bg = if (dark) TrafficGreenContainerDark else TrafficGreenContainer
+    val onBg = if (dark) OnTrafficGreenContainerDark else OnTrafficGreenContainer
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(TrafficGreenContainer)
+            .background(bg)
             .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("✅")
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF1B5E20))
+        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = onBg, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = onBg)
     }
 }
 
@@ -209,7 +226,7 @@ fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier
 @Composable
 fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
     val bg = decisionColor(result.decision)
-    val emoji = decisionEmoji(result.decision)
+    val icon = decisionIcon(result.decision)
     val ungradable = isUngradableDecision(result.decision)
     val resultContentDesc = if (ungradable) {
         stringResource(R.string.result_content_desc_ungradable, result.decisionText)
@@ -227,7 +244,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(emoji, fontSize = 46.sp)
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
         Text(
             result.decisionText,
             color = Color.White,
@@ -442,19 +459,24 @@ fun DisclaimerText(text: String) {
     )
 }
 
-/** Ogohlantiruvchi banner (masalan UNGRADABLE "kasallik yo'q emas"). */
+/** Ogohlantiruvchi banner (masalan UNGRADABLE "kasallik yo'q emas"). Qorong'i rejimda
+ * [InfoBanner]dagi kabi to'q, kam to'yingan fon variantiga o'tadi. */
 @Composable
 fun WarningBanner(text: String) {
+    val dark = isSystemInDarkTheme()
+    val bg = if (dark) TrafficYellowContainerDark else com.eyedetect.ai.ui.theme.TrafficYellowContainer
+    val onBg = if (dark) OnTrafficYellowContainerDark else OnTrafficYellowContainer
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(com.eyedetect.ai.ui.theme.TrafficYellowContainer)
+            .background(bg)
             .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("⚠️")
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF7A5B00))
+        Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = onBg, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = onBg)
     }
 }
 
@@ -529,7 +551,12 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
     ) {
-        Text("⚠️", fontSize = 48.sp)
+        Icon(
+            Icons.Filled.WarningAmber,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(48.dp),
+        )
         Text(stringResource(R.string.error_title), style = MaterialTheme.typography.headlineSmall)
         Text(
             message,
@@ -611,7 +638,10 @@ private fun QualityRow(label: String, level: QualityLevel) {
     }
 }
 
-/** 72 dp doiraviy kamera zatvor tugmasi (6-hujjat, 4.2). */
+/** 72 dp doiraviy kamera zatvor tugmasi (6-hujjat, 4.2). Ichida ikonka yo'q — foydalanuvchi
+ * allaqachon kamera ko'rish oynasida turibdi, standart iOS/Android zatvor uslubiga mos
+ * oddiy doira yetarli (avvalgi 📷 emojisi ortiqcha va OEM shriftiga qarab bir xilda
+ * ko'rinmasdi). */
 @Composable
 fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val ring = if (enabled) TrafficGreen else MaterialTheme.colorScheme.outlineVariant
@@ -632,9 +662,6 @@ fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Mo
                 .clip(CircleShape)
                 .background(Color.White)
                 .selectable(selected = false, enabled = enabled, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("📷", fontSize = 26.sp)
-        }
+        )
     }
 }

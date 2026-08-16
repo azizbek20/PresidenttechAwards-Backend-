@@ -49,7 +49,7 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
                 Text(
@@ -71,7 +71,7 @@ fun PatientScreen(vm: ScreeningViewModel, onNext: () -> Unit) {
 
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.CenterVertically),
         ) {
             PatientIdField(value = pid, onChange = { pid = it })
             Text(

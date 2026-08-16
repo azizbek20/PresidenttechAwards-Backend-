@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +58,7 @@ import com.eyedetect.ai.ui.theme.TrafficRedContainer
 import com.eyedetect.ai.ui.theme.TrafficYellow
 import com.eyedetect.ai.ui.theme.TrafficYellowContainer
 import com.eyedetect.ai.ui.theme.decisionColor
-import com.eyedetect.ai.ui.theme.decisionEmoji
+import com.eyedetect.ai.ui.theme.decisionIcon
 import com.eyedetect.ai.ui.theme.isUngradableDecision
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -255,7 +256,12 @@ private fun HistoryEntryCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(decisionEmoji(entry.decision))
+                    Icon(
+                        decisionIcon(entry.decision),
+                        contentDescription = null,
+                        tint = decisionColor(entry.decision),
+                        modifier = Modifier.size(20.dp),
+                    )
                     Text(
                         if (ungradable) stringResource(R.string.result_ungradable) else entry.decisionText,
                         style = MaterialTheme.typography.titleMedium,

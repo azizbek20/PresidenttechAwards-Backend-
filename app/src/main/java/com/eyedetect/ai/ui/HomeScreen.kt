@@ -30,7 +30,7 @@ fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
                 Text(
