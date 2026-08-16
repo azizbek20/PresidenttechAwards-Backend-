@@ -17,6 +17,20 @@ val localProperties = Properties().apply {
 val backendApiKey: String = localProperties.getProperty("API_KEY") ?: "dev-key-CHANGE-ME"
 val releaseApiUrl: String = localProperties.getProperty("RELEASE_API_URL") ?: ""
 
+// ===========================================================================
+// Versiyalash strategiyasi: Semantic Versioning (MAJOR.MINOR.PATCH).
+//   - PATCH: xato tuzatish, xulq o'zgarmaydi (masalan, 0.1.0 -> 0.1.1).
+//   - MINOR: orqaga mos yangi funksiya (masalan, 0.1.0 -> 0.2.0).
+//   - MAJOR: katta bosqich / orqaga mos kelmaydigan o'zgarish (1.0.0 —
+//     birinchi relizga chiqqanda MAJORni 1ga o'tkazish tavsiya etiladi).
+// `versionCode` shu uchtasidan avtomatik hisoblanadi (Play Console har doim
+// avvalgisidan katta versionCode talab qiladi) — versionName'ni yangilash
+// yetarli, versionCode'ni qo'lda ko'tarish shart emas.
+// ===========================================================================
+val appVersionName = "0.1.0"
+val versionParts = appVersionName.split(".").map { it.toInt() }
+val appVersionCode = versionParts[0] * 10_000 + versionParts[1] * 100 + versionParts[2]
+
 // Debug backend address. Overridable from local.properties (which is gitignored)
 // so pointing the app at a laptop on the LAN is a config edit, not a source
 // change: the previous hardcoded value meant every network change required
@@ -59,8 +73,8 @@ android {
         applicationId = "com.eyedetect.ai"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         // ===================================================================
         // MUHIM: backend manzili. local.properties'da API_BASE_URL bilan
@@ -78,7 +92,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiUrl\"")
         }
@@ -169,6 +184,13 @@ dependencies {
     implementation("androidx.room:room-runtime:$room")
     implementation("androidx.room:room-ktx:$room")
     kapt("androidx.room:room-compiler:$room")
+
+    // --- SQLCipher (Room bazasini shifrlash — PHI: bemor ID, skrining natijalari) ---
+    // `SupportFactory` Room'ning `openHelperFactory()`iga ulanadi, shu bilan
+    // bir xil DAO/entity kodi o'zgarishsiz shifrlangan faylga yozadi.
+    // Parolning o'zi `DatabaseKeyProvider` orqali Android Keystore'dagi
+    // apparat-himoyalangan AES kaliti bilan shifrlangan holda saqlanadi.
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
 
     // --- Fon rejimi: 20-20-20 eslatma ---
     implementation("androidx.work:work-runtime-ktx:2.9.1")

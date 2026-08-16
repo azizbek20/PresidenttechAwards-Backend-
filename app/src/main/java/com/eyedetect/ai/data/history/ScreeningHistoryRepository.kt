@@ -5,9 +5,20 @@ import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import kotlinx.coroutines.flow.Flow
 
+/** [ScreeningViewModel][com.eyedetect.ai.ScreeningViewModel] tarix uchun tayanadigan
+ * torroq interfeys — SQLCipher'ning native kutubxonasi Robolectric (JVM) test
+ * muhitida yuklanmaydi, shu sababli birlik testlari haqiqiy [ScreeningHistoryRepository]
+ * o'rniga soxta implementatsiya berishi kerak ([ApiService][com.eyedetect.ai.data.ApiService]
+ * uchun ishlatilgan `@JvmOverloads` in'eksiya naqshiga o'xshash). */
+interface ScreeningHistoryStore {
+    suspend fun latestFor(patientId: String, eye: String): ScreeningHistoryEntity?
+    suspend fun saveResult(result: PredictResponse, heuristic: PupilHeuristicResult?): Long
+    suspend fun updateHeuristic(id: Long, heuristic: PupilHeuristicResult)
+}
+
 /** O'tgan skrininglar tarixi uchun Room ombori — [EyeCarePreferencesRepository]dagi
  * kabi to'g'ridan-to'g'ri (DI'siz) instansiyalanadi. */
-class ScreeningHistoryRepository(context: Context) {
+class ScreeningHistoryRepository(context: Context) : ScreeningHistoryStore {
 
     private val dao = ScreeningHistoryDatabase.getInstance(context).screeningHistoryDao()
 
@@ -16,13 +27,13 @@ class ScreeningHistoryRepository(context: Context) {
     fun historyForPatient(patientId: String): Flow<List<ScreeningHistoryEntity>> =
         dao.observeForPatient(patientId)
 
-    suspend fun latestFor(patientId: String, eye: String): ScreeningHistoryEntity? =
+    override suspend fun latestFor(patientId: String, eye: String): ScreeningHistoryEntity? =
         dao.latestFor(patientId, eye)
 
     /** Backend natijasini (+ mavjud bo'lsa mahalliy evristika natijasini) tarixga saqlaydi.
      * @return saqlangan yozuvning ID'si — evristika keyinroq tayyor bo'lsa, shu ID orqali
      * [updateHeuristic] bilan to'ldiriladi. */
-    suspend fun saveResult(result: PredictResponse, heuristic: PupilHeuristicResult?): Long =
+    override suspend fun saveResult(result: PredictResponse, heuristic: PupilHeuristicResult?): Long =
         dao.insert(
             ScreeningHistoryEntity(
                 examId = result.examId,
@@ -47,7 +58,7 @@ class ScreeningHistoryRepository(context: Context) {
         )
 
     /** Yozuv saqlangandan keyin tayyor bo'lgan mahalliy evristika natijasi bilan to'ldiradi. */
-    suspend fun updateHeuristic(id: Long, heuristic: PupilHeuristicResult) {
+    override suspend fun updateHeuristic(id: Long, heuristic: PupilHeuristicResult) {
         dao.updateHeuristic(
             id = id,
             opacity = heuristic.opacity.name,
