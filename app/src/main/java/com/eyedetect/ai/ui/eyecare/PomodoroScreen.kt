@@ -41,7 +41,6 @@ import com.eyedetect.ai.ui.components.TextActionButton
 import com.eyedetect.ai.ui.components.TimerRing
 import com.eyedetect.ai.ui.components.WarningBanner
 import com.eyedetect.ai.ui.theme.Spacing
-import com.eyedetect.ai.ui.theme.TrafficRed
 
 private val FOCUS_OPTIONS = listOf(15, 20, 25, 30, 45)
 private val BREAK_OPTIONS = listOf(5, 10, 15)
@@ -142,7 +141,14 @@ fun PomodoroScreen(onBack: () -> Unit, vm: PomodoroViewModel = viewModel()) {
 
         if (state.running) {
             InfoBanner(stringResource(R.string.pomodoro_background_info))
-            PrimaryButton(stringResource(R.string.pomodoro_stop), onClick = vm::stop, containerColor = TrafficRed)
+            // MaterialTheme.colorScheme.error — TrafficRed emas: TrafficRed faqat klinik
+            // REFER qaroriga ajratilgan (svetofor tizimi ilova bo'ylab bashoratli bo'lishi
+            // uchun boshqa hech qanday "to'xtatish/xavfli" harakatda qayta ishlatilmaydi).
+            PrimaryButton(
+                stringResource(R.string.pomodoro_stop),
+                onClick = vm::stop,
+                containerColor = MaterialTheme.colorScheme.error,
+            )
         } else {
             PrimaryButton(
                 stringResource(R.string.pomodoro_start),
