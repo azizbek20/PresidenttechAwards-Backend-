@@ -26,6 +26,19 @@ checkpoint is arbitrary code execution. ``.safetensors`` is preferred where
 both exist. When ``EYE_MODEL_SHA256`` is set the digest of the artifact file is
 verified BEFORE it is opened by the loader; a mismatch refuses the model.
 
+NORMALISATION (per-checkpoint)
+-------------------------------
+``preprocess.to_model_input`` always normalises with the frozen
+``IMAGENET_MEAN``/``IMAGENET_STD`` (a cross-module contract shared with
+``mock_engine`` — see ``engine.py``). Not every checkpoint was trained with
+those stats (e.g. a timm HF export's ``pretrained_cfg.mean/std`` may differ).
+``find_checkpoint`` reads a checkpoint's own declared mean/std from
+``config.json`` when present; ``TorchEngine._renormalise`` then converts the
+shared ImageNet-normalised tensor into that checkpoint's own space before
+inference. This is entirely internal to this module — it never touches the
+frozen shared preprocessing, so other checkpoints (and the mock engine) are
+unaffected.
+
 AIR-GAPPED
 ----------
 Nothing in this module reaches the network, at import time or load time:
@@ -55,7 +68,7 @@ import numpy as np
 import timm
 import torch
 
-from app.inference.engine import ModelUnavailable, Prediction
+from app.inference.engine import IMAGENET_MEAN, IMAGENET_STD, ModelUnavailable, Prediction
 from app.inference.preprocess import to_model_input
 
 logger = logging.getLogger("eyedetect.torch_engine")
@@ -84,12 +97,19 @@ _DIGEST_CHUNK = 1 << 20
 
 @dataclass(frozen=True)
 class Checkpoint:
-    """A located, not yet loaded, model artifact."""
+    """A located, not yet loaded, model artifact.
+
+    ``mean``/``std`` default to the frozen ``IMAGENET_MEAN``/``IMAGENET_STD``
+    (see :func:`_normalisation_from_hf_config`) — the value every checkpoint
+    gets unless its own HF ``pretrained_cfg`` declares something else.
+    """
 
     path: Path
     kind: str  # "state_dict" | "safetensors" | "hf_pickle"
     arch: str
     num_classes: int
+    mean: tuple[float, float, float] = IMAGENET_MEAN
+    std: tuple[float, float, float] = IMAGENET_STD
 
 
 def sha256_file(path: Path) -> str:
@@ -133,18 +153,45 @@ def _read_arch(model_dir: Path) -> str:
     return arch or DEFAULT_ARCH
 
 
-def _arch_from_hf_config(config_path: Path) -> tuple[str, int]:
-    """Best-effort architecture + class count from a HF ``config.json``."""
+def _normalisation_from_hf_config(config: dict[str, Any]) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """A checkpoint's own ``mean``/``std``, from ``pretrained_cfg`` if present, else IMAGENET.
+
+    timm's HF export nests these under ``pretrained_cfg`` (see e.g. a
+    ``vit_large_patch16_224`` snapshot's ``pretrained_cfg.mean/std``); a plain
+    top-level ``mean``/``std`` is accepted too. Silently falling back to
+    IMAGENET here would defeat the point — a checkpoint normalised with
+    different stats would then see wrongly-scaled pixels with no error at
+    all, only a quietly worse prediction (the exact failure mode this module
+    otherwise refuses to allow for anything else). Falling back is therefore
+    only correct because "no declared stats" and "IMAGENET stats" are
+    genuinely the same case for every checkpoint this loader has seen so far
+    (the plain ``model.pt`` path, and HF snapshots that omit the field).
+    """
+    nested = config.get("pretrained_cfg")
+    source = nested if isinstance(nested, dict) else config
+    mean = source.get("mean")
+    std = source.get("std")
+    if (
+        isinstance(mean, list) and len(mean) == 3
+        and isinstance(std, list) and len(std) == 3
+        and all(isinstance(v, (int, float)) for v in (*mean, *std))
+    ):
+        return (float(mean[0]), float(mean[1]), float(mean[2])), (float(std[0]), float(std[1]), float(std[2]))
+    return IMAGENET_MEAN, IMAGENET_STD
+
+
+def _arch_from_hf_config(config_path: Path) -> tuple[str, int, tuple[float, float, float], tuple[float, float, float]]:
+    """Best-effort architecture + class count + normalisation from a HF ``config.json``."""
     arch = DEFAULT_ARCH
     num_classes = NUM_CLASSES
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         logger.warning("unreadable %s — assuming %s/%d", config_path, arch, num_classes)
-        return arch, num_classes
+        return arch, num_classes, IMAGENET_MEAN, IMAGENET_STD
 
     if not isinstance(config, dict):
-        return arch, num_classes
+        return arch, num_classes, IMAGENET_MEAN, IMAGENET_STD
 
     for key in ("architecture", "arch", "model_name", "model_type"):
         value = config.get(key)
@@ -164,7 +211,8 @@ def _arch_from_hf_config(config_path: Path) -> tuple[str, int]:
     elif isinstance(config.get("id2label"), dict):
         num_classes = len(config["id2label"])
 
-    return arch, num_classes
+    mean, std = _normalisation_from_hf_config(config)
+    return arch, num_classes, mean, std
 
 
 def find_checkpoint(model_dir: Path) -> Checkpoint | None:
@@ -187,12 +235,13 @@ def find_checkpoint(model_dir: Path) -> Checkpoint | None:
             if not weights.is_file():
                 continue
             arch, num_classes = (DEFAULT_ARCH, NUM_CLASSES)
+            mean, std = IMAGENET_MEAN, IMAGENET_STD
             config = base / HF_CONFIG_FILE
             if config.is_file():
-                arch, num_classes = _arch_from_hf_config(config)
+                arch, num_classes, mean, std = _arch_from_hf_config(config)
             kind = "safetensors" if name.endswith(".safetensors") else "hf_pickle"
             return Checkpoint(
-                path=weights, kind=kind, arch=arch, num_classes=num_classes
+                path=weights, kind=kind, arch=arch, num_classes=num_classes, mean=mean, std=std
             )
 
     return None
@@ -245,6 +294,13 @@ class TorchEngine:
                 f"or one of {HF_WEIGHT_FILES} (air-gapped: stage it out of band)"
             )
             raise ModelUnavailable(msg)
+        self._mean, self._std = checkpoint.mean, checkpoint.std
+        if (self._mean, self._std) != (IMAGENET_MEAN, IMAGENET_STD):
+            logger.info(
+                "checkpoint declares non-ImageNet normalisation mean=%s std=%s — "
+                "re-normalising from the shared ImageNet-preprocessed input",
+                self._mean, self._std,
+            )
 
         expected_digest = getattr(settings, "eye_model_sha256", None)
         if expected_digest:
@@ -301,6 +357,9 @@ class TorchEngine:
         ``api/predict.py`` passes ``to_model_input(retina_crop(img))`` while
         tests hand engines raw pixels; the frozen mock tolerates both, so the
         torch engine must too or the two engines would not be substitutable.
+        Either path lands in ImageNet-normalised CHW space (that transform is
+        frozen — see ``preprocess.py``), which ``_renormalise`` then re-expresses
+        in the checkpoint's own mean/std when the two differ.
         """
         arr = np.asarray(img)
         is_chw_float = (
@@ -308,9 +367,30 @@ class TorchEngine:
             and arr.shape[0] == 3
             and np.issubdtype(arr.dtype, np.floating)
         )
-        if is_chw_float:
-            return np.ascontiguousarray(arr, dtype=np.float32)
-        return to_model_input(arr, self._input_size)
+        imagenet_normalised = (
+            np.ascontiguousarray(arr, dtype=np.float32)
+            if is_chw_float
+            else to_model_input(arr, self._input_size)
+        )
+        return self._renormalise(imagenet_normalised)
+
+    def _renormalise(self, chw: np.ndarray) -> np.ndarray:
+        """Re-express an ImageNet-normalised tensor in the checkpoint's own mean/std.
+
+        A no-op (identity) whenever the checkpoint didn't declare its own
+        stats — which is every checkpoint this loader has handled before a
+        timm HF snapshot with a non-ImageNet ``pretrained_cfg`` showed up.
+        Skipping the arithmetic in that common case avoids float round-trip
+        drift for no benefit.
+        """
+        if (self._mean, self._std) == (IMAGENET_MEAN, IMAGENET_STD):
+            return chw
+        imagenet_mean = np.asarray(IMAGENET_MEAN, dtype=np.float32).reshape(3, 1, 1)
+        imagenet_std = np.asarray(IMAGENET_STD, dtype=np.float32).reshape(3, 1, 1)
+        pixel01 = chw * imagenet_std + imagenet_mean
+        ckpt_mean = np.asarray(self._mean, dtype=np.float32).reshape(3, 1, 1)
+        ckpt_std = np.asarray(self._std, dtype=np.float32).reshape(3, 1, 1)
+        return np.ascontiguousarray((pixel01 - ckpt_mean) / ckpt_std, dtype=np.float32)
 
     def predict(self, img: np.ndarray) -> Prediction:
         if not self.model_loaded:  # pragma: no cover - construction raises first
