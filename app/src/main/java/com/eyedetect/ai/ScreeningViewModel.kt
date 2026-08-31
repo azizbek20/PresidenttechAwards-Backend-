@@ -36,17 +36,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.io.File
 
+import androidx.compose.runtime.Immutable
+
 /** UI holati (ekranlar shu holatga qarab chiziladi). */
+@Immutable
 sealed interface UiState {
     data object Idle : UiState
     data object Loading : UiState
     data class Success(val result: PredictResponse) : UiState
+    data class OfflineSuccess(val result: PredictResponse) : UiState
     /** [canRetry] true bo'lsa, so'nggi so'rov manbai (fayl/URI) hali mavjud — foydalanuvchi
      * qaytadan suratga olmasdan xuddi shu rasmni qayta yuborishi mumkin ([retry]). */
     data class Error(val message: String, val canRetry: Boolean = false) : UiState
 }
 
 /** Ikki ko'z simmetriyasini solishtirish natijasi + qaysi ko'z/qachon bilan solishtirilgani. */
+@Immutable
 data class EyeSymmetryUiState(
     val comparison: EyeSymmetryResult,
     val comparedEye: String?,
@@ -66,6 +71,7 @@ class ScreeningViewModel @JvmOverloads constructor(
 ) : AndroidViewModel(application) {
 
     private val historyRepo = ScreeningHistoryRepository(application)
+    private val offlineClassifier = com.eyedetect.ai.vision.OfflineDrClassifier(application)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -171,6 +177,41 @@ class ScreeningViewModel @JvmOverloads constructor(
         }
     }
 
+    private suspend fun handleOfflineSync(e: Exception, bytes: ByteArray): Boolean {
+        if (e is java.net.UnknownHostException || e is java.net.ConnectException || e is java.net.SocketTimeoutException) {
+            val app = getApplication<Application>()
+            
+            // Faylni diskka saqlash
+            val pendingDir = File(app.filesDir, "pending_uploads").apply { mkdirs() }
+            val fileName = "pending_${System.currentTimeMillis()}.jpg"
+            val pendingFile = File(pendingDir, fileName)
+            
+            withContext(Dispatchers.IO) { pendingFile.writeBytes(bytes) }
+            
+            // Bazaga saqlash
+            historyRepo.savePending(
+                patientId = patientId.ifBlank { null },
+                eye = eye,
+                heuristic = _localHeuristic.value,
+                filePath = pendingFile.absolutePath
+            )
+            
+            // WorkManager'ga topshirish
+            val constraints = androidx.work.Constraints.Builder()
+                .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                .build()
+                
+            val workRequest = androidx.work.OneTimeWorkRequestBuilder<com.eyedetect.ai.worker.SyncWorker>()
+                .setConstraints(constraints)
+                .build()
+                
+            androidx.work.WorkManager.getInstance(app).enqueue(workRequest)
+            
+            return true
+        }
+        return false
+    }
+
     /** Faylni (kameradan) yuboradi; faqat muvaffaqiyatda o'chiriladi — xato bo'lsa [retry]
      * uchun saqlanadi. */
     fun uploadFile(file: File) {
@@ -181,14 +222,24 @@ class ScreeningViewModel @JvmOverloads constructor(
             _localHeuristic.value = null
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
+            var uploadBytes: ByteArray? = null
             try {
                 // Fayl o'chirilishidan oldin baytlarini o'qib olamiz (evristika uchun),
                 // keyin tahlilni fonda, yuklashni bloklamay ishga tushiramiz.
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeFileScaled(file.absolutePath) }
-                if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
+                if (bitmap != null) {
+                    runHeuristicAsync(bitmap, rowId)
+                    // TFLite orqali oflayn tahlil
+                    val offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
+                    if (offlineResult != null) {
+                        _uiState.value = UiState.OfflineSuccess(offlineResult)
+                    }
+                } else {
+                    rowId.complete(null)
+                }
 
-                val fileBytes = withContext(Dispatchers.IO) { file.readBytes() }
-                val body = buildUploadBody(fileBytes, fallbackMediaType = "image/jpeg")
+                uploadBytes = withContext(Dispatchers.IO) { file.readBytes() }
+                val body = buildUploadBody(uploadBytes, fallbackMediaType = "image/jpeg")
                 val part = MultipartBody.Part.createFormData("file", file.name, body)
                 doRequest(part, rowId)
 
@@ -197,7 +248,15 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                if (uploadBytes != null && handleOfflineSync(e, uploadBytes)) {
+                    if (_uiState.value !is UiState.OfflineSuccess) {
+                        _uiState.value = UiState.Error("Internet yo'q. Rasm saqlandi, tarmoq kelganda avtomatik yuboriladi.", canRetry = false)
+                    }
+                } else {
+                    if (_uiState.value !is UiState.OfflineSuccess) {
+                        _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                    }
+                }
                 if (!rowId.isCompleted) rowId.complete(null)
             } finally {
                 _uploadProgress.value = null
@@ -216,15 +275,25 @@ class ScreeningViewModel @JvmOverloads constructor(
             _localHeuristic.value = null
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
+            var uploadBytes: ByteArray? = null
             try {
-                val bytes = withContext(Dispatchers.IO) {
+                uploadBytes = withContext(Dispatchers.IO) {
                     appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 } ?: throw IllegalStateException(appContext.getString(R.string.error_cannot_read_image))
 
-                val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(bytes) }
-                if (bitmap != null) runHeuristicAsync(bitmap, rowId) else rowId.complete(null)
+                val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(uploadBytes) }
+                if (bitmap != null) {
+                    runHeuristicAsync(bitmap, rowId)
+                    // TFLite orqali oflayn tahlil
+                    val offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
+                    if (offlineResult != null) {
+                        _uiState.value = UiState.OfflineSuccess(offlineResult)
+                    }
+                } else {
+                    rowId.complete(null)
+                }
 
-                val body = buildUploadBody(bytes, fallbackMediaType = "image/*")
+                val body = buildUploadBody(uploadBytes, fallbackMediaType = "image/*")
                 val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
                 doRequest(part, rowId)
 
@@ -232,7 +301,15 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                if (uploadBytes != null && handleOfflineSync(e, uploadBytes)) {
+                    if (_uiState.value !is UiState.OfflineSuccess) {
+                        _uiState.value = UiState.Error("Internet yo'q. Rasm saqlandi, tarmoq kelganda avtomatik yuboriladi.", canRetry = false)
+                    }
+                } else {
+                    if (_uiState.value !is UiState.OfflineSuccess) {
+                        _uiState.value = UiState.Error(friendly(e), canRetry = true)
+                    }
+                }
                 if (!rowId.isCompleted) rowId.complete(null)
             } finally {
                 _uploadProgress.value = null
@@ -294,11 +371,30 @@ class ScreeningViewModel @JvmOverloads constructor(
     private suspend fun doRequest(part: MultipartBody.Part, rowId: CompletableDeferred<Long?>) {
         val pid = patientId.ifBlank { null }?.toRequestBody("text/plain".toMediaTypeOrNull())
         val eyePart = eye.toRequestBody("text/plain".toMediaTypeOrNull())
-        val result = api.predict(part, pid, eyePart)
+        
+        // 1. Dastlabki so'rov (TaskResponse qabul qilinadi)
+        val taskResponse = api.predict(part, pid, eyePart)
+        var status = taskResponse.status
+        var result: PredictResponse? = null
+        
+        // 2. Natijani kutish (Polling)
+        while (status == "PENDING" || status == "PROCESSING") {
+            kotlinx.coroutines.delay(2000) // 2 soniya kutish
+            val statusResponse = api.getPredictStatus(taskResponse.taskId)
+            status = statusResponse.status
+            if (status == "SUCCESS" && statusResponse.result != null) {
+                result = statusResponse.result
+            } else if (status == "FAILURE") {
+                throw Exception("Backend xatosi: ${statusResponse.error ?: "Noma'lum"}")
+            }
+        }
+        
+        if (result == null) {
+            throw Exception("Natija kelmadi!")
+        }
+        
         _uiState.value = UiState.Success(result)
-        // Tarixga saqlash — shu payt mahalliy evristika hali tayyor bo'lmasa (odatda
-        // sekinroq, backend javobidan keyin ham kelishi mumkin), holsiz saqlanadi;
-        // tayyor bo'lgach `runHeuristicAsync` shu ID orqali to'ldiradi.
+        // Tarixga saqlash
         val id = runCatching { historyRepo.saveResult(result, _localHeuristic.value) }.getOrNull()
         if (!rowId.isCompleted) rowId.complete(id)
     }

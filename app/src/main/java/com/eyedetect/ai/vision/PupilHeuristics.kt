@@ -11,6 +11,8 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
 import java.util.concurrent.TimeUnit
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Olingan surat ustida ishlaydigan KLASSIK CV EVRISTIKASI — trenirovka qilingan
  * ML modeli EMAS. Backendning haqiqiy klinik natijasini (ICDR/Grad-CAM) almashtirmaydi,
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit
  * Chegaralar (pastda) taxminiy — haqiqiy qurilma/flash sharoitida sinovdan so'ng
  * sozlash tavsiya etiladi ([FrameQualityAnalyzer]dagi kabi).
  */
+@Immutable
 data class PupilHeuristicResult(
     val regionFound: Boolean,
     val usedFaceLandmark: Boolean,

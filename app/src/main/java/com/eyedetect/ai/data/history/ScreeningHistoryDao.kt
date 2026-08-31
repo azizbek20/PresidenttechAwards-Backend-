@@ -46,4 +46,10 @@ interface ScreeningHistoryDao {
 
     @Query("DELETE FROM screening_history")
     suspend fun clearAll()
+
+    @Query("SELECT * FROM screening_history WHERE syncStatus = 'PENDING' ORDER BY savedAtMs ASC")
+    suspend fun getPendingUploads(): List<ScreeningHistoryEntity>
+
+    @androidx.room.Update
+    suspend fun update(entry: ScreeningHistoryEntity)
 }

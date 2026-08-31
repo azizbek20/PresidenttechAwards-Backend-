@@ -1,11 +1,13 @@
 package com.eyedetect.ai.data
 
 import com.google.gson.annotations.SerializedName
+import androidx.compose.runtime.Immutable
 
 /**
  * Backend POST /api/v1/predict javobi (reja 5.1 API kontrakti).
  * Maydonlar backend JSON kalitlariga aynan mos.
  */
+@Immutable
 data class PredictResponse(
     @SerializedName("exam_id") val examId: String,
     @SerializedName("patient_id") val patientId: String?,
@@ -22,4 +24,19 @@ data class PredictResponse(
     @SerializedName("model_version") val modelVersion: String,
     @SerializedName("processed_at") val processedAt: String,
     val disclaimer: String,
+)
+
+@Immutable
+data class TaskResponse(
+    @SerializedName("task_id") val taskId: String,
+    val status: String,
+    val message: String
+)
+
+@Immutable
+data class TaskStatusResponse(
+    @SerializedName("task_id") val taskId: String,
+    val status: String, // PENDING, PROCESSING, SUCCESS, FAILURE
+    val result: PredictResponse?,
+    val error: String?
 )

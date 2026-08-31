@@ -94,4 +94,16 @@ def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
             logger.error("torch engine failed to load: %s", exc)
             return UnavailableEngine(str(exc))
 
-    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch)")
+    if source == "onnx":
+        try:
+            from app.inference.onnx_engine import OnnxEngine
+        except ImportError as exc:
+            logger.error("onnx engine unavailable: %s", exc)
+            return UnavailableEngine(f"onnx engine import failed: {exc}")
+        try:
+            return OnnxEngine(settings)
+        except Exception as exc:
+            logger.error("onnx engine failed to load: %s", exc)
+            return UnavailableEngine(str(exc))
+
+    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch|onnx)")

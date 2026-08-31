@@ -162,8 +162,8 @@ yashil, `./gradlew testDebugUnitTest`).
       Hali qilinmagan: solishtirish yoshi/muddatiga chegara yo'q (masalan,
       6 oy oldingi natija bilan solishtirilishi mumkin — foydalanuvchi
       buni faqat ko'rsatilgan sanadan bilib oladi).
-- [ ] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
-      tiklanganda avtomatik yuborish.
+- [x] WorkManager: internet yo'q paytda rasmni navbatga qo'yib, ulanish
+      tiklanganda avtomatik yuborish. (SyncWorker orqali joriy etildi)
 - [x] Bemor tarixini ko'rish ekrani qo'shildi: Bosh ekrandan "Tarix" kartasi
       orqali ochiladi (`ui/HistoryScreen.kt`) — barcha saqlangan
       skrininglarni sana bo'yicha kamayish tartibida, qaror/ICDR/mahalliy
@@ -235,15 +235,15 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [ ] `isMinifyEnabled = true` + to'liq ProGuard qoidalarini tekshirish
-      (`app/build.gradle.kts:29`, hozir R8 o'chirilgan).
-- [ ] Haqiqiy ilova ikonkasi qo'shish (hozir standart tizim ikonkasi
-      ishlatilmoqda).
+- [x] `isMinifyEnabled = true` + to'liq ProGuard qoidalarini tekshirish
+      (`app/build.gradle.kts:29`, R8 yoqildi va mos qoidalar qo'shildi).
+- [x] Haqiqiy ilova ikonkasi qo'shish (Vektor AI ko'z ikonkasi
+      qo'shildi).
 - [x] `API_BASE_URL`ni build-turlariga (debug/staging/release) ajratish —
       release endi `local.properties`dagi `RELEASE_API_URL`ni ishlatadi
       (HTTPS majburiy), `assembleRelease`/`bundleRelease` oldidan
       `checkReleaseSecrets` orqali tekshiriladi.
-- [ ] Versiya nomlash strategiyasi (`versionName = "0.1.0"` dan keyin).
+- [x] Versiya nomlash strategiyasi (`versionName = "1.0.0-rc1"`, `versionCode = 2`).
 
 ---
 

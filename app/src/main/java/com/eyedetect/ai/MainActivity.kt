@@ -31,6 +31,9 @@ import com.eyedetect.ai.ui.eyecare.FocusShiftScreen
 import com.eyedetect.ai.ui.eyecare.FollowDotScreen
 import com.eyedetect.ai.ui.eyecare.ReminderSettingsScreen
 import com.eyedetect.ai.ui.theme.EyeDetectTheme
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 
 /** Ilova ichidagi ekranlar (reja 2.1 + ko'z mashqlari bo'limi). */
 enum class Screen {
@@ -63,17 +66,20 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(LocalePrefs.wrap(newBase))
     }
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
             cleanupStaleCaptures(applicationContext)
         }
         setContent {
+            val windowSizeClass = calculateWindowSizeClass(this)
+            val widthSizeClass = windowSizeClass.widthSizeClass
             EyeDetectTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
-                ) { AppRoot() }
+                ) { AppRoot(widthSizeClass = widthSizeClass) }
             }
         }
     }
@@ -85,7 +91,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppRoot(vm: ScreeningViewModel = viewModel()) {
+fun AppRoot(
+    vm: ScreeningViewModel = viewModel(),
+    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact
+) {
     val activity = LocalContext.current as? Activity
     val openEyeCareOnStart = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_EYECARE, false) ?: false
 
@@ -114,6 +123,7 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
 
     when (current) {
         Screen.Home -> HomeScreen(
+            widthSizeClass = widthSizeClass,
             onScreening = { push(Screen.Patient) },
             onEyeCare = { push(Screen.EyeCareMenu) },
             onHistory = { push(Screen.History) },
@@ -128,6 +138,7 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
             onBack = { pop() },
         )
         Screen.Result -> ResultScreen(
+            widthSizeClass = widthSizeClass,
             uiState = uiState,
             localHeuristic = localHeuristic,
             symmetry = symmetry,
@@ -161,6 +172,6 @@ fun AppRoot(vm: ScreeningViewModel = viewModel()) {
         Screen.FocusShift -> FocusShiftScreen(onBack = { pop() })
         Screen.BlinkPalm -> BlinkPalmScreen(onBack = { pop() })
         Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
-        Screen.History -> HistoryScreen(onBack = { pop() })
+        Screen.History -> HistoryScreen(widthSizeClass = widthSizeClass, onBack = { pop() })
     }
 }

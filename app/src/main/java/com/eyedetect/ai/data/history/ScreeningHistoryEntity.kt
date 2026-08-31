@@ -3,6 +3,8 @@ package com.eyedetect.ai.data.history
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Backenddan qaytgan bitta skrining natijasining lokal nusxasi (Room). Bemor ID va
  * rasm — shaxsiy tibbiy ma'lumot (PHI), shuning uchun faqat qurilma ichida, faqat
@@ -16,18 +18,19 @@ import androidx.room.PrimaryKey
  * solishtirish ([com.eyedetect.ai.vision.EyeSymmetryAnalyzer]) shu maydonlarga tayanadi.
  */
 @Entity(tableName = "screening_history")
+@Immutable
 data class ScreeningHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val examId: String,
+    val examId: String?,
     val patientId: String?,
     val eye: String?,
-    val decision: String,
-    val decisionText: String,
-    val gradeLabel: String,
-    val icdrGrade: Int,
-    val probability: Double,
-    val quality: String,
-    val modelVersion: String,
+    val decision: String?,
+    val decisionText: String?,
+    val gradeLabel: String?,
+    val icdrGrade: Int?,
+    val probability: Double?,
+    val quality: String?,
+    val modelVersion: String?,
     val imageUrl: String?,
     val heatmapUrl: String?,
     val localOpacity: String?,
@@ -35,6 +38,10 @@ data class ScreeningHistoryEntity(
     val localHueDeg: Float? = null,
     val localSaturation: Float? = null,
     val localValue: Float? = null,
-    val processedAt: String,
+    val processedAt: String?,
     val savedAtMs: Long = System.currentTimeMillis(),
+    
+    // Offline sync uchun yangi maydonlar
+    val syncStatus: String = "SYNCED", // "SYNCED", "PENDING", "ERROR"
+    val pendingFilePath: String? = null, // Internet yo'q bo'lsa mahalliy rasmni ushlab turamiz
 )

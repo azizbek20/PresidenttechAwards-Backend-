@@ -61,4 +61,38 @@ class ScreeningHistoryRepository(context: Context) {
     suspend fun delete(entry: ScreeningHistoryEntity) = dao.delete(entry)
 
     suspend fun clearAll() = dao.clearAll()
+    
+    suspend fun getPendingUploads() = dao.getPendingUploads()
+    
+    suspend fun update(entry: ScreeningHistoryEntity) = dao.update(entry)
+    
+    suspend fun savePending(
+        patientId: String?,
+        eye: String?,
+        heuristic: PupilHeuristicResult?,
+        filePath: String
+    ): Long = dao.insert(
+        ScreeningHistoryEntity(
+            examId = null,
+            patientId = patientId,
+            eye = eye,
+            decision = null,
+            decisionText = null,
+            gradeLabel = null,
+            icdrGrade = null,
+            probability = null,
+            quality = null,
+            modelVersion = null,
+            imageUrl = null,
+            heatmapUrl = null,
+            localOpacity = heuristic?.opacity?.name,
+            localRedReflex = heuristic?.redReflex?.name,
+            localHueDeg = heuristic?.darkMeanHueDeg,
+            localSaturation = heuristic?.darkMeanSaturation,
+            localValue = heuristic?.darkMeanValue,
+            processedAt = null,
+            syncStatus = "PENDING",
+            pendingFilePath = filePath
+        )
+    )
 }

@@ -38,12 +38,16 @@ import com.eyedetect.ai.vision.PupilHeuristicResult
  * 3-ekran: yuklanish / natija (svetofor + ishonch + heatmap) / xato.
  * Barcha holatlar 6-hujjat (6.C/6.D/6.F) dizayniga mos, API kontrakti buzilmagan.
  */
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Expanded
+
 @Composable
 fun ResultScreen(
     uiState: UiState,
     localHeuristic: PupilHeuristicResult?,
     symmetry: EyeSymmetryUiState?,
     uploadProgress: Float? = null,
+    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact,
     onRetry: () -> Unit,
     onCancelUpload: (() -> Unit)? = null,
     onNewPatient: () -> Unit,
@@ -57,7 +61,9 @@ fun ResultScreen(
             ErrorState(message = uiState.message, onRetry = onRetry, onNewPatient = onNewPatient)
         }
 
-        is UiState.Success -> SuccessContent(uiState.result, localHeuristic, symmetry, onRetry, onNewPatient)
+        is UiState.Success -> SuccessContent(uiState.result, localHeuristic, symmetry, widthSizeClass, onRetry, onNewPatient, isOffline = false)
+        
+        is UiState.OfflineSuccess -> SuccessContent(uiState.result, localHeuristic, symmetry, widthSizeClass, onRetry, onNewPatient, isOffline = true)
 
         UiState.Idle -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.result_none), style = MaterialTheme.typography.bodyLarge)
@@ -70,73 +76,137 @@ private fun SuccessContent(
     r: PredictResponse,
     localHeuristic: PupilHeuristicResult?,
     symmetry: EyeSymmetryUiState?,
+    widthSizeClass: WindowWidthSizeClass,
     onRetry: () -> Unit,
     onNewPatient: () -> Unit,
+    isOffline: Boolean = false,
 ) {
     val ungradable = r.decision != "REFER" && r.decision != "NO_REFER"
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(Spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        // Brend + bemor
-        Column {
-            Text(
-                stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                stringResource(R.string.result_header, r.patientId ?: stringResource(R.string.result_unknown_patient)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        // 1) Svetofor qaror kartasi
-        TrafficLightCard(r)
-
-        // UNGRADABLE uchun ogohlantirish
-        if (ungradable) {
-            WarningBanner(stringResource(R.string.result_ungradable_warning))
-        }
-
-        // 2) Klinik tafsilot
-        ClinicalDetailCard(r)
-
-        // 2b) Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
-        PupilHeuristicCard(localHeuristic)
-
-        // 2c) Ikki ko'z simmetriyasi — qarshi ko'z uchun oldingi natija topilgan bo'lsa
-        EyeSymmetryCard(symmetry)
-
-        // 3) Heatmap (asl + Grad-CAM)
-        HeatmapCard(r)
-
-        // 4) Tavsiya
-        RecommendationCard(r.decision)
-
-        // 5) Disklaymer
-        DisclaimerText(r.disclaimer)
-
-        // 6) Harakat tugmalari
+    if (widthSizeClass == Expanded) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
-            PrimaryButton(
-                text = if (ungradable) stringResource(R.string.common_retake) else stringResource(R.string.result_new_photo),
-                onClick = onRetry,
-                modifier = Modifier.weight(1f),
-            )
-            SecondaryButton(
-                text = stringResource(R.string.common_new_patient),
-                onClick = onNewPatient,
-                modifier = Modifier.weight(1f),
-            )
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+            ) {
+                Column {
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        stringResource(R.string.result_header, r.patientId ?: stringResource(R.string.result_unknown_patient)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (isOffline) {
+                    WarningBanner("⚡ Oflayn AI Natijasi\nInternet yo'qligi sababli bu natija cheklangan model orqali olindi. Iloji boricha internetga ulanib qayta tekshiring.")
+                }
+                if (ungradable) {
+                    WarningBanner(stringResource(R.string.result_ungradable_warning))
+                }
+                HeatmapCard(r)
+            }
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+            ) {
+                TrafficLightCard(r)
+                ClinicalDetailCard(r)
+                PupilHeuristicCard(localHeuristic)
+                EyeSymmetryCard(symmetry)
+                RecommendationCard(r.decision)
+                DisclaimerText(r.disclaimer)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    PrimaryButton(
+                        text = if (ungradable) stringResource(R.string.common_retake) else stringResource(R.string.result_new_photo),
+                        onClick = onRetry,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SecondaryButton(
+                        text = stringResource(R.string.common_new_patient),
+                        onClick = onNewPatient,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            // Brend + bemor
+            Column {
+                Text(
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    stringResource(R.string.result_header, r.patientId ?: stringResource(R.string.result_unknown_patient)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // 1) Svetofor qaror kartasi
+            TrafficLightCard(r)
+
+            if (isOffline) {
+                WarningBanner("⚡ Oflayn AI Natijasi\nInternet yo'qligi sababli bu natija cheklangan model orqali olindi. Iloji boricha internetga ulanib qayta tekshiring.")
+            }
+
+            // UNGRADABLE uchun ogohlantirish
+            if (ungradable) {
+                WarningBanner(stringResource(R.string.result_ungradable_warning))
+            }
+
+            // 2) Klinik tafsilot
+            ClinicalDetailCard(r)
+
+            // 2b) Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
+            PupilHeuristicCard(localHeuristic)
+
+            // 2c) Ikki ko'z simmetriyasi — qarshi ko'z uchun oldingi natija topilgan bo'lsa
+            EyeSymmetryCard(symmetry)
+
+            // 3) Heatmap (asl + Grad-CAM)
+            HeatmapCard(r)
+
+            // 4) Tavsiya
+            RecommendationCard(r.decision)
+
+            // 5) Disklaymer
+            DisclaimerText(r.disclaimer)
+
+            // 6) Harakat tugmalari
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                PrimaryButton(
+                    text = if (ungradable) stringResource(R.string.common_retake) else stringResource(R.string.result_new_photo),
+                    onClick = onRetry,
+                    modifier = Modifier.weight(1f),
+                )
+                SecondaryButton(
+                    text = stringResource(R.string.common_new_patient),
+                    onClick = onNewPatient,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }

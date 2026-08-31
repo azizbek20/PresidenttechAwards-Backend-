@@ -21,8 +21,16 @@ import com.eyedetect.ai.ui.theme.Spacing
  * Ilova kirish ekrani — foydalanuvchi Skrining oqimi yoki Ko'z mashqlari
  * bo'limiga o'tishni tanlaydi.
  */
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Expanded
+
 @Composable
-fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> Unit) {
+fun HomeScreen(
+    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact,
+    onScreening: () -> Unit,
+    onEyeCare: () -> Unit,
+    onHistory: () -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -47,23 +55,50 @@ fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> 
             LanguagePicker()
         }
 
-        MenuCard(
-            title = stringResource(R.string.home_screening_title),
-            subtitle = stringResource(R.string.home_screening_subtitle),
-            emoji = "🩺",
-            onClick = onScreening,
-        )
-        MenuCard(
-            title = stringResource(R.string.home_eyecare_title),
-            subtitle = stringResource(R.string.home_eyecare_subtitle),
-            emoji = "🧘",
-            onClick = onEyeCare,
-        )
-        MenuCard(
-            title = stringResource(R.string.home_history_title),
-            subtitle = stringResource(R.string.home_history_subtitle),
-            emoji = "🗂️",
-            onClick = onHistory,
-        )
+        if (widthSizeClass == Expanded) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                    MenuCard(
+                        title = stringResource(R.string.home_screening_title),
+                        subtitle = stringResource(R.string.home_screening_subtitle),
+                        emoji = "🩺",
+                        onClick = onScreening,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                    MenuCard(
+                        title = stringResource(R.string.home_eyecare_title),
+                        subtitle = stringResource(R.string.home_eyecare_subtitle),
+                        emoji = "🧘",
+                        onClick = onEyeCare,
+                    )
+                    MenuCard(
+                        title = stringResource(R.string.home_history_title),
+                        subtitle = stringResource(R.string.home_history_subtitle),
+                        emoji = "🗂️",
+                        onClick = onHistory,
+                    )
+                }
+            }
+        } else {
+            MenuCard(
+                title = stringResource(R.string.home_screening_title),
+                subtitle = stringResource(R.string.home_screening_subtitle),
+                emoji = "🩺",
+                onClick = onScreening,
+            )
+            MenuCard(
+                title = stringResource(R.string.home_eyecare_title),
+                subtitle = stringResource(R.string.home_eyecare_subtitle),
+                emoji = "🧘",
+                onClick = onEyeCare,
+            )
+            MenuCard(
+                title = stringResource(R.string.home_history_title),
+                subtitle = stringResource(R.string.home_history_subtitle),
+                emoji = "🗂️",
+                onClick = onHistory,
+            )
+        }
     }
 }

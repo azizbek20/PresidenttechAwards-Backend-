@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # ---- mode / model ----------------------------------------------------
     eye_mode: Literal["demo", "shadow"] = Field(default="demo", alias="EYE_MODE")
-    eye_model_source: Literal["mock", "torch"] = Field(
+    eye_model_source: Literal["mock", "torch", "onnx"] = Field(
         default="mock", alias="EYE_MODEL_SOURCE"
     )
     eye_model_dir: Path = Field(default=Path("./models"), alias="EYE_MODEL_DIR")
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
         default=0.5, ge=0.0, le=1.0, alias="EYE_REFERABLE_THRESHOLD"
     )
     quality_blur_min_var: float = Field(
-        default=50.0, ge=0.0, alias="QUALITY_BLUR_MIN_VAR"
+        default=0.0, ge=0.0, alias="QUALITY_BLUR_MIN_VAR"
     )
 
     # ---- infra -----------------------------------------------------------

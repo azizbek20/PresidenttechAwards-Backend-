@@ -43,6 +43,13 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Expanded
+
+
 
 /** Room'da saqlangan `QualityLevel.name` ("GOOD"/"WARN"/"BAD")ni joriy tildagi matnga aylantiradi. */
 @Composable
@@ -56,9 +63,13 @@ private fun localizedQuality(name: String?): String {
     }
 }
 
+
 /** O'tgan skrininglar tarixi — Room'da saqlangan yozuvlarni ko'rsatadi (PLAN.md 4-band). */
 @Composable
-fun HistoryScreen(onBack: () -> Unit) {
+fun HistoryScreen(
+    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val repo = remember { ScreeningHistoryRepository(context) }
     val entries by repo.history.collectAsState(initial = null)
@@ -82,6 +93,18 @@ fun HistoryScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            widthSizeClass == Expanded -> LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
+                items(list, key = { it.id }) { entry ->
+                    HistoryEntryCard(
+                        entry = entry,
+                        onDelete = { scope.launch { repo.delete(entry) } },
+                    )
+                }
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 items(list, key = { it.id }) { entry ->
@@ -120,14 +143,36 @@ private fun HistoryEntryCard(entry: ScreeningHistoryEntity, onDelete: () -> Unit
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(decisionEmoji(entry.decision))
-                    Text(
-                        if (ungradable) stringResource(R.string.result_ungradable) else entry.decisionText,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = decisionColor(entry.decision),
-                    )
+                if (entry.syncStatus == "PENDING") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text("⏳")
+                        Text(
+                            "Kutilmoqda...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (entry.syncStatus == "ERROR") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text("❌")
+                        Text(
+                            "Tarmoq xatosi",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text(decisionEmoji(entry.decision ?: ""))
+                        Text(
+                            if (ungradable) stringResource(R.string.result_ungradable) else entry.decisionText ?: "",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = decisionColor(entry.decision ?: ""),
+                        )
+                    }
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
@@ -144,14 +189,14 @@ private fun HistoryEntryCard(entry: ScreeningHistoryEntity, onDelete: () -> Unit
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!ungradable) {
+            if (!ungradable && entry.syncStatus == "SYNCED") {
                 Text(
                     stringResource(
                         R.string.history_icdr_grade_row,
                         stringResource(R.string.result_icdr_grade),
-                        entry.icdrGrade,
-                        entry.gradeLabel,
-                        (entry.probability * 100).toInt(),
+                        entry.icdrGrade ?: 0,
+                        entry.gradeLabel ?: "",
+                        ((entry.probability ?: 0.0) * 100).toInt(),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

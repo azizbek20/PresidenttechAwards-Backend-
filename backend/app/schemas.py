@@ -16,6 +16,20 @@ Eye = Literal["right", "left"]
 Quality = Literal["good", "poor"]
 
 DISCLAIMER = "Bu skrining/triaj vositasi; yakuniy tashxis oftalmolog mas'uliyati."
+TaskStatus = Literal["PENDING", "PROCESSING", "SUCCESS", "FAILURE"]
+
+
+class TaskResponse(BaseModel):
+    task_id: str
+    status: TaskStatus
+    message: str = "Rasm qabul qilindi, ishlov berilmoqda..."
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: TaskStatus
+    result: "PredictResponse | None" = None
+    error: str | None = None
 
 
 class PredictResponse(BaseModel):

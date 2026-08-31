@@ -21,5 +21,10 @@ interface ApiService {
         @Part file: MultipartBody.Part,
         @Part("patient_id") patientId: RequestBody?,
         @Part("eye") eye: RequestBody?,
-    ): PredictResponse
+    ): TaskResponse
+    
+    @retrofit2.http.GET("api/v1/predict/status/{task_id}")
+    suspend fun getPredictStatus(
+        @retrofit2.http.Path("task_id") taskId: String
+    ): TaskStatusResponse
 }

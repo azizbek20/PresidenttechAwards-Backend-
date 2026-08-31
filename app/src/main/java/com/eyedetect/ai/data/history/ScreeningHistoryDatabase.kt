@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ScreeningHistoryEntity::class], version = 2, exportSchema = false)
+@Database(entities = [ScreeningHistoryEntity::class], version = 3, exportSchema = false)
 abstract class ScreeningHistoryDatabase : RoomDatabase() {
     abstract fun screeningHistoryDao(): ScreeningHistoryDao
 
@@ -19,6 +19,12 @@ abstract class ScreeningHistoryDatabase : RoomDatabase() {
                     ScreeningHistoryDatabase::class.java,
                     "screening_history.db",
                 )
+                    // SQLCipher factory bilan bazani shifrlaymiz
+                    .openHelperFactory(
+                        net.sqlcipher.database.SupportFactory(
+                            DbKeyProvider.getPassphrase(context)
+                        )
+                    )
                     // v1 -> v2: localHueDeg/localSaturation/localValue qo'shildi (simmetriya
                     // solishtiruvi uchun). Loyiha hali relizga chiqmagan — eski keshni
                     // migratsiya qilish o'rniga oddiy tozalab qayta yaratamiz.
