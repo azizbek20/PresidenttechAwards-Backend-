@@ -149,7 +149,10 @@ def render_heatmap(
         layers = [_pick_target_layer(model)]
         # Grad-CAM needs a backward pass, so it must run outside inference_mode.
         with torch.enable_grad(), GradCAM(model=model, target_layers=layers) as cam:
-            activation = cam(input_tensor=batch)[0]
+            # CI's resolved grad-cam==1.5.* build has no default for ``targets``;
+            # pass it explicitly. None means "highest-scoring category" (the
+            # model's own top class), matching the old implicit behaviour.
+            activation = cam(input_tensor=batch, targets=None)[0]
 
         _write_png(_overlay(display, activation), Path(out_path))
     except Exception:
