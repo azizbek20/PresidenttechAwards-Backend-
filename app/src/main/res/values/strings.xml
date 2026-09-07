@@ -44,6 +44,7 @@
     <string name="camera_request_permission">Ruxsat so\'rash</string>
     <string name="camera_open_settings">Sozlamalarga o\'tish</string>
     <string name="camera_capture_error">Suratga olishda xatolik yuz berdi. Qayta urinib ko\'ring.</string>
+    <string name="camera_bind_error">Kamerani ishga tushirib bo\'lmadi. Ilovadan chiqib qayta kiring yoki galereyadan tanlang.</string>
     <string name="camera_eye_tag">👁 %1$s</string>
     <string name="camera_center_guide">🟡 Retinani doira ichiga markazlang</string>
     <string name="camera_pick_gallery">🖼️ Galereyadan tanlash (zaxira)</string>

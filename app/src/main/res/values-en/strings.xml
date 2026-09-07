@@ -44,6 +44,7 @@
     <string name="camera_request_permission">Request permission</string>
     <string name="camera_open_settings">Open settings</string>
     <string name="camera_capture_error">Something went wrong while taking the photo. Please try again.</string>
+    <string name="camera_bind_error">Couldn\'t start the camera. Leave and reopen the app, or pick a photo from the gallery instead.</string>
     <string name="camera_eye_tag">👁 %1$s</string>
     <string name="camera_center_guide">🟡 Center the retina inside the circle</string>
     <string name="camera_pick_gallery">🖼️ Choose from gallery (fallback)</string>
