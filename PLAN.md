@@ -133,6 +133,18 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
         Android/MediaPipe runtime'ga bog'liq — Robolectric ostida MediaPipe
         native kutubxonalari ishlamaydi, shuning uchun instrumentation test
         yoki qo'lda qurilma sinovi kerak bo'ladi).
+      - **Tuzatildi (QA audit):** `detectExecutor` (bitta ip'li executor)
+        timeout'da faqat `future.cancel(true)` chaqirar edi — bu native
+        `detect()` chaqiruvini to'xtatmaydi (interrupt e'tiborsiz
+        qoldirilishi mumkin), ya'ni yagona ip abadiy band bo'lib qolishi
+        mumkin edi. Bitta ip'li executor'da bu keyingi **barcha**
+        chaqiruvlarni shu band ip ortida navbatga tizib, har biri ham
+        vaqt tugashi bilan `null` qaytarardi — funksiya butun jarayon
+        davomida (hech qanday ko'rinadigan signal'siz) ML Kit/markaziy
+        zaxira rejimiga tushib qolar edi. Endi timeout'da `detectExecutor`
+        ham, `landmarker` (FaceLandmarker, ko'p ipli chaqiruvni
+        kafolatlamaydi) ham tashlanadi va keyingi chaqiruvda qaytadan
+        yaratiladi — ikkalasi ham `@Volatile var`.
 - [x] Flash boshqaruvi qo'shildi: `CameraScreen.kt`da yuqori chapdagi chip
       orqali YOQILGAN/AVTO/O'CHIQ o'rtasida almashtirish mumkin
       (`ImageCapture.flashMode`, standart holat — YOQILGAN, chunki qizil

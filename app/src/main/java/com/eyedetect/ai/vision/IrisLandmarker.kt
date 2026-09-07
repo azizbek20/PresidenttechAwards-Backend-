@@ -7,6 +7,7 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -41,8 +42,13 @@ object IrisLandmarker {
     private var landmarker: FaceLandmarker? = null
 
     // detect() past kutilmagan holatlarda (masalan, xotira bosimi ostida) uzoq bloklanib
-    // qolishi mumkin — chegaralangan kutish uchun alohida ip.
-    private val detectExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "IrisLandmarkerDetect") }
+    // qolishi mumkin — chegaralangan kutish uchun alohida ip. `@Volatile var` (val emas):
+    // timeout'da bu ip qayta yaratiladi, quyidagi izohga qarang.
+    @Volatile
+    private var detectExecutor: ExecutorService = newDetectExecutor()
+
+    private fun newDetectExecutor(): ExecutorService =
+        Executors.newSingleThreadExecutor { r -> Thread(r, "IrisLandmarkerDetect") }
 
     private fun getOrCreate(context: Context): FaceLandmarker =
         landmarker ?: synchronized(this) {
@@ -76,6 +82,9 @@ object IrisLandmarker {
      * ML Kit zaxira yo'lidagi `Tasks.await(..., 3, TimeUnit.SECONDS)`ga o'xshab: xotira
      * bosimi yoki boshqa kutilmagan holat ostida native chaqiruv cheksiz bloklanib qolsa
      * ham, chaqiruvchi ip abadiy osilib qolmaydi (past ip esa fon rejimida davom etadi).
+     * Timeout yuz bersa, [detectExecutor] va [landmarker] ikkalasi ham tashlab, qaytadan
+     * yaratiladi — aks holda band (osilib qolgan) yagona ip barcha keyingi chaqiruvlarni
+     * navbatga tizib, funksiya butun jarayon davomida jimgina ishlamay qolar edi.
      */
     @Synchronized
     fun detectIris(context: Context, bitmap: Bitmap, eye: String): Triple<Float, Float, Float>? {
@@ -87,7 +96,26 @@ object IrisLandmarker {
             try {
                 future.get(DETECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             } catch (e: TimeoutException) {
+                // `cancel(true)` faqat interrupt bayrog'ini qo'yadi — MediaPipe'ning native
+                // `detect()` chaqiruvi buni e'tiborsiz qoldirishi mumkin, ya'ni bitta ip'li
+                // executor'ning yagona ipi haligacha band bo'lib qolishi mumkin. Shu ipni
+                // (va navbatga tizilgan bitmap'ni) tashlab, yangi executor bilan
+                // almashtiramiz — aks holda barcha keyingi chaqiruvlar shu band ip ortida
+                // navbatga tizilib, har biri ham vaqt tugashi bilan yakunlanadi va bu
+                // funksiya butun jarayon davomida jimgina (hech qanday signal'siz) ishlamay
+                // qoladi.
                 future.cancel(true)
+                detectExecutor = newDetectExecutor()
+                // `faceLandmarker.detect()` ko'p ipli parallel chaqiruvni kafolatlamaydi
+                // (yuqoridagi eslatmaga qarang). Osilib qolgan eski ip hali shu obyekt
+                // ustida ishlab turgan bo'lishi mumkin — agar `landmarker`ni shu holicha
+                // qoldirsak, keyingi chaqiruv (yangi executor ipida) xuddi shu obyektda
+                // eski chaqiruv bilan bir vaqtda ishlab, aniqlanishi qiyin xatolarga
+                // (yoki native crash'ga) olib kelishi mumkin. Shu sababli obyektni ham
+                // tashlab yuboramiz — keyingi chaqiruv o'z sof nusxasini yaratadi, eski
+                // (hali tugamagan) chaqiruv esa eski nusxa bilan yakunlanadi/xotiradan
+                // chiqadi, ikkalasi bir-biriga aralashmaydi.
+                landmarker = null
                 null
             }
         }.getOrNull() ?: return null
