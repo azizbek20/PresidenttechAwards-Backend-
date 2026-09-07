@@ -59,6 +59,7 @@ class FocusShiftViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     override fun onCleared() {
+        super.onCleared()
         job?.cancel()
     }
 

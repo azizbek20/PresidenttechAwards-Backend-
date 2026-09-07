@@ -9,6 +9,7 @@ import com.eyedetect.ai.data.upload.PendingUploadEntity
 import com.eyedetect.ai.data.upload.PendingUploadRepository
 import com.eyedetect.ai.eyecare.NotificationHelper
 import com.eyedetect.ai.vision.BitmapLoader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -65,6 +66,16 @@ class UploadWorker(
             pendingRepo.delete(entry)
             NotificationHelper.showUploadSuccess(applicationContext, entry.patientId)
             Result.success()
+        } catch (e: CancellationException) {
+            // WorkManager cancels this coroutine when constraints are lost mid-upload
+            // (e.g. the network drops) or the work is explicitly stopped — cooperative
+            // cancellation, not a real failure. `catch (e: Exception)` below also
+            // matches CancellationException (it IS a RuntimeException), which used to
+            // route a benign cancellation into onPermanentFailure: marking the pending
+            // upload `failed = true` and firing an "upload failed" notification for
+            // something that never actually failed. Rethrow so structured concurrency's
+            // own cancellation handling applies, per kotlinx.coroutines convention.
+            throw e
         } catch (e: Exception) {
             if (isRetryable(e) && runAttemptCount < MAX_ATTEMPTS) {
                 Result.retry()

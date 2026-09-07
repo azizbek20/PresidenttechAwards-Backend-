@@ -102,6 +102,13 @@ fun CameraScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+    // Bu ekran ilovaning o'z (Activity emas) navigatsiya stekidan chiqib ketganda
+    // Compose'dan olib tashlanadi, lekin executor hech qachon shutdown()
+    // qilinmasa, har safar CameraScreen'ga qaytilganda yangi (o'chmaydigan)
+    // ip ochilaverar edi. Ekrandan chiqilganda bir marta yopiladi.
+    DisposableEffect(Unit) {
+        onDispose { executor.shutdown() }
+    }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -166,6 +173,11 @@ fun CameraScreen(
     // o'tmasdan, shu yerda ogohlantirib, qayta urinishga taklif qilinadi.
     var captureError by remember { mutableStateOf(false) }
 
+    // Kamerani lifecycle'ga bog'lash (bindToLifecycle) muvaffaqiyatsiz bo'lsa — avval
+    // bu jimgina yutilar edi (`catch (_: Exception) {}`), foydalanuvchi qora ekranni
+    // ko'rib nima bo'lganini bilmasdi. Endi ogohlantirib, galereya zaxirasini taklif qilamiz.
+    var cameraBindError by remember { mutableStateOf(false) }
+
     val eyeLabelText = eyeLabel(vm.eye)
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -197,25 +209,43 @@ fun CameraScreen(
                 .background(Color.Black),
         ) {
             if (hasCameraPermission) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        val providerFuture = ProcessCameraProvider.getInstance(ctx)
-                        providerFuture.addListener({
+                val previewView = remember { PreviewView(context) }
+                // `bindToLifecycle(lifecycleOwner, ...)` bog'lanadi Activity lifecycle'iga
+                // (bu ilovada CameraScreen Jetpack Navigation emas, custom
+                // `SnapshotStateList<Screen>` orqali almashadi — alohida
+                // lifecycle-egasi yo'q). Activity screen almashtirilganda ham
+                // STARTED/RESUMED holida qolgani uchun, avval kamera boshqa
+                // ekranga o'tilganda ham fonda ishlab, batareya sarflab,
+                // kamera qulfini ushlab turishda davom etardi. Shu sababli
+                // `unbindAll()` endi bu Composable kompozitsiyadan chiqqanda
+                // (ya'ni CameraScreen'dan chiqilganda) `onDispose`da ham
+                // qo'lda chaqiriladi — Activity lifecycle'idan mustaqil.
+                DisposableEffect(previewView, imageCapture, imageAnalysis, lifecycleOwner) {
+                    var boundProvider: ProcessCameraProvider? = null
+                    val providerFuture = ProcessCameraProvider.getInstance(context)
+                    providerFuture.addListener({
+                        try {
                             val provider = providerFuture.get()
                             val preview = Preview.Builder().build().also {
                                 it.setSurfaceProvider(previewView.surfaceProvider)
                             }
-                            val selector = CameraSelector.DEFAULT_BACK_CAMERA
-                            try {
-                                provider.unbindAll()
-                                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
-                            } catch (_: Exception) { /* demo: e'tiborsiz */ }
-                        }, ContextCompat.getMainExecutor(ctx))
-                        previewView
-                    },
-                )
+                            provider.unbindAll()
+                            provider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                imageCapture,
+                                imageAnalysis,
+                            )
+                            boundProvider = provider
+                        } catch (_: Exception) {
+                            cameraBindError = true
+                        }
+                    }, ContextCompat.getMainExecutor(context))
+
+                    onDispose { boundProvider?.unbindAll() }
+                }
+                AndroidView(modifier = Modifier.fillMaxSize(), factory = { previewView })
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(Spacing.xl),
@@ -308,6 +338,9 @@ fun CameraScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (cameraBindError) {
+                WarningBanner(stringResource(R.string.camera_bind_error))
+            }
             if (captureError) {
                 WarningBanner(stringResource(R.string.camera_capture_error))
             }

@@ -45,9 +45,17 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       migratsiya emas, tozalab qayta yaratish qabul qilingan).
       Texnik eslatma: SQLCipher'ning native kutubxonasi Robolectric (JVM)
       birlik testlarida yuklanmaydi, shu sababli `ScreeningViewModel` endi
-      `historyStore: ScreeningHistoryStore` parametrini ham in'eksiya qiladi
-      (`api`/`healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy
-      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi.
+      `historyStore: ScreeningHistoryStore` va `pendingUploadStore:
+      PendingUploadStore` parametrlarini ham in'eksiya qiladi (`api`/
+      `healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy Room/
+      SQLCipher o'rniga `FakeHistoryStore`/`FakePendingUploadStore` ishlatadi.
+      (`feature/pomodoro-share-m3` branch'iga bu tuzatish cherry-pick
+      qilinganda xuddi shu muammo — `PendingUploadRepository`ning
+      konstruktorda shartsiz/eager yaratilishi — mustaqil ravishda ham
+      topilib, boshida oddiyroq in'eksiya qilinadigan lambda bilan
+      tuzatilgan edi; branch'lar birlashtirilganda shu yerdagi
+      `PendingUploadStore` interfeys-asosli yechim afzal ko'rildi —
+      `ScreeningHistoryStore` naqshiga izchil mos keladi.)
 
 ## 2. Kamera va sifat nazorati 🔴
 
@@ -108,10 +116,34 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
         DEBUG-only `saveDebugCrop()` bor
         (`getExternalFilesDir()/debug_eye_crop_{left,right}.jpg`); real
         qurilmada tekshirilgach bu funksiya olib tashlanishi kerak.
+      - Android emulyator (Pixel_10 AVD, `-camera-back webcam0`) orqali
+        tekshirishga urinildi: chap/o'ng ko'z tanlash, backend'ga yuklash
+        va to'liq oqim (UI → `vm.eye="left"` → multipart → `/predict`)
+        xatosiz ishlashi tasdiqlandi. Suratga olish (`ImageCapture.takePicture()`)
+        natijasi barqaror emas edi — ba'zi urinishlarda haqiqiy webcam
+        kadri o'rniga sun'iy "pinwheel" test naqshi qaytdi (sabab
+        aniqlanmadi: ehtimol kamera warm-up/flash bilan bog'liq vaqtinchalik
+        holat, chunki keyingi urinishlarda haqiqiy kadr muvaffaqiyatli
+        qaytdi). Iris/ko'zga to'g'ridan-to'g'ri markazlashtirilgan sifatli
+        surat hali olinmadi (urinishlarda ko'z doira ichida emas edi).
+        Jismoniy qurilmada (masalan, avvalgi USB orqali ulangan
+        `2303CRA44A`) tekshirish barqarorroq natija berishi mumkin.
       - Birlik test yo'q (`IrisLandmarker`/yangilangan `PupilHeuristics`
         Android/MediaPipe runtime'ga bog'liq — Robolectric ostida MediaPipe
         native kutubxonalari ishlamaydi, shuning uchun instrumentation test
         yoki qo'lda qurilma sinovi kerak bo'ladi).
+      - **Tuzatildi (QA audit):** `detectExecutor` (bitta ip'li executor)
+        timeout'da faqat `future.cancel(true)` chaqirar edi — bu native
+        `detect()` chaqiruvini to'xtatmaydi (interrupt e'tiborsiz
+        qoldirilishi mumkin), ya'ni yagona ip abadiy band bo'lib qolishi
+        mumkin edi. Bitta ip'li executor'da bu keyingi **barcha**
+        chaqiruvlarni shu band ip ortida navbatga tizib, har biri ham
+        vaqt tugashi bilan `null` qaytarardi — funksiya butun jarayon
+        davomida (hech qanday ko'rinadigan signal'siz) ML Kit/markaziy
+        zaxira rejimiga tushib qolar edi. Endi timeout'da `detectExecutor`
+        ham, `landmarker` (FaceLandmarker, ko'p ipli chaqiruvni
+        kafolatlamaydi) ham tashlanadi va keyingi chaqiruvda qaytadan
+        yaratiladi — ikkalasi ham `@Volatile var`.
 - [x] Flash boshqaruvi qo'shildi: `CameraScreen.kt`da yuqori chapdagi chip
       orqali YOQILGAN/AVTO/O'CHIQ o'rtasida almashtirish mumkin
       (`ImageCapture.flashMode`, standart holat — YOQILGAN, chunki qizil

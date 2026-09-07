@@ -15,3 +15,7 @@ __pycache__/
 .env
 .coverage
 htmlcov/
+# uvicorn's default access/error log; can contain unauthenticated PHI image
+# URLs (exam-UUID paths under /static/images, /static/heatmaps — see
+# app/main.py's static mounts) mapped to request timestamps.
+*.log

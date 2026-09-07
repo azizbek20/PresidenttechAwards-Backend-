@@ -209,6 +209,9 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
+    // TestListenableWorkerBuilder + WorkManagerTestInitHelper, for PomodoroWorker/
+    // ReminderWorkerTest — matches work-runtime-ktx's version above.
+    testImplementation("androidx.work:work-testing:2.9.1")
 
     // --- Instrumentation testlar (qurilma/emulyator, `./gradlew connectedDebugAndroidTest`) ---
     androidTestImplementation(composeBom)
