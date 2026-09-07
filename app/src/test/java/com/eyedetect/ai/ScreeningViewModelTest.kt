@@ -6,7 +6,6 @@ import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryStore
-import com.eyedetect.ai.data.upload.PendingUploadRepository
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -311,15 +310,25 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile queues the photo instead of showing an error when there is no connection`() {
-        // `scheduleUpload` inject qilinadi — birlik testida haqiqiy WorkManager/tarmoq kerak emas
-        // (`healthCheck`dagi kabi sabab). [scheduledId] orqali navbat yozuvi ID'si bilan
-        // chaqirilganini ham tekshiramiz.
+        // `scheduleUpload` va `enqueuePendingUpload` inject qilinadi — birlik testida haqiqiy
+        // WorkManager/tarmoq va haqiqiy (SQLCipher bilan shifrlangan, Robolectric ostida
+        // yuklanmaydigan) Room bazasi kerak emas (`healthCheck`dagi kabi sabab). Navbatga
+        // qo'yilgan baytlar/bemor ID/ko'z va qaytarilgan ID orqali chaqirilishini tekshiramiz.
         var scheduledId: Long? = null
+        var enqueuedPatientId: String? = null
+        var enqueuedEye: String? = null
+        var enqueuedByteCount = -1
         val vm = ScreeningViewModel(
             app(),
             FakeApiService { throw UnknownHostException("no dns") },
             scheduleUpload = { id -> scheduledId = id },
             historyStore = FakeHistoryStore(),
+            enqueuePendingUpload = { bytes, patientId, eye, _ ->
+                enqueuedByteCount = bytes.size
+                enqueuedPatientId = patientId
+                enqueuedEye = eye
+                42L
+            },
         )
         vm.patientId = "p-42"
         vm.eye = "left"
@@ -331,12 +340,10 @@ class ScreeningViewModelTest {
         assertEquals(UiState.Queued, state)
         awaitFileDeleted(file)
 
-        val pendingRepo = PendingUploadRepository(app())
-        val pending = kotlinx.coroutines.runBlocking { pendingRepo.pending.first() }
-        assertEquals(1, pending.size)
-        assertEquals(scheduledId, pending[0].id)
-        assertEquals("p-42", pending[0].patientId)
-        assertEquals("left", pending[0].eye)
+        assertEquals(42L, scheduledId)
+        assertTrue(enqueuedByteCount > 0)
+        assertEquals("p-42", enqueuedPatientId)
+        assertEquals("left", enqueuedEye)
     }
 
     @Test

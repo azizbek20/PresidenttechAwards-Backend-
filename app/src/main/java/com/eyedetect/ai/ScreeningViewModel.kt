@@ -79,9 +79,16 @@ class ScreeningViewModel @JvmOverloads constructor(
     // `UploadWorker`ning haqiqiy tarmoq so'rovi yuborishga urinishi) kerak emas.
     private val scheduleUpload: (Long) -> Unit = { id -> UploadScheduler.enqueue(application, id) },
     private val historyStore: ScreeningHistoryStore = ScreeningHistoryRepository(application),
+    // `PendingUploadRepository`ni to'g'ridan-to'g'ri maydon sifatida saqlash o'rniga inject
+    // qilinadi — xuddi [historyStore] kabi sabab bilan: u xuddi shu SQLCipher bilan
+    // shifrlangan Room bazasini ochadi, shu sababli birlik testlarida (Robolectric) haqiqiy
+    // implementatsiya konstruktorda darhol chaqirilsa, offline navbatni sinamaydigan testlar
+    // ham UnsatisfiedLinkError bilan qulaydi.
+    private val enqueuePendingUpload: suspend (ByteArray, String?, String, String) -> Long =
+        { bytes, patientId, eye, fallbackMediaType ->
+            PendingUploadRepository(application).enqueue(bytes, patientId, eye, fallbackMediaType)
+        },
 ) : AndroidViewModel(application) {
-
-    private val pendingRepo = PendingUploadRepository(application)
 
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
@@ -287,7 +294,7 @@ class ScreeningViewModel @JvmOverloads constructor(
     /** Rasmni doimiy saqlash joyiga yozadi va [UploadScheduler] orqali WorkManager vazifasini
      * rejalashtiradi — ulanish tiklangach [com.eyedetect.ai.upload.UploadWorker] avtomatik yuboradi. */
     private suspend fun queueForOffline(bytes: ByteArray, fallbackMediaType: String) {
-        val id = pendingRepo.enqueue(bytes, patientId.ifBlank { null }, eye, fallbackMediaType)
+        val id = enqueuePendingUpload(bytes, patientId.ifBlank { null }, eye, fallbackMediaType)
         scheduleUpload(id)
     }
 

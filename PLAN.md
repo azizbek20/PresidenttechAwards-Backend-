@@ -47,7 +47,16 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       birlik testlarida yuklanmaydi, shu sababli `ScreeningViewModel` endi
       `historyStore: ScreeningHistoryStore` parametrini ham in'eksiya qiladi
       (`api`/`healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy
-      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi.
+      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi. Bu tuzatish
+      `feature/pomodoro-share-m3` branch'iga cherry-pick qilinganda offline
+      navbat funksiyasi (`PendingUploadRepository`, xuddi shu Room bazasidan
+      foydalanadi) bilan to'qnashdi: `pendingRepo` maydoni konstruktorda
+      shartsiz (eager) yaratilar edi, demak har bir test — hatto offline
+      holatni sinamaydiganlari ham — `UnsatisfiedLinkError` bilan qulardi.
+      Tuzatildi: `enqueuePendingUpload` deb nomlangan in'eksiya qilinadigan
+      lambda bilan almashtirildi (`scheduleUpload`ga o'xshab) — haqiqiy
+      `PendingUploadRepository` faqat funksiya chaqirilganda (ya'ni faqat
+      offline yo'lda) yaratiladi, testlar esa soxta lambda beradi.
 
 ## 2. Kamera va sifat nazorati 🔴
 
@@ -108,6 +117,18 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
         DEBUG-only `saveDebugCrop()` bor
         (`getExternalFilesDir()/debug_eye_crop_{left,right}.jpg`); real
         qurilmada tekshirilgach bu funksiya olib tashlanishi kerak.
+      - Android emulyator (Pixel_10 AVD, `-camera-back webcam0`) orqali
+        tekshirishga urinildi: chap/o'ng ko'z tanlash, backend'ga yuklash
+        va to'liq oqim (UI → `vm.eye="left"` → multipart → `/predict`)
+        xatosiz ishlashi tasdiqlandi. Suratga olish (`ImageCapture.takePicture()`)
+        natijasi barqaror emas edi — ba'zi urinishlarda haqiqiy webcam
+        kadri o'rniga sun'iy "pinwheel" test naqshi qaytdi (sabab
+        aniqlanmadi: ehtimol kamera warm-up/flash bilan bog'liq vaqtinchalik
+        holat, chunki keyingi urinishlarda haqiqiy kadr muvaffaqiyatli
+        qaytdi). Iris/ko'zga to'g'ridan-to'g'ri markazlashtirilgan sifatli
+        surat hali olinmadi (urinishlarda ko'z doira ichida emas edi).
+        Jismoniy qurilmada (masalan, avvalgi USB orqali ulangan
+        `2303CRA44A`) tekshirish barqarorroq natija berishi mumkin.
       - Birlik test yo'q (`IrisLandmarker`/yangilangan `PupilHeuristics`
         Android/MediaPipe runtime'ga bog'liq — Robolectric ostida MediaPipe
         native kutubxonalari ishlamaydi, shuning uchun instrumentation test
