@@ -9,10 +9,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.eyedetect.ai.R
+import com.eyedetect.ai.data.eyecare.EyeCarePreferencesRepository
+import com.eyedetect.ai.data.eyecare.ExerciseStats
 import com.eyedetect.ai.ui.components.LanguagePicker
 import com.eyedetect.ai.ui.components.MenuCard
 import com.eyedetect.ai.ui.theme.Spacing
@@ -23,6 +29,10 @@ import com.eyedetect.ai.ui.theme.Spacing
  */
 @Composable
 fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> Unit) {
+    val context = LocalContext.current
+    val eyeCareRepo = remember { EyeCarePreferencesRepository(context) }
+    val stats by eyeCareRepo.stats.collectAsState(initial = ExerciseStats())
+
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -30,7 +40,7 @@ fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
                 Text(
@@ -58,6 +68,7 @@ fun HomeScreen(onScreening: () -> Unit, onEyeCare: () -> Unit, onHistory: () -> 
             subtitle = stringResource(R.string.home_eyecare_subtitle),
             emoji = "🧘",
             onClick = onEyeCare,
+            badge = if (stats.streakDays > 0) "🔥 ${stats.streakDays}" else null,
         )
         MenuCard(
             title = stringResource(R.string.home_history_title),

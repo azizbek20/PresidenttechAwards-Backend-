@@ -6,11 +6,11 @@ import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryStore
+import com.eyedetect.ai.data.upload.PendingUploadStore
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -41,9 +41,10 @@ import java.net.UnknownServiceException
  * `friendly()` xato xabarlarini xaritalashni sinaydi. Backend `ApiService` soxta
  * implementatsiya bilan almashtiriladi ([ScreeningViewModel]dagi `@JvmOverloads`
  * konstruktor parametri orqali) — haqiqiy tarmoq yoki `ApiClient` singletoni kerak emas.
- * Xuddi shu sababdan tarix ombori ham [FakeHistoryStore] bilan almashtiriladi: haqiqiy
- * `ScreeningHistoryRepository` SQLCipher orqali shifrlangan Room bazasini ochadi, va
- * uning native kutubxonasi Robolectric (JVM, qurilmasiz) muhitida yuklanmaydi.
+ * Xuddi shu sababdan tarix ombori ham [FakeHistoryStore], navbat ombori esa [FakePendingUploadStore]
+ * bilan almashtiriladi: haqiqiy `ScreeningHistoryRepository`/`PendingUploadRepository` bir xil
+ * SQLCipher orqali shifrlangan Room bazasini ochadi, va uning native kutubxonasi Robolectric
+ * (JVM, qurilmasiz) muhitida yuklanmaydi.
  *
  * Rasm dekodlash (`BitmapLoader`) va mahalliy evristika `viewModelScope.launch`
  * ichida haqiqiy `Dispatchers.Default`da ishlaydi (SUT'da qattiq kodlangan) — shu
@@ -130,6 +131,22 @@ class ScreeningViewModelTest {
         override suspend fun updateHeuristic(id: Long, heuristic: PupilHeuristicResult) {}
     }
 
+    /** SQLCipher'ga tegmaydigan soxta navbat ombori (`FakeHistoryStore` bilan bir xil sabab) —
+     * [enqueue]ga uzatilgan argumentlarni keyinchalik tekshirish uchun eslab qoladi. */
+    private class FakePendingUploadStore : PendingUploadStore {
+        private var nextId = 1L
+        var lastPatientId: String? = null
+            private set
+        var lastEye: String? = null
+            private set
+
+        override suspend fun enqueue(bytes: ByteArray, patientId: String?, eye: String, fallbackMediaType: String): Long {
+            lastPatientId = patientId
+            lastEye = eye
+            return nextId++
+        }
+    }
+
     private fun httpException(code: Int, body: String? = null): HttpException {
         val responseBody = (body ?: "").toResponseBody("application/json".toMediaTypeOrNull())
         return HttpException(Response.error<Any>(code, responseBody))
@@ -159,14 +176,14 @@ class ScreeningViewModelTest {
 
     @Test
     fun `initial state is Idle`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         assertEquals(UiState.Idle, vm.uiState.value)
     }
 
     @Test
     fun `uploadFile sets Loading synchronously, then Success once the backend replies`() {
         val gate = CompletableDeferred<Unit>()
-        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         val file = newFile()
 
         vm.uploadFile(file)
@@ -182,7 +199,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile keeps the temp file when the request fails, so retry can resend it`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("boom") }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("boom") }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         val file = newFile()
 
         vm.uploadFile(file)
@@ -199,7 +216,7 @@ class ScreeningViewModelTest {
             { throw java.net.SocketTimeoutException("first attempt times out") },
             { sampleResponse() },
         )
-        val vm = ScreeningViewModel(app(), api, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), api, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         val file = newFile()
 
         vm.uploadFile(file)
@@ -217,7 +234,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `retry is a no-op when there is no pending upload source`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.retry()
 
@@ -227,7 +244,7 @@ class ScreeningViewModelTest {
     @Test
     fun `cancelUpload deletes the pending file and returns to Idle`() {
         val gate = CompletableDeferred<Unit>()
-        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         val file = newFile()
 
         vm.uploadFile(file)
@@ -248,6 +265,7 @@ class ScreeningViewModelTest {
             app(),
             FakeApiService { throw httpException(422, """{"detail":"Rasm juda xira"}""") },
             historyStore = FakeHistoryStore(),
+            pendingUploadStore = FakePendingUploadStore(),
         )
 
         vm.uploadFile(newFile())
@@ -259,7 +277,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps a 404 HttpException without a detail body to the not-found message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(404) }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(404) }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -270,7 +288,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps a 5xx HttpException to the server error message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(503) }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(503) }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -281,7 +299,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps an unmapped HttpException code to the generic http message with the code`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(418) }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(418) }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -292,7 +310,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `checkBackendHealth reflects the injected health check result`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { true }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { true }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.checkBackendHealth()
 
@@ -301,7 +319,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `checkBackendHealth reports offline when the health check fails`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { throw java.io.IOException("down") }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { throw java.io.IOException("down") }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.checkBackendHealth()
 
@@ -310,25 +328,17 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile queues the photo instead of showing an error when there is no connection`() {
-        // `scheduleUpload` va `enqueuePendingUpload` inject qilinadi — birlik testida haqiqiy
-        // WorkManager/tarmoq va haqiqiy (SQLCipher bilan shifrlangan, Robolectric ostida
-        // yuklanmaydigan) Room bazasi kerak emas (`healthCheck`dagi kabi sabab). Navbatga
-        // qo'yilgan baytlar/bemor ID/ko'z va qaytarilgan ID orqali chaqirilishini tekshiramiz.
+        // `scheduleUpload`/`pendingUploadStore` inject qilinadi — birlik testida haqiqiy
+        // WorkManager/tarmoq yoki SQLCipher orqali shifrlangan Room kerak emas (`historyStore`dagi
+        // kabi sabab). [scheduledId] orqali navbat yozuvi ID'si bilan chaqirilganini ham tekshiramiz.
         var scheduledId: Long? = null
-        var enqueuedPatientId: String? = null
-        var enqueuedEye: String? = null
-        var enqueuedByteCount = -1
+        val pendingStore = FakePendingUploadStore()
         val vm = ScreeningViewModel(
             app(),
             FakeApiService { throw UnknownHostException("no dns") },
-            scheduleUpload = { id -> scheduledId = id },
             historyStore = FakeHistoryStore(),
-            enqueuePendingUpload = { bytes, patientId, eye, _ ->
-                enqueuedByteCount = bytes.size
-                enqueuedPatientId = patientId
-                enqueuedEye = eye
-                42L
-            },
+            pendingUploadStore = pendingStore,
+            scheduleUpload = { id -> scheduledId = id },
         )
         vm.patientId = "p-42"
         vm.eye = "left"
@@ -340,15 +350,14 @@ class ScreeningViewModelTest {
         assertEquals(UiState.Queued, state)
         awaitFileDeleted(file)
 
-        assertEquals(42L, scheduledId)
-        assertTrue(enqueuedByteCount > 0)
-        assertEquals("p-42", enqueuedPatientId)
-        assertEquals("left", enqueuedEye)
+        assertEquals(1L, scheduledId)
+        assertEquals("p-42", pendingStore.lastPatientId)
+        assertEquals("left", pendingStore.lastEye)
     }
 
     @Test
     fun `uploadFile maps SocketTimeoutException to the timeout message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw SocketTimeoutException("timed out") }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw SocketTimeoutException("timed out") }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -359,7 +368,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps UnknownServiceException to the https-required message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw UnknownServiceException("cleartext blocked") }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw UnknownServiceException("cleartext blocked") }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -370,7 +379,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile falls back to the raw exception message for unmapped errors`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("backend exploded") }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("backend exploded") }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -381,7 +390,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile falls back to the unknown-error message when the exception has no message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -392,7 +401,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `reset returns to Idle and clears local heuristic and symmetry`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore())
+        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, historyStore = FakeHistoryStore(), pendingUploadStore = FakePendingUploadStore())
         vm.uploadFile(newFile())
         awaitTerminalState(vm)
 

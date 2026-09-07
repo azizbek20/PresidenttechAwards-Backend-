@@ -45,18 +45,17 @@ Bemor ID va fundus rasm — shaxsiy tibbiy ma'lumot.
       migratsiya emas, tozalab qayta yaratish qabul qilingan).
       Texnik eslatma: SQLCipher'ning native kutubxonasi Robolectric (JVM)
       birlik testlarida yuklanmaydi, shu sababli `ScreeningViewModel` endi
-      `historyStore: ScreeningHistoryStore` parametrini ham in'eksiya qiladi
-      (`api`/`healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy
-      Room/SQLCipher o'rniga `FakeHistoryStore` ishlatadi. Bu tuzatish
-      `feature/pomodoro-share-m3` branch'iga cherry-pick qilinganda offline
-      navbat funksiyasi (`PendingUploadRepository`, xuddi shu Room bazasidan
-      foydalanadi) bilan to'qnashdi: `pendingRepo` maydoni konstruktorda
-      shartsiz (eager) yaratilar edi, demak har bir test — hatto offline
-      holatni sinamaydiganlari ham — `UnsatisfiedLinkError` bilan qulardi.
-      Tuzatildi: `enqueuePendingUpload` deb nomlangan in'eksiya qilinadigan
-      lambda bilan almashtirildi (`scheduleUpload`ga o'xshab) — haqiqiy
-      `PendingUploadRepository` faqat funksiya chaqirilganda (ya'ni faqat
-      offline yo'lda) yaratiladi, testlar esa soxta lambda beradi.
+      `historyStore: ScreeningHistoryStore` va `pendingUploadStore:
+      PendingUploadStore` parametrlarini ham in'eksiya qiladi (`api`/
+      `healthCheck`ka o'xshab) — `ScreeningViewModelTest` haqiqiy Room/
+      SQLCipher o'rniga `FakeHistoryStore`/`FakePendingUploadStore` ishlatadi.
+      (`feature/pomodoro-share-m3` branch'iga bu tuzatish cherry-pick
+      qilinganda xuddi shu muammo — `PendingUploadRepository`ning
+      konstruktorda shartsiz/eager yaratilishi — mustaqil ravishda ham
+      topilib, boshida oddiyroq in'eksiya qilinadigan lambda bilan
+      tuzatilgan edi; branch'lar birlashtirilganda shu yerdagi
+      `PendingUploadStore` interfeys-asosli yechim afzal ko'rildi —
+      `ScreeningHistoryStore` naqshiga izchil mos keladi.)
 
 ## 2. Kamera va sifat nazorati 🔴
 
@@ -345,23 +344,27 @@ yashil, `./gradlew testDebugUnitTest`).
 
 ## 8. Relizga tayyorlik 🟢
 
-- [x] `isMinifyEnabled = true` + `isShrinkResources = true` release build
-      turida yoqildi. Har bir kutubxona AAR/jar'ining o'z consumer-rules/
-      `META-INF/proguard` qoidalarini olib kelishi tekshirildi: Retrofit,
-      OkHttp, Room, WorkManager, ML Kit — hammasi o'z qoidalarini olib
-      keladi. **Gson** (`converter-gson` ham) hech qanday consumer-rules
-      olib kelmaydi — shu sababli `proguard-rules.pro`ga qo'lda qo'shildi:
-      Retrofit uchun rasmiy tavsiya qilingan qoidalar (dinamik proksi
-      interfeysi + suspend/generic signature saqlash), Gson'ning
-      `Signature`/`*Annotation*`/`TypeAdapterFactory`/`TypeToken` himoyaviy
-      qoidalari, va SQLCipher uchun JNI ko'prik klasslarini saqlash
-      (`net.sqlcipher.**`). Mavjud `-keep class com.eyedetect.ai.data.** { *; }`
-      (DTO/Room entity/DAO) saqlab qolindi. `./gradlew assembleRelease`
-      orqali haqiqiy R8 minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL,
-      `mapping.txt`da `PredictResponse` maydonlari va uchta Worker klassi
-      (`UploadWorker`, `PomodoroWorker`, `ReminderWorker`) o'z nomlarini
-      saqlab qolgani tasdiqlandi (WorkManager ularni ism bo'yicha
-      reflection orqali qayta yuklaydi, nomi o'zgarsa ishlamay qoladi).
+- [x] `isMinifyEnabled = true` + `isShrinkResources = true` release build turida
+      yoqildi. Har bir
+      kutubxona AAR/jar'ining o'z consumer-rules/`META-INF/proguard`
+      qoidalarini olib kelishi tekshirildi (Gradle cache'dan AAR/jar'larni
+      ochib): Retrofit, OkHttp, Room, WorkManager, ML Kit — hammasi o'z
+      qoidalarini olib keladi, qo'shimcha kerak emas. Faqat **Gson**
+      (`converter-gson` ham) hech qanday consumer-rules olib kelmaydi —
+      shu sababli `proguard-rules.pro`ga qo'lda qo'shildi: `Signature`/
+      `*Annotation*` atributlarini saqlash (aks holda `@SerializedName`
+      va generic turlar yo'qoladi) + Gson'ning rasmiy tavsiya qilingan
+      `TypeAdapterFactory`/`TypeToken` himoyaviy qoidalari. Mavjud
+      `-keep class com.eyedetect.ai.data.** { *; }` (DTO/Room entity/DAO)
+      saqlab qolindi. `./gradlew assembleRelease` orqali haqiqiy R8
+      minifikatsiya bilan tekshirildi: BUILD SUCCESSFUL, `missing_rules.txt`
+      yaratilmadi (R8 hech narsa yetishmayotganini aniqlamadi), `mapping.txt`da
+      `PredictResponse` maydonlari va uchta Worker klassi (`UploadWorker`,
+      `PomodoroWorker`, `ReminderWorker`) o'z nomlarini saqlab qolgani
+      tasdiqlandi (WorkManager ularni ism bo'yicha reflection orqali
+      qayta yuklaydi, nomi o'zgarsa ishlamay qoladi). SQLCipher (Room bazasini
+      shifrlash) uchun ham alohida qoida saqlab qolindi — uning JNI/native
+      ko'prik klasslari reflektsiya orqali chaqirilgani uchun.
       Hali qilinmagan: haqiqiy qurilmada release APK'ni ishga tushirib
       to'liq qo'lda sinash (bu muhitda emulyator/qurilma yo'q) —
       release'ga chiqishdan oldin tavsiya etiladi.

@@ -14,6 +14,7 @@ import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.data.history.ScreeningHistoryStore
 import com.eyedetect.ai.data.upload.PendingUploadRepository
+import com.eyedetect.ai.data.upload.PendingUploadStore
 import com.eyedetect.ai.ui.components.QualityLevel
 import com.eyedetect.ai.upload.UploadScheduler
 import com.eyedetect.ai.vision.BitmapLoader
@@ -63,31 +64,22 @@ data class EyeSymmetryUiState(
 
 /**
  * Skrining oqimi ViewModel'i: bemor ID, rasm yuborish va natija holatini boshqaradi.
- * [api], [healthCheck] va [historyStore] standart holatda haqiqiy implementatsiyalarga
- * bog'lanadi — testlarda soxta implementatsiya berish uchun almashtiriladi
- * (`@JvmOverloads` androidx `viewModel()` factory'si `Application`dan qurish uchun
- * konstruktorni topa olishi kerak). [historyStore] alohida in'eksiya qilinadi, chunki
- * haqiqiy [ScreeningHistoryRepository] SQLCipher orqali shifrlangan Room bazasini
- * ochadi — uning native kutubxonasi Robolectric (JVM) birlik testlarida yuklanmaydi.
+ * [api], [healthCheck], [historyStore], [pendingUploadStore] va [scheduleUpload] standart
+ * holatda haqiqiy implementatsiyalarga bog'lanadi — testlarda soxta implementatsiya berish
+ * uchun almashtiriladi (`@JvmOverloads` androidx `viewModel()` factory'si `Application`dan
+ * qurish uchun konstruktorni topa olishi kerak). [historyStore]/[pendingUploadStore] alohida
+ * in'eksiya qilinadi, chunki haqiqiy [ScreeningHistoryRepository]/[PendingUploadRepository]
+ * bir xil SQLCipher orqali shifrlangan Room bazasini ochadi — uning native kutubxonasi
+ * Robolectric (JVM) birlik testlarida yuklanmaydi. [scheduleUpload] ham xuddi shu sababdan
+ * (birlik testlarida haqiqiy WorkManager infratuzilmasi kerak emas) inject qilinadi.
  */
 class ScreeningViewModel @JvmOverloads constructor(
     application: Application,
     private val api: ApiService = ApiClient.service,
     private val healthCheck: suspend () -> Boolean = { ApiClient.ping() },
-    // `WorkManager`ni to'g'ridan-to'g'ri chaqirish o'rniga inject qilinadi — `healthCheck`dagi
-    // kabi sabab bilan: birlik testlarida haqiqiy WorkManager infratuzilmasi (va u orqali
-    // `UploadWorker`ning haqiqiy tarmoq so'rovi yuborishga urinishi) kerak emas.
-    private val scheduleUpload: (Long) -> Unit = { id -> UploadScheduler.enqueue(application, id) },
     private val historyStore: ScreeningHistoryStore = ScreeningHistoryRepository(application),
-    // `PendingUploadRepository`ni to'g'ridan-to'g'ri maydon sifatida saqlash o'rniga inject
-    // qilinadi — xuddi [historyStore] kabi sabab bilan: u xuddi shu SQLCipher bilan
-    // shifrlangan Room bazasini ochadi, shu sababli birlik testlarida (Robolectric) haqiqiy
-    // implementatsiya konstruktorda darhol chaqirilsa, offline navbatni sinamaydigan testlar
-    // ham UnsatisfiedLinkError bilan qulaydi.
-    private val enqueuePendingUpload: suspend (ByteArray, String?, String, String) -> Long =
-        { bytes, patientId, eye, fallbackMediaType ->
-            PendingUploadRepository(application).enqueue(bytes, patientId, eye, fallbackMediaType)
-        },
+    private val pendingUploadStore: PendingUploadStore = PendingUploadRepository(application),
+    private val scheduleUpload: (Long) -> Unit = { id -> UploadScheduler.enqueue(application, id) },
 ) : AndroidViewModel(application) {
 
 
@@ -294,7 +286,7 @@ class ScreeningViewModel @JvmOverloads constructor(
     /** Rasmni doimiy saqlash joyiga yozadi va [UploadScheduler] orqali WorkManager vazifasini
      * rejalashtiradi — ulanish tiklangach [com.eyedetect.ai.upload.UploadWorker] avtomatik yuboradi. */
     private suspend fun queueForOffline(bytes: ByteArray, fallbackMediaType: String) {
-        val id = enqueuePendingUpload(bytes, patientId.ifBlank { null }, eye, fallbackMediaType)
+        val id = pendingUploadStore.enqueue(bytes, patientId.ifBlank { null }, eye, fallbackMediaType)
         scheduleUpload(id)
     }
 

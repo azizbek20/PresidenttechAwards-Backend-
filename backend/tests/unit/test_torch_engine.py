@@ -249,6 +249,98 @@ def test_a_checkpoint_with_the_wrong_class_count_is_refused(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
+# per-checkpoint normalisation (a timm HF export's own pretrained_cfg mean/std)
+# ---------------------------------------------------------------------------
+def test_find_checkpoint_defaults_to_imagenet_normalisation_when_absent(tmp_path: Path) -> None:
+    (tmp_path / "model.pt").write_bytes(b"x")
+
+    found = find_checkpoint(tmp_path)
+
+    assert found is not None
+    assert found.mean == torch_engine.IMAGENET_MEAN
+    assert found.std == torch_engine.IMAGENET_STD
+
+
+def test_find_checkpoint_reads_normalisation_from_nested_pretrained_cfg(tmp_path: Path) -> None:
+    """The layout an actual timm HF export uses (e.g. a ViT snapshot)."""
+    (tmp_path / "model.safetensors").write_bytes(b"y")
+    (tmp_path / "config.json").write_text(
+        '{"architecture": "vit_large_patch16_224", "num_classes": 5, '
+        '"pretrained_cfg": {"mean": [0.5, 0.5, 0.5], "std": [0.5, 0.5, 0.5]}}',
+        encoding="utf-8",
+    )
+
+    found = find_checkpoint(tmp_path)
+
+    assert found is not None
+    assert found.mean == (0.5, 0.5, 0.5)
+    assert found.std == (0.5, 0.5, 0.5)
+
+
+def test_find_checkpoint_reads_a_top_level_mean_std_too(tmp_path: Path) -> None:
+    (tmp_path / "model.safetensors").write_bytes(b"y")
+    (tmp_path / "config.json").write_text(
+        '{"num_classes": 5, "mean": [0.4, 0.4, 0.4], "std": [0.2, 0.2, 0.2]}',
+        encoding="utf-8",
+    )
+
+    found = find_checkpoint(tmp_path)
+
+    assert found is not None
+    assert found.mean == (0.4, 0.4, 0.4)
+    assert found.std == (0.2, 0.2, 0.2)
+
+
+def test_find_checkpoint_ignores_a_malformed_mean_std(tmp_path: Path) -> None:
+    """Wrong length / non-numeric — falls back to IMAGENET rather than raising."""
+    (tmp_path / "model.safetensors").write_bytes(b"y")
+    (tmp_path / "config.json").write_text(
+        '{"num_classes": 5, "mean": [0.5, 0.5], "std": "not-a-list"}', encoding="utf-8"
+    )
+
+    found = find_checkpoint(tmp_path)
+
+    assert found is not None
+    assert found.mean == torch_engine.IMAGENET_MEAN
+    assert found.std == torch_engine.IMAGENET_STD
+
+
+def _bare_engine(mean: tuple[float, float, float], std: tuple[float, float, float]) -> TorchEngine:
+    """A `TorchEngine` with `_mean`/`_std` set directly, bypassing `__init__`
+    (which needs a real checkpoint) — this only exercises `_renormalise`'s math."""
+    engine = TorchEngine.__new__(TorchEngine)
+    engine._mean = mean
+    engine._std = std
+    return engine
+
+
+def test_renormalise_is_a_no_op_for_imagenet_stats() -> None:
+    engine = _bare_engine(torch_engine.IMAGENET_MEAN, torch_engine.IMAGENET_STD)
+    chw = np.random.default_rng(0).standard_normal((3, 4, 4)).astype(np.float32)
+
+    assert engine._renormalise(chw) is chw  # identity, not just equal
+
+
+def test_renormalise_converts_between_normalisation_schemes() -> None:
+    """A known 0..1 pixel value, expressed in IMAGENET space, must come back out
+    correctly re-expressed in the checkpoint's own (0.5, 0.5, 0.5)/(0.5, 0.5, 0.5)
+    space — i.e. `_renormalise` genuinely inverts-then-reapplies, not just scales."""
+    engine = _bare_engine((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+    pixel01 = 0.7  # arbitrary, non-special 0..1 pixel value, same on all 3 channels
+    imagenet_mean = np.asarray(torch_engine.IMAGENET_MEAN, dtype=np.float32).reshape(3, 1, 1)
+    imagenet_std = np.asarray(torch_engine.IMAGENET_STD, dtype=np.float32).reshape(3, 1, 1)
+    imagenet_normalised = (pixel01 - imagenet_mean) / imagenet_std
+
+    out = engine._renormalise(imagenet_normalised)
+
+    # (0.7 - 0.5) / 0.5 == 0.4, uniformly across channels regardless of IMAGENET's
+    # per-channel mean/std — proving the pixel01 round-trip actually happened.
+    assert out.shape == (3, 1, 1)
+    assert out == pytest.approx(0.4, abs=1e-5)
+
+
+# ---------------------------------------------------------------------------
 # device policy (orchestrator addendum) — always cpu in the gate
 # ---------------------------------------------------------------------------
 def test_cpu_is_honoured_verbatim() -> None:

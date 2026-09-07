@@ -7,9 +7,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** [PendingUploadRepository]dan `ScreeningViewModel`ga kerak bo'lgan qismi — testlarda
+ * SQLCipher'ning native kutubxonasisiz (Robolectric/JVM) soxta implementatsiya bilan
+ * almashtirish uchun, [com.eyedetect.ai.data.history.ScreeningHistoryStore] bilan bir xil sabab. */
+interface PendingUploadStore {
+    suspend fun enqueue(bytes: ByteArray, patientId: String?, eye: String, fallbackMediaType: String): Long
+}
+
 /** Internet yo'q paytda navbatga qo'yilgan rasmlar uchun Room ombori — [ScreeningHistoryRepository]
  * kabi to'g'ridan-to'g'ri (DI'siz) instansiyalanadi, xuddi shu Room bazasidan ([ScreeningHistoryDatabase]). */
-class PendingUploadRepository(private val context: Context) {
+class PendingUploadRepository(private val context: Context) : PendingUploadStore {
 
     private val appContext = context.applicationContext
     private val dao = ScreeningHistoryDatabase.getInstance(appContext).pendingUploadDao()
@@ -24,7 +31,7 @@ class PendingUploadRepository(private val context: Context) {
      * @return yaratilgan yozuv ID'si — [UploadScheduler.enqueue][com.eyedetect.ai.upload.UploadScheduler.enqueue]
      * shu ID bilan chaqirilishi kerak.
      */
-    suspend fun enqueue(bytes: ByteArray, patientId: String?, eye: String, fallbackMediaType: String): Long =
+    override suspend fun enqueue(bytes: ByteArray, patientId: String?, eye: String, fallbackMediaType: String): Long =
         withContext(Dispatchers.IO) {
             val file = File(pendingDir, "pending_${System.currentTimeMillis()}_${(0..9999).random()}.jpg")
             file.writeBytes(bytes)

@@ -242,6 +242,33 @@ digest-verified artifact; without a loaded model `/health/ready` stays 503 and
 The v1 `auto` model source was deleted: silently degrading to mock predictions
 in a live deployment is a safety failure, not a convenience.
 
+**A real checkpoint has been staged and verified once, manually — not
+clinically validated.** `seige-ml/DERETFound_DR_APTOS2019` (Apache-2.0, timm
+`vit_large_patch16_224`, HF snapshot layout: `pytorch_model.bin` +
+`config.json`) loads under `EYE_MODE=shadow` with a strict state_dict match,
+and `/api/v1/predict` returns sane-looking REFER/NO_REFER verdicts with
+working Grad-CAM heatmaps end-to-end. Two things to know before trusting it
+further:
+
+* Its `pretrained_cfg` declares `mean=std=[0.5,0.5,0.5]`, not the frozen
+  ImageNet stats `to_model_input` always applies — `torch_engine.py` now
+  reads a checkpoint's own normalisation from `config.json` and re-expresses
+  the shared ImageNet-normalised tensor in it before inference, so this
+  checkpoint (and any future one with different declared stats) isn't fed
+  silently-wrong pixels. See `TorchEngine._renormalise`.
+* `download_model.py` refuses `.bin`/`.pkl` files by policy (arbitrary code
+  execution risk), and this repo ships no `.safetensors` alternative — the
+  artifact used here was fetched with a one-off script that bypasses that
+  gate for this specific, manually reviewed case, relying on the same
+  `torch.load(..., weights_only=True)` protection the script's allowed
+  formats already depend on. Re-review before reusing that shortcut for any
+  other `.bin`/`.pkl` artifact.
+
+Its reported accuracy is unverified (no lawfully-sourced labeled APTOS
+samples exist in this repo to check against — see `tests/unit/test_torch_engine.py`'s
+`needs_real_samples` skip). Nothing here is "the production model" until it
+clears that gate.
+
 ---
 
 ## 5. CI

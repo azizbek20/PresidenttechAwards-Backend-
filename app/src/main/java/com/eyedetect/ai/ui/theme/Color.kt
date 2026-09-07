@@ -1,6 +1,11 @@
 package com.eyedetect.ai.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 
 /**
  * EYE DETECT AI rang tizimi (6-hujjat: Mobil Dizayn/UX, 2-bo'lim).
@@ -16,15 +21,26 @@ val TrafficRed    = Color(0xFFC62828)   // REFER — oftalmologga
 val TrafficGrey   = Color(0xFF616161)   // UNGRADABLE — qayta oling
 val TrafficYellow = Color(0xFFF9A825)   // faqat real-vaqt kamera "chegaraviy"
 
-// Svetofor yumshoq fonlari (banner/urg'u uchun)
+// Svetofor yumshoq fonlari (banner/urg'u uchun) — yorug' rejim
 val TrafficGreenContainer  = Color(0xFFE3F4EA)
 val TrafficRedContainer    = Color(0xFFFBE4E4)
 val TrafficYellowContainer = Color(0xFFFFF8E1)
+val OnTrafficGreenContainer  = Color(0xFF1B5E20)
+val OnTrafficYellowContainer = Color(0xFF7A5B00)
+
+// Svetofor yumshoq fonlari — qorong'i rejim (och pastel fon qorong'i sirt ustida
+// "yorug' teshik" bo'lib ko'rinmasligi uchun to'q, kam to'yingan variant)
+val TrafficGreenContainerDark  = Color(0xFF1B3B24)
+val TrafficYellowContainerDark = Color(0xFF3A2E0A)
+val OnTrafficGreenContainerDark  = Color(0xFFA8E6B0)
+val OnTrafficYellowContainerDark = Color(0xFFFFD873)
 
 // ---- Brend (teal — ishonch; svetofor bilan raqobatlashmaydi) ------------
 val Primary            = Color(0xFF00696E)
 val OnPrimary          = Color(0xFFFFFFFF)
-val PrimaryContainer   = Color(0xFF6FF6FE)
+// Primary'dan tabiiy chiqadigan yumshoq tonal soya — avvalgi #6FF6FE (to'q teal
+// tugmalar yonida "neon"dek ko'rinib, brend bilan mos kelmasdi).
+val PrimaryContainer   = Color(0xFFB6E9EA)
 val OnPrimaryContainer = Color(0xFF002022)
 
 // ---- Neytral karkas — yorug' rejim --------------------------------------
@@ -57,11 +73,12 @@ fun decisionColor(decision: String): Color = when (decision) {
     else -> TrafficGrey
 }
 
-/** Qaror kodiga mos svetofor emojisi (rang + ikonka + matn — WCAG 1.4.1). */
-fun decisionEmoji(decision: String): String = when (decision) {
-    "REFER" -> "🔴"      // 🔴
-    "NO_REFER" -> "🟢"   // 🟢
-    else -> "⚪"               // ⚪
+/** Qaror kodiga mos vektor ikonka — qurilma/OEM emoji shrift to'plamiga qarab
+ * ko'rinishi o'zgarmaydi (rang + ikonka + matn — WCAG 1.4.1). */
+fun decisionIcon(decision: String): ImageVector = when (decision) {
+    "REFER" -> Icons.Filled.Warning
+    "NO_REFER" -> Icons.Filled.CheckCircle
+    else -> Icons.AutoMirrored.Filled.HelpOutline
 }
 
 /** REFER/NO_REFER'dan boshqa har qanday qiymat (masalan sifat yetarli emasligi sababli
