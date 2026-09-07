@@ -271,14 +271,27 @@ async def predict(
     # ---- 3b. dedup / idempotency (C14) -----------------------------------
     content_sha256 = hashlib.sha256(raw).hexdigest()
     idempotency_key = request.headers.get("Idempotency-Key")
-    outcome, stored = await run_in_threadpool(
-        _lookup_replay,
-        content_sha256=content_sha256,
-        idempotency_key=idempotency_key,
-        patient_code=patient_id,
-        eye=eye,
-        window_min=settings.dedup_window_min,
-    )
+    try:
+        outcome, stored = await run_in_threadpool(
+            _lookup_replay,
+            content_sha256=content_sha256,
+            idempotency_key=idempotency_key,
+            patient_code=patient_id,
+            eye=eye,
+            window_min=settings.dedup_window_min,
+        )
+    except Exception as exc:
+        # Without this, a DB outage here fell through to the catch-all
+        # handler's "unhandled error on POST /api/v1/predict" — nothing in
+        # that log line says which of predict's several DB/disk steps broke.
+        # NOT `persistence_error`: that code specifically means "the result
+        # you just submitted was not saved" (C10, step 10 below), and no exam
+        # exists yet at this point — see
+        # test_a_read_failure_does_not_masquerade_as_persistence_error.
+        logger.exception(
+            "dedup lookup failed before exam creation (sha256=%s)", content_sha256
+        )
+        raise ApiError(500, "inference_error", _D_INFERENCE) from exc
     if outcome == "conflict":
         raise ApiError(409, "idempotency_conflict", _D_IDEMPOTENCY)
     if outcome == "replay" and stored is not None:
@@ -287,7 +300,14 @@ async def predict(
 
     # ---- 4. identity + original bytes on disk ----------------------------
     exam_id = str(uuid4())
-    _, image_url = await run_in_threadpool(storage.save_original, raw, exam_id)
+    try:
+        _, image_url = await run_in_threadpool(storage.save_original, raw, exam_id)
+    except Exception as exc:
+        # Same reasoning as the dedup lookup above: a disk-full/permission
+        # error here (no exam created yet) previously surfaced as the same
+        # untraceable generic 500 as an actual model crash.
+        logger.exception("failed to write the original image for exam %s", exam_id)
+        raise ApiError(500, "inference_error", _D_INFERENCE) from exc
 
     # ---- 5. quality gate, on the FULL image, before any crop -------------
     report = await run_in_threadpool(quality_gate.assess, img, settings)
