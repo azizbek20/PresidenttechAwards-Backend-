@@ -45,6 +45,7 @@ class FollowDotViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        super.onCleared()
         job?.cancel()
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import androidx.annotation.VisibleForTesting
 import com.eyedetect.ai.ui.components.QualityLevel
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -78,7 +79,12 @@ object PupilHeuristics {
         )
     }
 
-    private fun classifyOpacity(value: Float, saturation: Float): QualityLevel {
+    // internal (`private` emas) + @VisibleForTesting: MediaPipe/ML Kit'ga bog'liq
+    // emas — sof matematika, Robolectric ostida to'g'ridan-to'g'ri testlanadi
+    // (PupilHeuristicsTest.kt); `analyze()`ni chaqirish orqali sinash esa
+    // IrisLandmarker/FaceDetection'ni ham ishga tushirishni talab qilardi.
+    @VisibleForTesting
+    internal fun classifyOpacity(value: Float, saturation: Float): QualityLevel {
         // "Oqlik" ko'rsatkichi: yorqin + to'yinmagan (kulrang/oq) = normal qora qorachiqdan chetlanish.
         val whiteness = value * (1f - saturation)
         return when {
@@ -88,7 +94,8 @@ object PupilHeuristics {
         }
     }
 
-    private fun classifyRedReflex(hueDeg: Float, saturation: Float, value: Float): QualityLevel {
+    @VisibleForTesting
+    internal fun classifyRedReflex(hueDeg: Float, saturation: Float, value: Float): QualityLevel {
         val isReddish = hueDeg <= 25f || hueDeg >= 335f
         return when {
             // Juda qorong'i — flash aks etmagan, refleksni baholab bo'lmaydi (flash yoqilganini tekshiring).
@@ -157,7 +164,8 @@ object PupilHeuristics {
         java.io.FileOutputStream(out).use { crop.compress(Bitmap.CompressFormat.JPEG, 95, it) }
     }
 
-    private fun squareRect(bitmap: Bitmap, cx: Float, cy: Float, radius: Float): Rect {
+    @VisibleForTesting
+    internal fun squareRect(bitmap: Bitmap, cx: Float, cy: Float, radius: Float): Rect {
         val left = (cx - radius).toInt().coerceIn(0, bitmap.width - 1)
         val top = (cy - radius).toInt().coerceIn(0, bitmap.height - 1)
         val right = (cx + radius).toInt().coerceIn(left + 1, bitmap.width)
