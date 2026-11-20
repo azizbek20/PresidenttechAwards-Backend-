@@ -203,17 +203,17 @@ class ScreeningViewModel @JvmOverloads constructor(
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
             var uploadBytes: ByteArray? = null
+            var offlineResult: PredictResponse? = null
             try {
                 // Fayl o'chirilishidan oldin baytlarini o'qib olamiz (evristika uchun),
                 // keyin tahlilni fonda, yuklashni bloklamay ishga tushiramiz.
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeFileScaled(file.absolutePath) }
                 if (bitmap != null) {
                     runHeuristicAsync(bitmap, rowId)
-                    // TFLite orqali oflayn tahlil
-                    val offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
-                    if (offlineResult != null) {
-                        _uiState.value = UiState.OfflineSuccess(offlineResult)
-                    }
+                    // TFLite orqali oflayn tahlil — faqat tayyorlab qo'yiladi; ekranda
+                    // server javobi kelmasa (internet yo'q, rasm navbatga qo'yilganda)
+                    // ko'rsatiladi, aks holda yuklanish holati server javobigacha turadi.
+                    offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
                 } else {
                     rowId.complete(null)
                 }
@@ -227,7 +227,6 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val offlineResult = _uiState.value as? UiState.OfflineSuccess
                 val bytesForQueue = uploadBytes
                     ?: if (file.exists()) withContext(Dispatchers.IO) { file.readBytes() } else null
                 if (isOfflineError(e) && bytesForQueue != null) {
@@ -235,8 +234,8 @@ class ScreeningViewModel @JvmOverloads constructor(
                     file.delete()
                     currentSource = null
                     // Qurilmadagi TFLite natijasi bo'lsa, shuni ko'rsatamiz (rasm baribir navbatda).
-                    _uiState.value = offlineResult ?: UiState.Queued
-                } else if (offlineResult == null) {
+                    _uiState.value = offlineResult?.let { UiState.OfflineSuccess(it) } ?: UiState.Queued
+                } else {
                     _uiState.value = UiState.Error(friendly(e), canRetry = true)
                 }
                 if (!rowId.isCompleted) rowId.complete(null)
@@ -258,6 +257,7 @@ class ScreeningViewModel @JvmOverloads constructor(
             _symmetry.value = null
             val rowId = CompletableDeferred<Long?>()
             var uploadBytes: ByteArray? = null
+            var offlineResult: PredictResponse? = null
             try {
                 uploadBytes = withContext(Dispatchers.IO) {
                     appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -266,11 +266,10 @@ class ScreeningViewModel @JvmOverloads constructor(
                 val bitmap = withContext(Dispatchers.Default) { BitmapLoader.decodeBytesScaled(uploadBytes) }
                 if (bitmap != null) {
                     runHeuristicAsync(bitmap, rowId)
-                    // TFLite orqali oflayn tahlil
-                    val offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
-                    if (offlineResult != null) {
-                        _uiState.value = UiState.OfflineSuccess(offlineResult)
-                    }
+                    // TFLite orqali oflayn tahlil — faqat tayyorlab qo'yiladi; ekranda
+                    // server javobi kelmasa (internet yo'q, rasm navbatga qo'yilganda)
+                    // ko'rsatiladi, aks holda yuklanish holati server javobigacha turadi.
+                    offlineResult = withContext(Dispatchers.Default) { offlineClassifier.predict(bitmap, eye) }
                 } else {
                     rowId.complete(null)
                 }
@@ -282,13 +281,12 @@ class ScreeningViewModel @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val offlineResult = _uiState.value as? UiState.OfflineSuccess
                 val bytesForQueue = uploadBytes
                 if (isOfflineError(e) && bytesForQueue != null) {
                     queueForOffline(bytesForQueue, "image/*")
                     currentSource = null
-                    _uiState.value = offlineResult ?: UiState.Queued
-                } else if (offlineResult == null) {
+                    _uiState.value = offlineResult?.let { UiState.OfflineSuccess(it) } ?: UiState.Queued
+                } else {
                     _uiState.value = UiState.Error(friendly(e), canRetry = true)
                 }
                 if (!rowId.isCompleted) rowId.complete(null)
@@ -389,39 +387,6 @@ class ScreeningViewModel @JvmOverloads constructor(
     }
 
     /** Texnik xatoni foydalanuvchiga tushunarli, joriy tildagi xabarga aylantiradi. */
-    private suspend fun friendly(e: Exception): String {
-        val app = getApplication<Application>()
-        return when (e) {
-            is java.net.UnknownHostException,
-            is java.net.ConnectException ->
-                app.getString(R.string.error_no_connection)
-            is java.net.SocketTimeoutException,
-            is HttpRequestTimeoutException,
-            is PredictTimeoutException ->
-                app.getString(R.string.error_timeout)
-            is java.net.UnknownServiceException ->
-                app.getString(R.string.error_https_required)
-            is ResponseException -> httpErrorMessage(e)
-            else -> e.message ?: app.getString(R.string.error_unknown)
-        }
-    }
-
-    private suspend fun httpErrorMessage(e: ResponseException): String {
-        val app = getApplication<Application>()
-        val detail = runCatching {
-            val body = e.response.bodyAsText()
-            Json.parseToJsonElement(body).jsonObject["detail"]?.jsonPrimitive?.content?.ifBlank { null }
-        }.getOrNull()
-        if (!detail.isNullOrBlank()) return detail
-
-        val code = e.response.status.value
-        return when (code) {
-            400, 422 -> app.getString(R.string.error_bad_request)
-            401, 403 -> app.getString(R.string.error_unauthorized)
-            404 -> app.getString(R.string.error_not_found)
-            429 -> app.getString(R.string.error_too_many_requests)
-            in 500..599 -> app.getString(R.string.error_server)
-            else -> app.getString(R.string.error_http_generic, code)
-        }
-    }
+    private suspend fun friendly(e: Exception): String =
+        friendlyErrorMessage(getApplication<Application>(), e)
 }

@@ -72,6 +72,14 @@ class OfflineDrClassifier(context: Context) {
             // Natija uchun buferni modelning o'zidan qarab moslaymiz (masalan test model 1x1000 bo'lishi ham mumkin)
             val outputTensor = tflite.getOutputTensor(0)
             val outputShape = outputTensor.shape()
+            // Faqat ICDR 0..4 (5 sinf) chiqaradigan DR modeli qabul qilinadi. Boshqa model
+            // (masalan 1000 sinfli ImageNet yoki namuna fayl) "606-daraja" kabi ma'nosiz,
+            // lekin klinik ko'rinishdagi natija beradi — buni ko'rsatishdan ko'ra natija
+            // bermaslik xavfsizroq.
+            if (outputShape.lastOrNull() != ICDR_CLASSES) {
+                Log.w("OfflineDrClassifier", "Unexpected model output ${outputShape.contentToString()}; offline result disabled.")
+                return null
+            }
             val outputDataType = outputTensor.dataType()
             val outputBuffer = TensorBuffer.createFixedSize(outputShape, outputDataType)
 
@@ -137,6 +145,10 @@ class OfflineDrClassifier(context: Context) {
         return Pair(maxIndex, maxProb)
     }
     
+    private companion object {
+        const val ICDR_CLASSES = 5
+    }
+
     fun close() {
         interpreter?.close()
         interpreter = null
