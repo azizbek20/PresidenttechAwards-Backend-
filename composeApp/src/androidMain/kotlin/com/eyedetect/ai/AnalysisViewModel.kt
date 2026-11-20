@@ -61,6 +61,9 @@ class AnalysisViewModel @JvmOverloads constructor(
     private var job: Job? = null
 
     fun selectType(code: String) {
+        // Tana qismi faqat teri uchun so'raladi; boshqa turga o'tilganda eski qiymat
+        // (masalan, teri tahlilidagi "chap bilak") natijaga va serverga o'tib ketmasin.
+        if (code != _type.value) _bodySite.value = ""
         _type.value = code
         _uiState.value = AnalysisUiState.Idle
     }
@@ -84,7 +87,8 @@ class AnalysisViewModel @JvmOverloads constructor(
                     fileName = "analysis_$type.jpg",
                     analysisType = type,
                     patientId = _patientId.value.trim().ifBlank { null },
-                    bodySite = _bodySite.value.trim().ifBlank { null },
+                    bodySite = _bodySite.value.trim().ifBlank { null }
+                        ?.takeIf { type == com.eyedetect.ai.data.AnalysisTypes.SKIN },
                     onProgress = { _uploadProgress.value = it },
                 )
                 _uiState.value = AnalysisUiState.Success(result)

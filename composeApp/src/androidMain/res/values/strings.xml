@@ -283,4 +283,6 @@
     <string name="analysis_new">Yangi tahlil</string>
     <string name="analysis_home">Bosh sahifa</string>
     <string name="analysis_error_read_image">Rasmni o\'qib bo\'lmadi. Boshqa rasm tanlang.</string>
+    <string name="analysis_quality_good">Yaxshi</string>
+    <string name="analysis_quality_poor">Past</string>
 </resources>

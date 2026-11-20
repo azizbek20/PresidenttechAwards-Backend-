@@ -283,4 +283,6 @@
     <string name="analysis_new">Новый анализ</string>
     <string name="analysis_home">Главная</string>
     <string name="analysis_error_read_image">Не удалось прочитать изображение. Выберите другое.</string>
+    <string name="analysis_quality_good">Хорошее</string>
+    <string name="analysis_quality_poor">Низкое</string>
 </resources>

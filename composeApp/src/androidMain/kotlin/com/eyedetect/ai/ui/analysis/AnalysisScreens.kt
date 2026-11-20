@@ -339,7 +339,7 @@ private fun AnalysisResultContent(result: AnalyzeResponse, imageUri: Uri?) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             DetailRow(stringResource(R.string.analysis_detail_patient), result.patientId)
             if (result.bodySite.isNotBlank()) DetailRow(stringResource(R.string.analysis_body_site_label), result.bodySite)
-            DetailRow(stringResource(R.string.analysis_detail_quality), result.quality)
+            DetailRow(stringResource(R.string.analysis_detail_quality), qualityLabel(result.quality))
             DetailRow(stringResource(R.string.analysis_detail_model), result.modelVersion)
         }
     }
@@ -359,6 +359,13 @@ private fun FindingRow(f: AnalysisFinding) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+@Composable
+private fun qualityLabel(quality: String): String = when (quality) {
+    "good" -> stringResource(R.string.analysis_quality_good)
+    "poor" -> stringResource(R.string.analysis_quality_poor)
+    else -> quality
 }
 
 @Composable
