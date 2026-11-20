@@ -8,9 +8,6 @@ import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.vision.BitmapLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
 class SyncWorker(
@@ -43,17 +40,11 @@ class SyncWorker(
                 
                 // Siqish (compress) ViewModel'dagi kabi
                 val compressed = withContext(Dispatchers.Default) { BitmapLoader.compressForUpload(fileBytes) }
-                val (finalBytes, mediaType) =
-                    if (compressed != null) compressed to "image/jpeg" else fileBytes to "image/jpeg"
-                    
-                val body = finalBytes.toRequestBody(mediaType.toMediaTypeOrNull())
-                val part = MultipartBody.Part.createFormData("file", file.name, body)
-                
-                val pid = pending.patientId?.takeIf { it.isNotBlank() }?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val eyePart = pending.eye?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val finalBytes = compressed ?: fileBytes
+                val pid = pending.patientId?.takeIf { it.isNotBlank() }
                 
                 // API so'rovi
-                val taskResponse = ApiClient.service.predict(part, pid, eyePart)
+                val taskResponse = ApiClient.service.predict(finalBytes, file.name, pid, pending.eye)
                 var status = taskResponse.status
                 var result: com.eyedetect.ai.data.PredictResponse? = null
                 

@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictResponse
-import com.eyedetect.ai.data.ProgressRequestBody
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.ui.components.QualityLevel
@@ -29,12 +28,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import retrofit2.HttpException
 import java.io.File
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.ResponseException
+import io.ktor.client.statement.bodyAsText
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
 
 import androidx.compose.runtime.Immutable
 
@@ -168,13 +169,9 @@ class ScreeningViewModel @JvmOverloads constructor(
     /** Yuklashdan oldin rasmni siqadi (uzun tomoni ~1500px, JPEG ~85%) — to'liq o'lchamdagi
      * kamera surati sekin/qimmat mobil internetga mos emas. Siqish muvaffaqiyatsiz bo'lsa
      * (masalan, kutilmagan format) asl baytlar o'zgarishsiz yuboriladi. */
-    private suspend fun buildUploadBody(bytes: ByteArray, fallbackMediaType: String): RequestBody {
+    private suspend fun compressUploadBytes(bytes: ByteArray): ByteArray {
         val compressed = withContext(Dispatchers.Default) { BitmapLoader.compressForUpload(bytes) }
-        val (finalBytes, mediaType) =
-            if (compressed != null) compressed to "image/jpeg" else bytes to fallbackMediaType
-        return ProgressRequestBody(finalBytes.toRequestBody(mediaType.toMediaTypeOrNull())) {
-            _uploadProgress.value = it
-        }
+        return compressed ?: bytes
     }
 
     private suspend fun handleOfflineSync(e: Exception, bytes: ByteArray): Boolean {
@@ -239,9 +236,8 @@ class ScreeningViewModel @JvmOverloads constructor(
                 }
 
                 uploadBytes = withContext(Dispatchers.IO) { file.readBytes() }
-                val body = buildUploadBody(uploadBytes, fallbackMediaType = "image/jpeg")
-                val part = MultipartBody.Part.createFormData("file", file.name, body)
-                doRequest(part, rowId)
+                val finalBytes = compressUploadBytes(uploadBytes)
+                doRequest(finalBytes, file.name, rowId)
 
                 file.delete()
                 currentSource = null
@@ -293,9 +289,8 @@ class ScreeningViewModel @JvmOverloads constructor(
                     rowId.complete(null)
                 }
 
-                val body = buildUploadBody(uploadBytes, fallbackMediaType = "image/*")
-                val part = MultipartBody.Part.createFormData("file", "gallery.jpg", body)
-                doRequest(part, rowId)
+                val finalBytes = compressUploadBytes(uploadBytes)
+                doRequest(finalBytes, "gallery.jpg", rowId)
 
                 currentSource = null
             } catch (e: CancellationException) {
@@ -368,12 +363,16 @@ class ScreeningViewModel @JvmOverloads constructor(
         return EyeSymmetrySample(opacityLevel, redReflexLevel, localHueDeg, localSaturation, localValue)
     }
 
-    private suspend fun doRequest(part: MultipartBody.Part, rowId: CompletableDeferred<Long?>) {
-        val pid = patientId.ifBlank { null }?.toRequestBody("text/plain".toMediaTypeOrNull())
-        val eyePart = eye.toRequestBody("text/plain".toMediaTypeOrNull())
+    private suspend fun doRequest(uploadBytes: ByteArray, fileName: String, rowId: CompletableDeferred<Long?>) {
+        val pid = patientId.ifBlank { null }
         
-        // 1. Dastlabki so'rov (TaskResponse qabul qilinadi)
-        val taskResponse = api.predict(part, pid, eyePart)
+        val taskResponse = api.predict(
+            fileBytes = uploadBytes,
+            fileName = fileName,
+            patientId = pid,
+            eye = eye,
+            onProgress = { _uploadProgress.value = it }
+        )
         var status = taskResponse.status
         var result: PredictResponse? = null
         
@@ -400,7 +399,7 @@ class ScreeningViewModel @JvmOverloads constructor(
     }
 
     /** Texnik xatoni foydalanuvchiga tushunarli, joriy tildagi xabarga aylantiradi. */
-    private fun friendly(e: Exception): String {
+    private suspend fun friendly(e: Exception): String {
         val app = getApplication<Application>()
         return when (e) {
             is java.net.UnknownHostException,
@@ -408,32 +407,27 @@ class ScreeningViewModel @JvmOverloads constructor(
                 app.getString(R.string.error_no_connection)
             is java.net.SocketTimeoutException ->
                 app.getString(R.string.error_timeout)
-            is java.net.UnknownServiceException ->
-                app.getString(R.string.error_https_required)
-            is HttpException -> httpErrorMessage(e)
+            is ResponseException -> httpErrorMessage(e)
             else -> e.message ?: app.getString(R.string.error_unknown)
         }
     }
 
-    /** 4xx/5xx javoblarni kod oralig'iga qarab tushunarli xabarga aylantiradi. Backend
-     * xato tanasida (`{"detail": "..."}`, odatiy FastAPI validatsiya formati) aniqroq
-     * xabar bo'lsa, o'shani ishlatadi. */
-    private fun httpErrorMessage(e: HttpException): String {
+    private suspend fun httpErrorMessage(e: ResponseException): String {
         val app = getApplication<Application>()
         val detail = runCatching {
-            e.response()?.errorBody()?.string()?.let { body ->
-                org.json.JSONObject(body).optString("detail").ifBlank { null }
-            }
+            val body = e.response.bodyAsText()
+            Json.parseToJsonElement(body).jsonObject["detail"]?.jsonPrimitive?.content?.ifBlank { null }
         }.getOrNull()
         if (!detail.isNullOrBlank()) return detail
 
-        return when (e.code()) {
+        val code = e.response.status.value
+        return when (code) {
             400, 422 -> app.getString(R.string.error_bad_request)
             401, 403 -> app.getString(R.string.error_unauthorized)
             404 -> app.getString(R.string.error_not_found)
             429 -> app.getString(R.string.error_too_many_requests)
             in 500..599 -> app.getString(R.string.error_server)
-            else -> app.getString(R.string.error_http_generic, e.code())
+            else -> app.getString(R.string.error_http_generic, code)
         }
     }
 }
