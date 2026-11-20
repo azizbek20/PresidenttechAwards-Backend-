@@ -23,6 +23,22 @@ data class ReminderSettings(
     val quietEndHour: Int = 7,
 )
 
+/** Pomodoro davri turi. */
+enum class PomodoroPhase { FOCUS, BREAK }
+
+/**
+ * Pomodoro — ekran vaqtini kuzatuvchi taymer holati. [phaseEndEpochMs]dan hisoblangan qolgan
+ * vaqt ekranda ko'rsatiladi; taymerning o'zi fon rejimida [com.eyedetect.ai.eyecare.PomodoroWorker]
+ * orqali ishlaydi, shu sababli ilova yopilsa/qurilma qulflansa ham bosqich tugaganda ogohlantiradi.
+ */
+data class PomodoroState(
+    val running: Boolean = false,
+    val phase: PomodoroPhase = PomodoroPhase.FOCUS,
+    val phaseEndEpochMs: Long = 0L,
+    val focusMinutes: Int = 25,
+    val breakMinutes: Int = 5,
+)
+
 /** Ko'z mashqlari bo'yicha bajarilish statistikasi. */
 data class ExerciseStats(
     val followDotCount: Int = 0,

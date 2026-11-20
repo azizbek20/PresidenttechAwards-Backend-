@@ -94,7 +94,11 @@ kotlin {
             implementation("androidx.camera:camera-view:$camerax")
 
             // --- ML Kit (ko'z/iris joylashuvini aniqlash — kamera sifat nazorati uchun) ---
-            implementation("com.google.mlkit:face-detection:16.1.6")
+            implementation("com.google.mlkit:face-detection:16.1.7")
+
+            // --- MediaPipe (haqiqiy iris landmarklari — PupilHeuristics ROI aniqligi uchun,
+            // ML Kit'ning taxminiy fixed-radius o'rniga; ML Kit hamon zaxira sifatida qoladi) ---
+            implementation("com.google.mediapipe:tasks-vision:0.10.14")
 
             // Offline AI (TFLite)
             implementation("org.tensorflow:tensorflow-lite:2.14.0")
@@ -118,7 +122,6 @@ kotlin {
             // --- DB shifrlash (SQLCipher) ---
             implementation("net.zetetic:android-database-sqlcipher:4.5.4")
             implementation("androidx.sqlite:sqlite-framework:2.4.0")
-            implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
             // --- Fon rejimi: 20-20-20 eslatma ---
             implementation("androidx.work:work-runtime-ktx:2.9.1")
@@ -143,6 +146,18 @@ kotlin {
     }
 }
 
+// Semantic version is the single source of truth; versionCode is derived so the
+// two can never drift apart (e.g. someone bumping versionName and forgetting
+// versionCode, which silently blocks Play Store updates). Bump one of these
+// three on each release — patch for fixes, minor for features, major for
+// breaking/incompatible changes — and versionCode follows automatically.
+// Cap: each field must stay below 100 (2 digits) or versionCode collides with
+// the next field up.
+val versionMajor = 1
+val versionMinor = 0
+val versionPatch = 0
+val versionSuffix = "-rc1" // reliz nomzodi; yakuniy relizda bo'sh qoldiring
+
 android {
     buildFeatures { buildConfig = true }
     namespace = "com.eyedetect.ai"
@@ -164,8 +179,8 @@ android {
         applicationId = "com.eyedetect.ai"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.0-rc1"
+        versionCode = versionMajor * 10_000 + versionMinor * 100 + versionPatch
+        versionName = "$versionMajor.$versionMinor.$versionPatch$versionSuffix"
         buildConfigField("String", "API_BASE_URL", "\"$debugApiUrl\"")
         buildConfigField("String", "API_KEY", "\"$backendApiKey\"")
     }

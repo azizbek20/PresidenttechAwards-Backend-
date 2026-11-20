@@ -2,9 +2,6 @@ package com.eyedetect.ai
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
-import androidx.room.Room
-import androidx.work.testing.WorkManagerTestInitHelper
-import com.eyedetect.ai.data.history.ScreeningHistoryDatabase
 import com.eyedetect.ai.data.ApiService
 import com.eyedetect.ai.data.PredictPolling
 import com.eyedetect.ai.data.PredictResponse
@@ -19,6 +16,10 @@ import io.ktor.client.request.get
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import com.eyedetect.ai.data.history.ScreeningHistoryEntity
+import com.eyedetect.ai.data.history.ScreeningHistoryStore
+import com.eyedetect.ai.data.upload.PendingUploadStore
+import com.eyedetect.ai.vision.PupilHeuristicResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +47,10 @@ import java.net.UnknownServiceException
  * `friendly()` xato xabarlarini xaritalashni sinaydi. Backend `ApiService` soxta
  * implementatsiya bilan almashtiriladi ([ScreeningViewModel]dagi `@JvmOverloads`
  * konstruktor parametri orqali) — haqiqiy tarmoq yoki `ApiClient` singletoni kerak emas.
+ * Xuddi shu sababdan tarix ombori ham [FakeHistoryStore], navbat ombori esa [FakePendingUploadStore]
+ * bilan almashtiriladi: haqiqiy `ScreeningHistoryRepository`/`PendingUploadRepository` bir xil
+ * SQLCipher orqali shifrlangan Room bazasini ochadi, va uning native kutubxonasi Robolectric
+ * (JVM, qurilmasiz) muhitida yuklanmaydi.
  *
  * Rasm dekodlash (`BitmapLoader`) va mahalliy evristika `viewModelScope.launch`
  * ichida haqiqiy `Dispatchers.Default`da ishlaydi (SUT'da qattiq kodlangan) — shu
@@ -63,20 +68,11 @@ class ScreeningViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        // Oflayn rejim (tarmoq xatosi) SyncWorker'ni WorkManager'ga topshiradi.
-        WorkManagerTestInitHelper.initializeTestWorkManager(app())
-        // SQLCipher native kutubxonasi JVM'da yo'q — shifrlanmagan in-memory baza.
-        ScreeningHistoryDatabase.overrideForTests(
-            Room.inMemoryDatabaseBuilder(app(), ScreeningHistoryDatabase::class.java)
-                .allowMainThreadQueries()
-                .build(),
-        )
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        ScreeningHistoryDatabase.overrideForTests(null)
     }
 
     private fun app(): Application = ApplicationProvider.getApplicationContext()
@@ -142,10 +138,41 @@ class ScreeningViewModelTest {
         }
     }
 
+    /** SQLCipher'ga tegmaydigan xotiradagi soxta tarix ombori — bu test to'plami tarixning
+     * o'zini emas, faqat `ScreeningViewModel`ning tarixga bog'liq bo'lmagan holat o'tishlarini
+     * tekshiradi, shu sababli hech narsani haqiqatan saqlash shart emas. */
+    private class FakeHistoryStore : ScreeningHistoryStore {
+        private var nextId = 1L
+        override suspend fun latestFor(patientId: String, eye: String): ScreeningHistoryEntity? = null
+        override suspend fun saveResult(result: PredictResponse, heuristic: PupilHeuristicResult?): Long = nextId++
+        override suspend fun updateHeuristic(id: Long, heuristic: PupilHeuristicResult) {}
+    }
+
+    /** SQLCipher'ga tegmaydigan soxta navbat ombori (`FakeHistoryStore` bilan bir xil sabab) —
+     * [enqueue]ga uzatilgan argumentlarni keyinchalik tekshirish uchun eslab qoladi. */
+    private class FakePendingUploadStore : PendingUploadStore {
+        private var nextId = 1L
+        var lastPatientId: String? = null
+            private set
+        var lastEye: String? = null
+            private set
+
+        override suspend fun enqueue(bytes: ByteArray, patientId: String?, eye: String, fallbackMediaType: String): Long {
+            lastPatientId = patientId
+            lastEye = eye
+            return nextId++
+        }
+    }
+
     private val noWait = PredictPolling(intervalMs = 0, timeoutMs = 5_000)
 
-    private fun newVm(api: ApiService, healthCheck: suspend () -> Boolean = { true }) =
-        ScreeningViewModel(app(), api, healthCheck, noWait)
+    private fun newVm(
+        api: ApiService,
+        healthCheck: suspend () -> Boolean = { true },
+        pendingUploadStore: PendingUploadStore = FakePendingUploadStore(),
+        scheduleUpload: (Long) -> Unit = {},
+        polling: PredictPolling = noWait,
+    ) = ScreeningViewModel(app(), api, healthCheck, FakeHistoryStore(), pendingUploadStore, scheduleUpload, polling)
 
     /** Haqiqiy Ktor `ResponseException`ni (ishlab chiqarishdagi [configureApi] bilan)
      * `MockEngine` orqali hosil qiladi — javob tanasi `bodyAsText()` uchun saqlangan bo'ladi. */
@@ -333,27 +360,40 @@ class ScreeningViewModelTest {
     }
 
     @Test
-    fun `a network failure saves the photo for background sync instead of offering retry`() {
-        val vm = newVm(FakeApiService { throw UnknownHostException("no dns") })
+    fun `uploadFile queues the photo instead of showing an error when there is no connection`() {
+        var scheduledId: Long? = null
+        val pendingStore = FakePendingUploadStore()
+        val vm = newVm(
+            FakeApiService { throw UnknownHostException("no dns") },
+            pendingUploadStore = pendingStore,
+            scheduleUpload = { id -> scheduledId = id },
+        )
+        vm.patientId = "p-42"
+        vm.eye = "left"
+        val file = newFile()
 
-        vm.uploadFile(newFile())
+        vm.uploadFile(file)
         val state = awaitTerminalState(vm)
 
-        assertTrue(state is UiState.Error)
-        assertEquals(false, (state as UiState.Error).canRetry)
-        val pending = File(app().filesDir, "pending_uploads").listFiles().orEmpty()
-        assertEquals(1, pending.size)
+        assertEquals(UiState.Queued, state)
+        awaitFileDeleted(file)
+
+        assertEquals(1L, scheduledId)
+        assertEquals("p-42", pendingStore.lastPatientId)
+        assertEquals("left", pendingStore.lastEye)
     }
 
     @Test
-    fun `a socket timeout is also treated as offline`() {
+    fun `uploadFile maps SocketTimeoutException to the timeout message`() {
+        // Timeout navbatga qo'yilmaydi — server sekin bo'lishi mumkin (tarmoq bor).
         val vm = newVm(FakeApiService { throw SocketTimeoutException("timed out") })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
 
         assertTrue(state is UiState.Error)
-        assertEquals(false, (state as UiState.Error).canRetry)
+        assertEquals(app().getString(R.string.error_timeout), (state as UiState.Error).message)
+        assertTrue(state.canRetry)
     }
 
     @Test
@@ -370,7 +410,7 @@ class ScreeningViewModelTest {
             override suspend fun getPredictStatus(taskId: String) =
                 TaskStatusResponse(taskId = taskId, status = "PROCESSING")
         }
-        val vm = ScreeningViewModel(app(), stuck, { true }, PredictPolling(intervalMs = 0, timeoutMs = 50))
+        val vm = newVm(stuck, polling = PredictPolling(intervalMs = 0, timeoutMs = 50))
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)

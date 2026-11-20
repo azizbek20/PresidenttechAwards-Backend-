@@ -36,6 +36,7 @@ from app.api.deps import engine_for, require_api_key
 from app.config import get_settings
 from app.core.errors import register_handlers
 from app.core.limits import MaxBodySizeMiddleware
+from app.core.rate_limit import RateLimitMiddleware
 from app.core.security import warn_if_unprotected
 from app.inference.engine import get_engine
 from app.storage import local as storage
@@ -129,6 +130,20 @@ def create_app() -> FastAPI:
         MaxBodySizeMiddleware,
         max_bytes=settings.max_upload_bytes,
         detail=f"Rasm hajmi juda katta — {settings.max_upload_mb} MB dan oshmasin",
+    )
+
+    # Registered after the body cap (so it sits OUTSIDE it — rejects an
+    # over-quota client before spending any effort on that request's body) and
+    # before CORS (so CORS wraps it too, same reasoning as the body cap
+    # above). Guards `/api/v1/*` only: wrong-key guesses and upload floods
+    # against the authenticated surface were previously unbounded (the 429
+    # error code in app/core/errors.py was defined but never raised).
+    app.add_middleware(
+        RateLimitMiddleware,
+        path_prefix=API_PREFIX,
+        max_requests=30,
+        window_seconds=60.0,
+        detail="So'rovlar juda ko'p — biroz kuting",
     )
 
     # Starlette's CORS middleware is app-scoped; /api/v1/* is the surface that

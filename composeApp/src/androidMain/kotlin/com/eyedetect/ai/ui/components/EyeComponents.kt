@@ -2,6 +2,11 @@ package com.eyedetect.ai.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +48,7 @@ import com.eyedetect.ai.R
 import com.eyedetect.ai.EyeSymmetryUiState
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.ui.eyeShortLabel
 import com.eyedetect.ai.vision.PupilHeuristicResult
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,8 +60,15 @@ import com.eyedetect.ai.ui.theme.TrafficGreenContainer
 import com.eyedetect.ai.ui.theme.TrafficGrey
 import com.eyedetect.ai.ui.theme.TrafficRed
 import com.eyedetect.ai.ui.theme.TrafficYellow
+import com.eyedetect.ai.ui.theme.OnTrafficGreenContainer
+import com.eyedetect.ai.ui.theme.OnTrafficGreenContainerDark
+import com.eyedetect.ai.ui.theme.OnTrafficYellowContainer
+import com.eyedetect.ai.ui.theme.OnTrafficYellowContainerDark
+import com.eyedetect.ai.ui.theme.TrafficGreenContainerDark
+import com.eyedetect.ai.ui.theme.TrafficYellowContainerDark
 import com.eyedetect.ai.ui.theme.decisionColor
-import com.eyedetect.ai.ui.theme.decisionEmoji
+import com.eyedetect.ai.ui.theme.decisionIcon
+import com.eyedetect.ai.ui.theme.isUngradableDecision
 
 // =====================================================================
 //  TUGMALAR — dala uchun kattalashtirilgan (6-hujjat, 4.2)
@@ -107,19 +120,25 @@ fun TextActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Mod
 //  STATUS / HOLAT
 // =====================================================================
 
-/** Ijobiy/axborot banneri — yashil (galereya tanlovi kabi neytral eslatmalar uchun). */
+/** Ijobiy/axborot banneri — yashil (galereya tanlovi kabi neytral eslatmalar uchun).
+ * Qorong'i rejimda och pastel fon (yorug' rejim tovushi) sirt bilan mos kelmasligi
+ * uchun to'q, kam to'yingan variant ishlatiladi. */
 @Composable
 fun InfoBanner(text: String, modifier: Modifier = Modifier) {
+    val dark = isSystemInDarkTheme()
+    val bg = if (dark) TrafficGreenContainerDark else TrafficGreenContainer
+    val onBg = if (dark) OnTrafficGreenContainerDark else OnTrafficGreenContainer
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(TrafficGreenContainer)
+            .background(bg)
             .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("✅")
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF1B5E20))
+        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = onBg, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = onBg)
     }
 }
 
@@ -207,8 +226,8 @@ fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier
 @Composable
 fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
     val bg = decisionColor(result.decision)
-    val emoji = decisionEmoji(result.decision)
-    val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
+    val icon = decisionIcon(result.decision)
+    val ungradable = isUngradableDecision(result.decision)
     val resultContentDesc = if (ungradable) {
         stringResource(R.string.result_content_desc_ungradable, result.decisionText)
     } else {
@@ -225,7 +244,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(emoji, fontSize = 46.sp)
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
         Text(
             result.decisionText,
             color = Color.White,
@@ -289,7 +308,7 @@ private fun KeyValueRow(key: String, value: String, valueColor: Color = Material
 @Composable
 fun ClinicalDetailCard(result: PredictResponse) {
     SectionCard(stringResource(R.string.result_clinical_details)) {
-        val ungradable = result.decision != "REFER" && result.decision != "NO_REFER"
+        val ungradable = isUngradableDecision(result.decision)
         if (!ungradable) {
             KeyValueRow(stringResource(R.string.result_icdr_grade), "${result.icdrGrade} — ${result.gradeLabel}")
         }
@@ -299,11 +318,7 @@ fun ClinicalDetailCard(result: PredictResponse) {
             valueColor = if (ungradable) TrafficGrey else MaterialTheme.colorScheme.onSurface,
         )
         val pid = result.patientId ?: stringResource(R.string.result_unknown_patient)
-        val eye = when (result.eye) {
-            "right" -> stringResource(R.string.common_eye_right_short)
-            "left" -> stringResource(R.string.common_eye_left_short)
-            else -> result.eye ?: stringResource(R.string.result_unknown_patient)
-        }
+        val eye = eyeShortLabel(result.eye)
         KeyValueRow(stringResource(R.string.result_patient_eye), "$pid · $eye")
         KeyValueRow(stringResource(R.string.result_model), result.modelVersion)
     }
@@ -346,11 +361,7 @@ fun PupilHeuristicCard(result: PupilHeuristicResult?) {
 @Composable
 fun EyeSymmetryCard(state: EyeSymmetryUiState?) {
     if (state == null) return
-    val comparedEyeLabel = when (state.comparedEye) {
-        "left" -> stringResource(R.string.common_eye_left_short)
-        "right" -> stringResource(R.string.common_eye_right_short)
-        else -> "—"
-    }
+    val comparedEyeLabel = eyeShortLabel(state.comparedEye)
     val dateLabel = remember(state.comparedAtMs) {
         SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(state.comparedAtMs))
     }
@@ -448,19 +459,24 @@ fun DisclaimerText(text: String) {
     )
 }
 
-/** Ogohlantiruvchi banner (masalan UNGRADABLE "kasallik yo'q emas"). */
+/** Ogohlantiruvchi banner (masalan UNGRADABLE "kasallik yo'q emas"). Qorong'i rejimda
+ * [InfoBanner]dagi kabi to'q, kam to'yingan fon variantiga o'tadi. */
 @Composable
 fun WarningBanner(text: String) {
+    val dark = isSystemInDarkTheme()
+    val bg = if (dark) TrafficYellowContainerDark else com.eyedetect.ai.ui.theme.TrafficYellowContainer
+    val onBg = if (dark) OnTrafficYellowContainerDark else OnTrafficYellowContainer
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(com.eyedetect.ai.ui.theme.TrafficYellowContainer)
+            .background(bg)
             .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("⚠️")
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF7A5B00))
+        Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = onBg, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = onBg)
     }
 }
 
@@ -535,7 +551,12 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
     ) {
-        Text("⚠️", fontSize = 48.sp)
+        Icon(
+            Icons.Filled.WarningAmber,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(48.dp),
+        )
         Text(stringResource(R.string.error_title), style = MaterialTheme.typography.headlineSmall)
         Text(
             message,
@@ -546,6 +567,28 @@ fun ErrorState(message: String, onRetry: () -> Unit, onNewPatient: () -> Unit) {
         Spacer(Modifier.height(Spacing.xs))
         PrimaryButton(stringResource(R.string.common_retry), onRetry)
         SecondaryButton(stringResource(R.string.common_new_patient), onNewPatient)
+    }
+}
+
+/** Internet yo'qligi sababli rasm navbatga qo'yilgan holat — WorkManager ulanish tiklangach
+ * o'zi yuboradi, foydalanuvchi hech narsa qilishi shart emas (PLAN.md 4-band, offline navbat). */
+@Composable
+fun QueuedState(onDone: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
+    ) {
+        Text("📶", fontSize = 48.sp)
+        Text(stringResource(R.string.queued_title), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.queued_message),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        PrimaryButton(stringResource(R.string.queued_ok_button), onDone)
     }
 }
 
@@ -595,7 +638,10 @@ private fun QualityRow(label: String, level: QualityLevel) {
     }
 }
 
-/** 72 dp doiraviy kamera zatvor tugmasi (6-hujjat, 4.2). */
+/** 72 dp doiraviy kamera zatvor tugmasi (6-hujjat, 4.2). Ichida ikonka yo'q — foydalanuvchi
+ * allaqachon kamera ko'rish oynasida turibdi, standart iOS/Android zatvor uslubiga mos
+ * oddiy doira yetarli (avvalgi 📷 emojisi ortiqcha va OEM shriftiga qarab bir xilda
+ * ko'rinmasdi). */
 @Composable
 fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val ring = if (enabled) TrafficGreen else MaterialTheme.colorScheme.outlineVariant
@@ -616,9 +662,6 @@ fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Mo
                 .clip(CircleShape)
                 .background(Color.White)
                 .selectable(selected = false, enabled = enabled, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("📷", fontSize = 26.sp)
-        }
+        )
     }
 }
