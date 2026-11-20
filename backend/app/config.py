@@ -72,7 +72,7 @@ class Settings(BaseSettings):
         default=0.5, ge=0.0, le=1.0, alias="EYE_REFERABLE_THRESHOLD"
     )
     quality_blur_min_var: float = Field(
-        default=0.0, ge=0.0, alias="QUALITY_BLUR_MIN_VAR"
+        default=50.0, ge=0.0, alias="QUALITY_BLUR_MIN_VAR"
     )
 
     # ---- infra -----------------------------------------------------------

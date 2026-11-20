@@ -44,7 +44,15 @@ from app.core.errors import ApiError
 from app.db import crud
 from app.inference.decision import DecisionResult, decide
 from app.inference.engine import ModelUnavailable
-from app.schemas import DISCLAIMER, Decision, Eye, PredictResponse, Quality, TaskResponse
+from app.schemas import (
+    DISCLAIMER,
+    Decision,
+    Eye,
+    PredictResponse,
+    Quality,
+    TaskResponse,
+    TaskStatusResponse,
+)
 from app.storage import local as storage
 
 logger = logging.getLogger("eyedetect.predict")
@@ -64,6 +72,9 @@ _D_INFERENCE = "Tahlil bajarilmadi — qayta urining"
 _D_PERSISTENCE = "Natija saqlanmadi — qayta urining"
 _D_MODEL = "Model tayyor emas — administratorga murojaat qiling"
 _D_IDEMPOTENCY = "Bu kalit boshqa rasm uchun ishlatilgan"
+
+#: Task ids of the form ``replay:<exam_id>`` point at an already stored exam.
+_REPLAY_PREFIX = "replay:"
 
 
 def _clean(value: str | None) -> str | None:
@@ -223,13 +234,13 @@ def _persist(
         )
 
 
-@router.post("/predict", response_model=TaskResponse)
+@router.post("/predict", response_model=PredictResponse)
 async def predict(
     request: Request,
     file: UploadFile = File(...),  # noqa: B008 - FastAPI's declaration style
     patient_id: str | None = Form(default=None),
     eye: str | None = Form(default=None),
-) -> TaskResponse:
+) -> PredictResponse:
     settings = get_settings()
 
     # ---- 1. eye validation ------------------------------------------------
@@ -283,62 +294,220 @@ async def predict(
         raise ApiError(409, "idempotency_conflict", _D_IDEMPOTENCY)
     if outcome == "replay" and stored is not None:
         logger.info("replaying exam %s for a duplicate upload", stored.get("exam_id"))
-        return TaskResponse(
-            task_id=f"replay:{stored.get('exam_id')}",
-            status="PROCESSING",
-            message="Natija topildi, tayyorlanmoqda..."
-        )
+        return PredictResponse.model_validate(fill_additive_keys(stored, settings))
 
-    # ---- 4. Celery Task Dispatch -----------------------------------------
+    # ---- 4. identity + original bytes on disk ----------------------------
     exam_id = str(uuid4())
-    
-    # Send task to celery worker
-    from app.worker import process_exam_task
-    task = process_exam_task.delay(
-        exam_id, raw, patient_id or "", eye or "right", idempotency_key or "", content_sha256
+    _, image_url = await run_in_threadpool(storage.save_original, raw, exam_id)
+
+    # ---- 5. quality gate, on the FULL image, before any crop -------------
+    report = await run_in_threadpool(quality_gate.assess, img, settings)
+
+    # ---- 6. inference, only when the gate passed -------------------------
+    pred = None
+    tensor = None
+    # The C9 gate ran at 3c, before dedup and before anything was written.
+    if report.ok:
+        try:
+            tensor = await run_in_threadpool(
+                _to_tensor, img, settings.engine_input_size
+            )
+            # `async with` (not acquire/release): a client that navigates away
+            # mid-request is cancelled here, and the permit must still come
+            # back or the server dies of slow permit exhaustion (C16).
+            async with semaphore_for(request.app):
+                pred = await run_in_threadpool(engine.predict, tensor)
+        except ModelUnavailable as exc:
+            raise ApiError(503, "model_unavailable", _D_MODEL) from exc
+        except ApiError:
+            raise
+        except Exception as exc:
+            logger.exception("inference failed for exam %s", exam_id)
+            raise ApiError(500, "inference_error", _D_INFERENCE) from exc
+
+    # ---- 7. verdict (threshold lives server-side, only here) -------------
+    result = decide(pred, report.ok, settings.referable_threshold)
+
+    # ---- 8. heatmap, best effort ------------------------------------------
+    heatmap_url: str | None = None
+    if report.ok:
+        heatmap_path, candidate_url = storage.heatmap_target(exam_id)
+        if await run_in_threadpool(
+            _render_heatmap, engine, img, tensor, heatmap_path
+        ):
+            heatmap_url = candidate_url
+
+    # ---- 9. C2: the patient code is non-null from here on ----------------
+    patient_code = patient_id or crud.generate_patient_code()
+
+    # ---- 10. unconditional persistence (C10) -----------------------------
+    processed_at = _utc_now()
+    model_version = pred["model_version"] if pred else settings.eye_model_version
+    try:
+        await run_in_threadpool(
+            _persist,
+            exam_id=exam_id,
+            patient_code=patient_code,
+            eye=eye,
+            image_url=image_url,
+            content_sha256=content_sha256,
+            result=result,
+            blur_var=report.blur_var,
+            mean_gray=report.mean_gray,
+            model_version=model_version,
+            heatmap_url=heatmap_url,
+            processed_at=processed_at,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as exc:  # C10 is unconditional: ANY failure is a 500.
+        logger.exception("persistence failed for exam %s", exam_id)
+        raise ApiError(500, "persistence_error", _D_PERSISTENCE) from exc
+
+    # ---- 11. the frozen wire shape ---------------------------------------
+    return wire_response(
+        exam_id=exam_id,
+        patient_code=patient_code,
+        eye=eye,
+        result=result,
+        heatmap_url=heatmap_url,
+        image_url=image_url,
+        model_version=model_version,
+        processed_at=processed_at,
+        settings=settings,
     )
 
-    from app.schemas import TaskResponse
+
+def wire_response(
+    *,
+    exam_id: str,
+    patient_code: str,
+    eye: str | None,
+    result: DecisionResult,
+    heatmap_url: str | None,
+    image_url: str,
+    model_version: str,
+    processed_at: datetime,
+    settings: Settings,
+) -> PredictResponse:
+    """Step 11, shared by the sync endpoint and the Celery worker."""
+    return PredictResponse(
+        exam_id=exam_id,
+        patient_id=patient_code,
+        eye=cast("Eye | None", eye),
+        referable=result.referable,
+        probability=result.probability,
+        icdr_grade=result.icdr_grade,
+        grade_label=result.grade_label,
+        decision=cast("Decision", result.decision),
+        decision_text=result.decision_text,
+        quality=cast("Quality", result.quality),
+        heatmap_url=heatmap_url,
+        image_url=image_url,
+        model_version=model_version,
+        processed_at=_wire_time(processed_at),
+        disclaimer=DISCLAIMER,
+        request_id=str(uuid4()),
+        mode=settings.eye_mode,
+    )
+
+
+@router.post("/predict/async", response_model=TaskResponse)
+async def predict_async(
+    request: Request,
+    file: UploadFile = File(...),  # noqa: B008 - FastAPI's declaration style
+    patient_id: str | None = Form(default=None),
+    eye: str | None = Form(default=None),
+) -> TaskResponse:
+    """Queue the screening on the Celery worker; poll ``/predict/status/{id}``.
+
+    Steps 1-3b (validation, capped read, decode, C9 gate, dedup) run here so
+    that bad input is rejected synchronously with the same errors as
+    ``/predict``; steps 4-11 run in :func:`app.worker.process_exam_task`.
+    """
+    settings = get_settings()
+
+    eye = _clean(eye)
+    if eye not in _VALID_EYES:
+        raise ApiError(422, "validation_error", _D_EYE)
+    patient_id = _clean(patient_id)
+
+    raw = await _read_capped(request, file, settings.max_upload_bytes)
+    if storage.sniff_ext(raw) is None or preprocessing.load_rgb(raw) is None:
+        raise ApiError(400, "invalid_image", _D_INVALID_IMAGE)
+
+    engine = engine_for(request.app)
+    if not getattr(engine, "model_loaded", False):
+        raise ApiError(503, "model_unavailable", _D_MODEL)
+
+    content_sha256 = hashlib.sha256(raw).hexdigest()
+    idempotency_key = request.headers.get("Idempotency-Key")
+    outcome, stored = await run_in_threadpool(
+        _lookup_replay,
+        content_sha256=content_sha256,
+        idempotency_key=idempotency_key,
+        patient_code=patient_id,
+        eye=eye,
+        window_min=settings.dedup_window_min,
+    )
+    if outcome == "conflict":
+        raise ApiError(409, "idempotency_conflict", _D_IDEMPOTENCY)
+    if outcome == "replay" and stored is not None:
+        logger.info("replaying exam %s for a duplicate upload", stored.get("exam_id"))
+        return TaskResponse(
+            task_id=f"{_REPLAY_PREFIX}{stored.get('exam_id')}",
+            status="PROCESSING",
+            message="Natija topildi, tayyorlanmoqda...",
+        )
+
+    from app.worker import process_exam_task
+
+    task = process_exam_task.delay(
+        str(uuid4()), raw, patient_id, eye, idempotency_key, content_sha256
+    )
     return TaskResponse(
         task_id=task.id,
         status="PENDING",
-        message="Rasm qabul qilindi, ishlov berilmoqda..."
+        message="Rasm qabul qilindi, ishlov berilmoqda...",
     )
 
 
-from app.schemas import TaskStatusResponse
-from celery.result import AsyncResult
-
 @router.get("/predict/status/{task_id}", response_model=TaskStatusResponse)
 async def get_predict_status(task_id: str) -> TaskStatusResponse:
-    if task_id.startswith("replay:"):
-        exam_id = task_id.split(":", 1)[1]
-        with db_base.get_session() as session:
-            exam = crud.get_exam(session, exam_id)
-            if exam:
-                from app.api.deps import fill_additive_keys
-                settings = get_settings()
-                result = PredictResponse.model_validate(fill_additive_keys(dict(exam), settings))
-                return TaskStatusResponse(task_id=task_id, status="SUCCESS", result=result)
-            return TaskStatusResponse(task_id=task_id, status="FAILURE", error="Replay not found")
+    settings = get_settings()
+
+    if task_id.startswith(_REPLAY_PREFIX):
+        exam_id = task_id[len(_REPLAY_PREFIX):]
+
+        def _load() -> dict[str, Any] | None:
+            with db_base.get_session() as session:
+                exam = crud.get_exam(session, exam_id)
+                return dict(exam) if exam else None
+
+        exam = await run_in_threadpool(_load)
+        if exam is None:
+            return TaskStatusResponse(
+                task_id=task_id, status="FAILURE", error="Natija topilmadi"
+            )
+        result = PredictResponse.model_validate(fill_additive_keys(exam, settings))
+        return TaskStatusResponse(task_id=task_id, status="SUCCESS", result=result)
+
+    from celery.result import AsyncResult
 
     from app.worker import celery_app
+
     task_result = AsyncResult(task_id, app=celery_app)
-    
-    if task_result.state == "PENDING" or task_result.state == "STARTED":
+    state = task_result.state
+    if state in ("PENDING", "STARTED", "RETRY"):
         return TaskStatusResponse(task_id=task_id, status="PROCESSING")
-    elif task_result.state == "SUCCESS":
+    if state == "SUCCESS":
         return TaskStatusResponse(
-            task_id=task_id, 
-            status="SUCCESS", 
-            result=task_result.result
+            task_id=task_id,
+            status="SUCCESS",
+            result=PredictResponse.model_validate(task_result.result),
         )
-    else:
-        return TaskStatusResponse(
-            task_id=task_id, 
-            status="FAILURE", 
-            error=str(task_result.info)
-        )
+    return TaskStatusResponse(
+        task_id=task_id, status="FAILURE", error=str(task_result.info)
+    )
 
 
 def _to_tensor(img: Any, size: int) -> Any:

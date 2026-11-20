@@ -1,21 +1,28 @@
-import os
+"""Celery worker for ``POST /api/v1/predict/async`` (steps 4-11).
+
+Steps 1-3b (validation, decode, C9 gate, dedup) already ran in the API
+process; this task runs the rest of the screening flow with the SAME helpers
+as the synchronous ``/predict`` endpoint, so both paths produce identical
+verdicts, files and database rows.
+"""
+
+from __future__ import annotations
+
 import logging
+import os
+from typing import Any
+
 from celery import Celery
 from celery.signals import worker_process_init
-from datetime import datetime, timezone
-import hashlib
-from uuid import uuid4
 
+import app.api.predict as predict_flow
+import app.inference.preprocess as preprocessing
+import app.inference.quality as quality_gate
 from app.config import get_settings
-from app.inference.engine import get_engine, ModelUnavailable
-from app.storage import local as storage
-from app.inference import preprocess as preprocessing
-from app.inference import quality as quality_gate
-from app.inference.decision import decide
 from app.db import crud
-import app.db.base as db_base
-import app.inference.gradcam as heatmaps
-from app.schemas import DISCLAIMER
+from app.inference.decision import decide
+from app.inference.engine import InferenceEngine, get_engine
+from app.storage import local as storage
 
 logger = logging.getLogger("eyedetect.worker")
 
@@ -24,109 +31,100 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "db+sqlite:///celery_
 
 celery_app = Celery("eyedetect_worker", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
 
-engine = None
+_engine: InferenceEngine | None = None
+
+
+def _get_engine() -> InferenceEngine:
+    """Load the engine once per worker process (lazily if the signal did not fire)."""
+    global _engine
+    if _engine is None:
+        _engine = get_engine(get_settings())
+    return _engine
+
 
 @worker_process_init.connect
-def init_worker(**kwargs):
-    global engine
-    settings = get_settings()
-    engine = get_engine(settings)
-    logger.info("Celery Worker initialized inference engine.")
+def init_worker(**_kwargs: Any) -> None:
+    _get_engine()
+    logger.info("Celery worker initialised the inference engine.")
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
-
-def _wire_time(moment: datetime) -> str:
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 @celery_app.task(bind=True, name="process_exam_task")
-def process_exam_task(self, exam_id: str, raw_bytes: bytes, patient_id: str, eye: str, idempotency_key: str, content_sha256: str):
-    """
-    Synchronous Celery task that processes an exam.
-    Returns the JSON-serializable PredictResponse dictionary.
-    """
-    global engine
+def process_exam_task(
+    self: Any,  # noqa: ARG001 - bound task signature
+    exam_id: str,
+    raw_bytes: bytes,
+    patient_id: str | None,
+    eye: str | None,
+    idempotency_key: str | None,
+    content_sha256: str,
+) -> dict[str, Any]:
+    """Run steps 4-11 and return the JSON-ready ``PredictResponse`` dict."""
     settings = get_settings()
+    engine = _get_engine()
 
-    # 3. Decode
     img = preprocessing.load_rgb(raw_bytes)
     if img is None:
-        raise ValueError("Invalid image bytes")
+        raise ValueError(predict_flow._D_INVALID_IMAGE)
 
-    # 4. Identity + save original
+    # 4. original bytes on disk
     _, image_url = storage.save_original(raw_bytes, exam_id)
 
-    # 5. Quality Gate
+    # 5. quality gate on the full image
     report = quality_gate.assess(img, settings)
 
-    # 6. Inference
+    # 6. inference only when the gate passed
     pred = None
     tensor = None
     if report.ok:
+        if not getattr(engine, "model_loaded", False):
+            raise RuntimeError(predict_flow._D_MODEL)
         try:
-            tensor = preprocessing.to_model_input(preprocessing.retina_crop(img), settings.engine_input_size)
+            tensor = predict_flow._to_tensor(img, settings.engine_input_size)
             pred = engine.predict(tensor)
         except Exception as exc:
             logger.exception("inference failed for exam %s", exam_id)
-            raise RuntimeError("Inference error") from exc
+            raise RuntimeError(predict_flow._D_INFERENCE) from exc
 
-    # 7. Decision
+    # 7. verdict
     result = decide(pred, report.ok, settings.referable_threshold)
 
-    # 8. Heatmap
-    heatmap_url = None
+    # 8. heatmap, best effort
+    heatmap_url: str | None = None
     if report.ok:
         heatmap_path, candidate_url = storage.heatmap_target(exam_id)
-        model = getattr(engine, "model", None)
-        try:
-            display = preprocessing.display_copy(img)
-            if model is not None and tensor is not None and heatmaps.render_heatmap(model, tensor, display, heatmap_path):
-                heatmap_url = candidate_url
-            elif heatmaps.mock_heatmap(display, heatmap_path):
-                heatmap_url = candidate_url
-        except Exception:
-            logger.warning("heatmap rendering failed", exc_info=True)
+        if predict_flow._render_heatmap(engine, img, tensor, heatmap_path):
+            heatmap_url = candidate_url
 
-    # 9. Patient code
+    # 9. patient code is non-null from here on
     patient_code = patient_id or crud.generate_patient_code()
-    processed_at = _utc_now()
+
+    # 10. unconditional persistence
+    processed_at = predict_flow._utc_now()
     model_version = pred["model_version"] if pred else settings.eye_model_version
+    predict_flow._persist(
+        exam_id=exam_id,
+        patient_code=patient_code,
+        eye=eye,
+        image_url=image_url,
+        content_sha256=content_sha256,
+        result=result,
+        blur_var=report.blur_var,
+        mean_gray=report.mean_gray,
+        model_version=model_version,
+        heatmap_url=heatmap_url,
+        processed_at=processed_at,
+        idempotency_key=idempotency_key,
+    )
 
-    # 10. Persistence
-    with db_base.get_session() as session:
-        crud.create_exam_with_result(
-            session,
-            exam_id=exam_id,
-            patient_code=patient_code,
-            eye=eye,
-            image_path=image_url,
-            content_sha256=content_sha256,
-            quality=result.quality,
-            blur_var=report.blur_var,
-            mean_gray=report.mean_gray,
-            result=result,
-            model_version=model_version,
-            heatmap_path=heatmap_url,
-            processed_at=processed_at,
-            idempotency_key=idempotency_key,
-        )
-
-    return {
-        "exam_id": exam_id,
-        "patient_id": patient_code,
-        "eye": eye,
-        "referable": result.referable,
-        "probability": result.probability,
-        "icdr_grade": result.icdr_grade,
-        "grade_label": result.grade_label,
-        "decision": result.decision,
-        "decision_text": result.decision_text,
-        "quality": result.quality,
-        "heatmap_url": heatmap_url,
-        "image_url": image_url,
-        "model_version": model_version,
-        "processed_at": _wire_time(processed_at),
-        "disclaimer": DISCLAIMER,
-        "request_id": str(uuid4()),
-        "mode": settings.eye_mode,
-    }
+    # 11. the frozen wire shape
+    return predict_flow.wire_response(
+        exam_id=exam_id,
+        patient_code=patient_code,
+        eye=eye,
+        result=result,
+        heatmap_url=heatmap_url,
+        image_url=image_url,
+        model_version=model_version,
+        processed_at=processed_at,
+        settings=settings,
+    ).model_dump()
