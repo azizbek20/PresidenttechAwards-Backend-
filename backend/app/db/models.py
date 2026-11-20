@@ -230,6 +230,44 @@ class AuditLog(Base):
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class Analysis(Base):
+    """One non-fundus analysis (external eye / skin / oral / nail).
+
+    A separate table so the frozen DR exam/result contract is untouched.
+    ``findings_json`` stores the full probability list as JSON text — the
+    catalogue may grow, and a fixed column per condition would not.
+    """
+
+    __tablename__ = "analyses"
+    __table_args__ = (
+        CheckConstraint(
+            "risk_level IN ('low', 'medium', 'high', 'ungradable')",
+            name="ck_analyses_risk_level",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    patient_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("patients.id"), nullable=True
+    )
+    analysis_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    body_site: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    image_path: Mapped[str] = mapped_column(Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    quality: Mapped[str] = mapped_column(String(8), nullable=False)
+    risk_level: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: NULL when ungradable.
+    top_finding: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    model_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow
+    )
+
+    patient: Mapped[Patient | None] = relationship(lazy="joined")
+
+
 # ---------------------------------------------------------------------------
 # indexes (DESC where the reads are newest-first)
 # ---------------------------------------------------------------------------
@@ -240,6 +278,8 @@ Index("ix_exams_sha256_created_at", Exam.content_sha256, Exam.created_at.desc())
 #: C14 ``Idempotency-Key`` lookup.
 Index("ix_exams_idem_key_created_at", Exam.idempotency_key, Exam.created_at.desc())
 Index("ix_audit_log_ts", AuditLog.ts.desc())
+Index("ix_analyses_created_at", Analysis.created_at.desc())
+Index("ix_analyses_patient_created_at", Analysis.patient_id, Analysis.created_at.desc())
 
 
 # ---------------------------------------------------------------------------

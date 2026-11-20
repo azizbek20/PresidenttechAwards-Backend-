@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 import app.db.base as db_base  # Agent B; arrives at the Phase 2 merge.
+from app.api import analyze as analyze_api
 from app.api import exams as exams_api
 from app.api import predict as predict_api
 from app.api.deps import engine_for, require_api_key
@@ -159,6 +160,7 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_api_key)])
     api.include_router(predict_api.router, tags=["predict"])
     api.include_router(exams_api.router, tags=["exams"])
+    api.include_router(analyze_api.router, tags=["analysis"])
     app.include_router(api)
 
     @app.head("/", status_code=204, include_in_schema=False)
