@@ -240,4 +240,47 @@
     <string name="notification_upload_success_text_patient">Patient %1$s\'s result is ready. Check \"History\".</string>
     <string name="notification_upload_failed_title">Couldn\'t send</string>
     <string name="notification_upload_failed_text">Sending the queued photo failed. You can retry it from \"History\".</string>
+
+    <!-- Tahlil bo'limi: tashqi ko'z, teri, og'iz, tirnoq -->
+    <string name="home_analysis_title">Eye, skin and more</string>
+    <string name="home_analysis_subtitle">Analyse photos of the external eye, skin, mouth and nails</string>
+    <string name="analysis_types_title">Analysis type</string>
+    <string name="analysis_types_subtitle">Which body part are we analysing?</string>
+    <string name="analysis_types_note">This is not a diagnosis — only an initial triage. If in doubt, see a doctor.</string>
+    <string name="analysis_type_external_eye">External eye</string>
+    <string name="analysis_type_external_eye_sub">Redness, jaundice, eyelid swelling, cataract signs</string>
+    <string name="analysis_type_skin">Skin</string>
+    <string name="analysis_type_skin_sub">Spots, moles, rashes and other skin changes</string>
+    <string name="analysis_type_oral">Oral cavity</string>
+    <string name="analysis_type_oral_sub">Tongue, gum and mucosa changes</string>
+    <string name="analysis_type_nail">Nails</string>
+    <string name="analysis_type_nail_sub">Nail colour, shape and fungal signs</string>
+    <string name="analysis_tips_title">For a good photo</string>
+    <string name="analysis_tip_external_eye">Photograph the eye up close in good light, without flash. Keep the eye fully open and centred.</string>
+    <string name="analysis_tip_skin">Photograph the area from 10–15 cm in daylight. Keep the spot centred and avoid shadows.</string>
+    <string name="analysis_tip_oral">Open your mouth wide in good light so the tongue and gums are clearly visible.</string>
+    <string name="analysis_tip_nail">Photograph nails without polish on a flat surface in daylight.</string>
+    <string name="analysis_body_site_label">Body site</string>
+    <string name="analysis_body_site_placeholder">E.g. left forearm</string>
+    <string name="analysis_camera_denied">Camera permission denied. You can pick a photo from the gallery.</string>
+    <string name="analysis_take_photo">Take photo</string>
+    <string name="analysis_pick_gallery">Pick from gallery</string>
+    <string name="analysis_back">← Back</string>
+    <string name="analysis_result_title">Result: %1$s</string>
+    <string name="analysis_result_content_desc">Risk level: %1$s. %2$s</string>
+    <string name="analysis_risk_high">High risk</string>
+    <string name="analysis_risk_medium">Medium risk</string>
+    <string name="analysis_risk_low">Low risk</string>
+    <string name="analysis_risk_ungradable">Could not grade</string>
+    <string name="analysis_ungradable_title">Image quality too low — please retake</string>
+    <string name="analysis_demo_warning">Demo mode: this result comes from a test (mock) model, not a real one.</string>
+    <string name="analysis_recommendation">Recommendation</string>
+    <string name="analysis_image_desc">Analysed photo</string>
+    <string name="analysis_findings">Findings</string>
+    <string name="analysis_detail_patient">Patient</string>
+    <string name="analysis_detail_quality">Image quality</string>
+    <string name="analysis_detail_model">Model</string>
+    <string name="analysis_new">New analysis</string>
+    <string name="analysis_home">Home</string>
+    <string name="analysis_error_read_image">Could not read the image. Please pick another one.</string>
 </resources>

@@ -25,6 +25,10 @@ import com.eyedetect.ai.ui.HistoryScreen
 import com.eyedetect.ai.ui.HomeScreen
 import com.eyedetect.ai.ui.PatientScreen
 import com.eyedetect.ai.ui.ResultScreen
+import com.eyedetect.ai.ui.analysis.ANALYSIS_CAPTURE_DIR
+import com.eyedetect.ai.ui.analysis.AnalysisCaptureScreen
+import com.eyedetect.ai.ui.analysis.AnalysisResultScreen
+import com.eyedetect.ai.ui.analysis.AnalysisTypeScreen
 import com.eyedetect.ai.ui.eyecare.BlinkPalmScreen
 import com.eyedetect.ai.ui.eyecare.EyeCareMenuScreen
 import com.eyedetect.ai.ui.eyecare.FocusShiftScreen
@@ -43,6 +47,7 @@ enum class Screen {
     EyeCareMenu, ReminderSettings,
     FollowDot, FocusShift, BlinkPalm, Pomodoro,
     History,
+    AnalysisTypes, AnalysisCapture, AnalysisResult,
 }
 
 private val ScreenListSaver: Saver<SnapshotStateList<Screen>, List<String>> = Saver(
@@ -55,6 +60,8 @@ private val ScreenListSaver: Saver<SnapshotStateList<Screen>, List<String>> = Sa
 private fun cleanupStaleCaptures(context: Context) {
     context.cacheDir.listFiles { f -> f.name.startsWith("fundus_") && f.name.endsWith(".jpg") }
         ?.forEach { it.delete() }
+    // Tahlil bo'limi kamerasi olgan rasmlar (FileProvider orqali cacheDir/analysis/).
+    java.io.File(context.cacheDir, ANALYSIS_CAPTURE_DIR).listFiles()?.forEach { it.delete() }
 }
 
 class MainActivity : ComponentActivity() {
@@ -97,6 +104,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot(
     vm: ScreeningViewModel = viewModel(),
+    analysisVm: AnalysisViewModel = viewModel(),
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact
 ) {
     val activity = LocalContext.current as? Activity
@@ -121,6 +129,7 @@ fun AppRoot(
     // uni bekor qiladi — aks holda foydalanuvchi chiqib ketsa ham so'rov fonda davom etardi.
     fun pop(): Boolean {
         if (current == Screen.Result && uiState is UiState.Loading) vm.cancelUpload()
+        if (current == Screen.AnalysisResult) analysisVm.cancel()
         return if (backStack.size > 1) { backStack.removeAt(backStack.lastIndex); true } else false
     }
     fun resetTo(vararg s: Screen) { backStack.clear(); backStack.addAll(s) }
@@ -133,6 +142,7 @@ fun AppRoot(
             onScreening = { push(Screen.Patient) },
             onEyeCare = { push(Screen.EyeCareMenu) },
             onHistory = { push(Screen.History) },
+            onAnalysis = { push(Screen.AnalysisTypes) },
         )
         Screen.Patient -> PatientScreen(
             vm = vm,
@@ -181,5 +191,28 @@ fun AppRoot(
         Screen.Pomodoro -> PomodoroScreen(onBack = { pop() })
         Screen.ReminderSettings -> ReminderSettingsScreen(onBack = { pop() })
         Screen.History -> HistoryScreen(widthSizeClass = widthSizeClass, onBack = { pop() })
+        Screen.AnalysisTypes -> AnalysisTypeScreen(
+            onSelect = { code ->
+                analysisVm.selectType(code)
+                push(Screen.AnalysisCapture)
+            },
+            onBack = { pop() },
+        )
+        Screen.AnalysisCapture -> AnalysisCaptureScreen(
+            vm = analysisVm,
+            onAnalyze = { push(Screen.AnalysisResult) },
+            onBack = { pop() },
+        )
+        Screen.AnalysisResult -> AnalysisResultScreen(
+            vm = analysisVm,
+            onNewAnalysis = {
+                analysisVm.resetResult()
+                if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+            },
+            onHome = {
+                analysisVm.resetResult()
+                resetTo(Screen.Home)
+            },
+        )
     }
 }

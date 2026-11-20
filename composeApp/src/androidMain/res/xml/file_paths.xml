@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider: tizim kamerasi tahlil rasmini shu papkaga yozadi
+     (ANALYSIS_CAPTURE_DIR bilan bir xil). Faqat cacheDir/analysis ochiq. -->
+<paths>
+    <cache-path name="analysis" path="analysis/" />
+</paths>

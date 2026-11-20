@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,14 +37,15 @@ fun HomeScreen(
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Compact,
     onScreening: () -> Unit,
     onEyeCare: () -> Unit,
-    onHistory: () -> Unit
+    onHistory: () -> Unit,
+    onAnalysis: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val eyeCareRepo = remember { EyeCarePreferencesRepository(context) }
     val stats by eyeCareRepo.stats.collectAsState(initial = ExerciseStats())
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+        modifier = Modifier.fillMaxSize().padding(Spacing.xl).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         Row(
@@ -74,6 +77,12 @@ fun HomeScreen(
                         emoji = "🩺",
                         onClick = onScreening,
                     )
+                    MenuCard(
+                        title = stringResource(R.string.home_analysis_title),
+                        subtitle = stringResource(R.string.home_analysis_subtitle),
+                        emoji = "🔬",
+                        onClick = onAnalysis,
+                    )
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                     MenuCard(
@@ -97,6 +106,12 @@ fun HomeScreen(
                 subtitle = stringResource(R.string.home_screening_subtitle),
                 emoji = "🩺",
                 onClick = onScreening,
+            )
+            MenuCard(
+                title = stringResource(R.string.home_analysis_title),
+                subtitle = stringResource(R.string.home_analysis_subtitle),
+                emoji = "🔬",
+                onClick = onAnalysis,
             )
             MenuCard(
                 title = stringResource(R.string.home_eyecare_title),

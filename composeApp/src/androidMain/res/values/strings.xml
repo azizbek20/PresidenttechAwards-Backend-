@@ -240,4 +240,47 @@
     <string name="notification_upload_success_text_patient">%1$s bemor natijasi tayyor. \"Tarix\" bo\'limidan ko\'ring.</string>
     <string name="notification_upload_failed_title">Yuborib bo\'lmadi</string>
     <string name="notification_upload_failed_text">Navbatdagi rasmni yuborishda xatolik yuz berdi. \"Tarix\" bo\'limidan qayta urinib ko\'rishingiz mumkin.</string>
+
+    <!-- Tahlil bo'limi: tashqi ko'z, teri, og'iz, tirnoq -->
+    <string name="home_analysis_title">Ko\'z, teri va boshqalar</string>
+    <string name="home_analysis_subtitle">Tashqi ko\'z, teri, og\'iz va tirnoq rasmini tahlil qilish</string>
+    <string name="analysis_types_title">Tahlil turi</string>
+    <string name="analysis_types_subtitle">Qaysi a\'zoning rasmini tahlil qilamiz?</string>
+    <string name="analysis_types_note">Bu tahlil tashxis emas — faqat dastlabki saralash. Shubha bo\'lsa, shifokorga murojaat qiling.</string>
+    <string name="analysis_type_external_eye">Tashqi ko\'z</string>
+    <string name="analysis_type_external_eye_sub">Qizarish, sariqlik, qovoq shishi, katarakta belgilari</string>
+    <string name="analysis_type_skin">Teri</string>
+    <string name="analysis_type_skin_sub">Dog\', xol, toshma va boshqa teri o\'zgarishlari</string>
+    <string name="analysis_type_oral">Og\'iz bo\'shlig\'i</string>
+    <string name="analysis_type_oral_sub">Til, milk va shilliq qavat o\'zgarishlari</string>
+    <string name="analysis_type_nail">Tirnoq</string>
+    <string name="analysis_type_nail_sub">Tirnoq rangi, shakli va zamburug\' belgilari</string>
+    <string name="analysis_tips_title">Yaxshi rasm uchun</string>
+    <string name="analysis_tip_external_eye">Ko\'zni yaqindan, yorug\' joyda, chaqnoqsiz suratga oling. Ko\'z to\'liq ochiq va kadr markazida bo\'lsin.</string>
+    <string name="analysis_tip_skin">Teri qismini 10–15 sm masofadan, kunduzgi yorug\'likda suratga oling. Dog\' kadr markazida, soya tushmasin.</string>
+    <string name="analysis_tip_oral">Og\'izni keng oching, yaxshi yorug\'lik bering. Til va milk aniq ko\'rinsin.</string>
+    <string name="analysis_tip_nail">Tirnoqlarni lak va bezaksiz, tekis yuzada, kunduzgi yorug\'likda suratga oling.</string>
+    <string name="analysis_body_site_label">Tana qismi</string>
+    <string name="analysis_body_site_placeholder">Masalan: chap bilak</string>
+    <string name="analysis_camera_denied">Kamera ruxsati berilmadi. Galereyadan rasm tanlashingiz mumkin.</string>
+    <string name="analysis_take_photo">Suratga olish</string>
+    <string name="analysis_pick_gallery">Galereyadan tanlash</string>
+    <string name="analysis_back">← Orqaga</string>
+    <string name="analysis_result_title">Natija: %1$s</string>
+    <string name="analysis_result_content_desc">Xavf darajasi: %1$s. %2$s</string>
+    <string name="analysis_risk_high">Yuqori xavf</string>
+    <string name="analysis_risk_medium">O\'rtacha xavf</string>
+    <string name="analysis_risk_low">Past xavf</string>
+    <string name="analysis_risk_ungradable">Baholab bo\'lmadi</string>
+    <string name="analysis_ungradable_title">Rasm sifati yetarli emas — qayta suratga oling</string>
+    <string name="analysis_demo_warning">Demo rejim: natija haqiqiy modeldan emas, sinov (mock) modelidan olingan.</string>
+    <string name="analysis_recommendation">Tavsiya</string>
+    <string name="analysis_image_desc">Tahlil qilingan rasm</string>
+    <string name="analysis_findings">Topilmalar</string>
+    <string name="analysis_detail_patient">Bemor</string>
+    <string name="analysis_detail_quality">Rasm sifati</string>
+    <string name="analysis_detail_model">Model</string>
+    <string name="analysis_new">Yangi tahlil</string>
+    <string name="analysis_home">Bosh sahifa</string>
+    <string name="analysis_error_read_image">Rasmni o\'qib bo\'lmadi. Boshqa rasm tanlang.</string>
 </resources>

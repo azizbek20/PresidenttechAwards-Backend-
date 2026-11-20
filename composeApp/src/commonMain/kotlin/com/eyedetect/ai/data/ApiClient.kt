@@ -97,6 +97,8 @@ object ApiClient {
 
     val service: ApiService = KtorApiService(client) { baseUrl }
 
+    val analysis: AnalysisApi = KtorAnalysisApi(client) { baseUrl }
+
     suspend fun ping(): Boolean {
         return try {
             val response = pingClient.head(baseUrl)

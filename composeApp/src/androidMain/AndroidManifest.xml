@@ -41,6 +41,18 @@
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="face" />
 
+        <!-- Tahlil bo'limi: tizim kamerasiga (ACTION_IMAGE_CAPTURE) rasmni yozish uchun
+             vaqtinchalik content:// URI beradi. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

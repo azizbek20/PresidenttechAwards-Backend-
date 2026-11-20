@@ -240,4 +240,47 @@
     <string name="notification_upload_success_text_patient">Результат пациента %1$s готов. Смотрите в разделе \"История\".</string>
     <string name="notification_upload_failed_title">Не удалось отправить</string>
     <string name="notification_upload_failed_text">Не удалось отправить снимок из очереди. Вы можете повторить попытку в разделе \"История\".</string>
+
+    <!-- Tahlil bo'limi: tashqi ko'z, teri, og'iz, tirnoq -->
+    <string name="home_analysis_title">Глаза, кожа и другое</string>
+    <string name="home_analysis_subtitle">Анализ фото наружного глаза, кожи, полости рта и ногтей</string>
+    <string name="analysis_types_title">Тип анализа</string>
+    <string name="analysis_types_subtitle">Фото какого органа анализируем?</string>
+    <string name="analysis_types_note">Это не диагноз — только первичная сортировка. При сомнениях обратитесь к врачу.</string>
+    <string name="analysis_type_external_eye">Наружный глаз</string>
+    <string name="analysis_type_external_eye_sub">Покраснение, желтушность, отёк век, признаки катаракты</string>
+    <string name="analysis_type_skin">Кожа</string>
+    <string name="analysis_type_skin_sub">Пятна, родинки, сыпь и другие изменения кожи</string>
+    <string name="analysis_type_oral">Полость рта</string>
+    <string name="analysis_type_oral_sub">Изменения языка, дёсен и слизистой</string>
+    <string name="analysis_type_nail">Ногти</string>
+    <string name="analysis_type_nail_sub">Цвет, форма ногтей и признаки грибка</string>
+    <string name="analysis_tips_title">Для хорошего фото</string>
+    <string name="analysis_tip_external_eye">Снимайте глаз крупно, при хорошем освещении, без вспышки. Глаз полностью открыт и в центре кадра.</string>
+    <string name="analysis_tip_skin">Снимайте участок кожи с 10–15 см при дневном свете. Пятно в центре, без теней.</string>
+    <string name="analysis_tip_oral">Широко откройте рот при хорошем освещении, чтобы язык и дёсны были хорошо видны.</string>
+    <string name="analysis_tip_nail">Снимайте ногти без лака на ровной поверхности при дневном свете.</string>
+    <string name="analysis_body_site_label">Часть тела</string>
+    <string name="analysis_body_site_placeholder">Например: левое предплечье</string>
+    <string name="analysis_camera_denied">Нет доступа к камере. Можно выбрать фото из галереи.</string>
+    <string name="analysis_take_photo">Сделать фото</string>
+    <string name="analysis_pick_gallery">Выбрать из галереи</string>
+    <string name="analysis_back">← Назад</string>
+    <string name="analysis_result_title">Результат: %1$s</string>
+    <string name="analysis_result_content_desc">Уровень риска: %1$s. %2$s</string>
+    <string name="analysis_risk_high">Высокий риск</string>
+    <string name="analysis_risk_medium">Средний риск</string>
+    <string name="analysis_risk_low">Низкий риск</string>
+    <string name="analysis_risk_ungradable">Не удалось оценить</string>
+    <string name="analysis_ungradable_title">Недостаточное качество фото — переснимите</string>
+    <string name="analysis_demo_warning">Демо-режим: результат получен от тестовой (mock) модели, а не реальной.</string>
+    <string name="analysis_recommendation">Рекомендация</string>
+    <string name="analysis_image_desc">Проанализированное фото</string>
+    <string name="analysis_findings">Находки</string>
+    <string name="analysis_detail_patient">Пациент</string>
+    <string name="analysis_detail_quality">Качество фото</string>
+    <string name="analysis_detail_model">Модель</string>
+    <string name="analysis_new">Новый анализ</string>
+    <string name="analysis_home">Главная</string>
+    <string name="analysis_error_read_image">Не удалось прочитать изображение. Выберите другое.</string>
 </resources>
