@@ -146,12 +146,19 @@ kotlin {
 android {
     buildFeatures { buildConfig = true }
     namespace = "com.eyedetect.ai"
-    compileSdk = 34
+    compileSdk = 35
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
     sourceSets["main"].resources.srcDirs("src/androidMain/resources")
     sourceSets["main"].assets.srcDirs("src/androidMain/assets")
+
+    // Robolectric testlari R.string resurslarini o'qiy olishi uchun.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 
     defaultConfig {
         applicationId = "com.eyedetect.ai"
@@ -212,4 +219,12 @@ afterEvaluate {
 dependencies {
     add("kapt", "androidx.room:room-compiler:2.7.1")
     add("debugImplementation", "androidx.compose.ui:ui-tooling")
+
+    // --- Unit testlar (JVM, `./gradlew :composeApp:testDebugUnitTest`) ---
+    add("testImplementation", "junit:junit:4.13.2")
+    add("testImplementation", "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    add("testImplementation", "org.robolectric:robolectric:4.13")
+    add("testImplementation", "androidx.test:core:1.6.1")
+    add("testImplementation", "io.ktor:ktor-client-mock:2.3.12")
+    add("testImplementation", "androidx.work:work-testing:2.9.1")
 }

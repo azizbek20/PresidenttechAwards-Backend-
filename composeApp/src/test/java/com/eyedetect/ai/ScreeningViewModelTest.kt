@@ -2,18 +2,29 @@ package com.eyedetect.ai
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
+import androidx.room.Room
+import androidx.work.testing.WorkManagerTestInitHelper
+import com.eyedetect.ai.data.history.ScreeningHistoryDatabase
 import com.eyedetect.ai.data.ApiService
+import com.eyedetect.ai.data.PredictPolling
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.data.TaskResponse
+import com.eyedetect.ai.data.TaskStatusResponse
+import com.eyedetect.ai.data.configureApi
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.ResponseException
+import io.ktor.client.request.get
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -25,8 +36,6 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import retrofit2.HttpException
-import retrofit2.Response
 import java.io.File
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -54,11 +63,20 @@ class ScreeningViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Oflayn rejim (tarmoq xatosi) SyncWorker'ni WorkManager'ga topshiradi.
+        WorkManagerTestInitHelper.initializeTestWorkManager(app())
+        // SQLCipher native kutubxonasi JVM'da yo'q — shifrlanmagan in-memory baza.
+        ScreeningHistoryDatabase.overrideForTests(
+            Room.inMemoryDatabaseBuilder(app(), ScreeningHistoryDatabase::class.java)
+                .allowMainThreadQueries()
+                .build(),
+        )
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        ScreeningHistoryDatabase.overrideForTests(null)
     }
 
     private fun app(): Application = ApplicationProvider.getApplicationContext()
@@ -88,12 +106,19 @@ class ScreeningViewModelTest {
         disclaimer = "Not a diagnosis",
     )
 
+    /** Backend'ning asinxron oqimini soxtalashtiradi: `predict` vazifa qaytaradi,
+     * `getPredictStatus` esa [respond] natijasini darhol `SUCCESS` sifatida beradi. */
     private class FakeApiService(private val respond: suspend () -> PredictResponse) : ApiService {
         override suspend fun predict(
-            file: MultipartBody.Part,
-            patientId: RequestBody?,
-            eye: RequestBody?,
-        ): PredictResponse = respond()
+            fileBytes: ByteArray,
+            fileName: String,
+            patientId: String?,
+            eye: String?,
+            onProgress: ((Float) -> Unit)?,
+        ): TaskResponse = TaskResponse(taskId = "t-1", status = "PENDING", message = "ok")
+
+        override suspend fun getPredictStatus(taskId: String): TaskStatusResponse =
+            TaskStatusResponse(taskId = taskId, status = "SUCCESS", result = respond())
     }
 
     /** Har chaqiruvda ro'yxatdagi keyingi xatti-harakatni qaytaradi ([retry] testlari
@@ -103,19 +128,37 @@ class ScreeningViewModelTest {
             private set
 
         override suspend fun predict(
-            file: MultipartBody.Part,
-            patientId: RequestBody?,
-            eye: RequestBody?,
-        ): PredictResponse {
+            fileBytes: ByteArray,
+            fileName: String,
+            patientId: String?,
+            eye: String?,
+            onProgress: ((Float) -> Unit)?,
+        ): TaskResponse = TaskResponse(taskId = "t-1", status = "PENDING", message = "ok")
+
+        override suspend fun getPredictStatus(taskId: String): TaskStatusResponse {
             val behavior = behaviors[callCount.coerceAtMost(behaviors.size - 1)]
             callCount++
-            return behavior()
+            return TaskStatusResponse(taskId = taskId, status = "SUCCESS", result = behavior())
         }
     }
 
-    private fun httpException(code: Int, body: String? = null): HttpException {
-        val responseBody = (body ?: "").toResponseBody("application/json".toMediaTypeOrNull())
-        return HttpException(Response.error<Any>(code, responseBody))
+    private val noWait = PredictPolling(intervalMs = 0, timeoutMs = 5_000)
+
+    private fun newVm(api: ApiService, healthCheck: suspend () -> Boolean = { true }) =
+        ScreeningViewModel(app(), api, healthCheck, noWait)
+
+    /** Haqiqiy Ktor `ResponseException`ni (ishlab chiqarishdagi [configureApi] bilan)
+     * `MockEngine` orqali hosil qiladi — javob tanasi `bodyAsText()` uchun saqlangan bo'ladi. */
+    private suspend fun httpException(code: Int, body: String? = null): ResponseException {
+        val client = HttpClient(MockEngine {
+            respond(body ?: "", HttpStatusCode.fromValue(code), headersOf(HttpHeaders.ContentType, "application/json"))
+        }) { configureApi(apiKey = "k") }
+        return try {
+            client.get("http://backend.test/")
+            error("expected an HTTP $code failure")
+        } catch (e: ResponseException) {
+            e
+        }
     }
 
     /** `uiState` hali `Loading`ligicha qolsa, alohida (real) threadda ishlayotgan
@@ -142,14 +185,14 @@ class ScreeningViewModelTest {
 
     @Test
     fun `initial state is Idle`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() })
+        val vm = newVm(FakeApiService { sampleResponse() })
         assertEquals(UiState.Idle, vm.uiState.value)
     }
 
     @Test
     fun `uploadFile sets Loading synchronously, then Success once the backend replies`() {
         val gate = CompletableDeferred<Unit>()
-        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() })
+        val vm = newVm(FakeApiService { gate.await(); sampleResponse() })
         val file = newFile()
 
         vm.uploadFile(file)
@@ -165,7 +208,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile keeps the temp file when the request fails, so retry can resend it`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("boom") })
+        val vm = newVm(FakeApiService { throw IllegalStateException("boom") })
         val file = newFile()
 
         vm.uploadFile(file)
@@ -179,10 +222,10 @@ class ScreeningViewModelTest {
     @Test
     fun `retry resends the same file without the caller retaking a photo`() {
         val api = SequencedFakeApiService(
-            { throw java.net.SocketTimeoutException("first attempt times out") },
+            { throw httpException(503) },
             { sampleResponse() },
         )
-        val vm = ScreeningViewModel(app(), api)
+        val vm = newVm(api)
         val file = newFile()
 
         vm.uploadFile(file)
@@ -200,7 +243,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `retry is a no-op when there is no pending upload source`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() })
+        val vm = newVm(FakeApiService { sampleResponse() })
 
         vm.retry()
 
@@ -210,7 +253,7 @@ class ScreeningViewModelTest {
     @Test
     fun `cancelUpload deletes the pending file and returns to Idle`() {
         val gate = CompletableDeferred<Unit>()
-        val vm = ScreeningViewModel(app(), FakeApiService { gate.await(); sampleResponse() })
+        val vm = newVm(FakeApiService { gate.await(); sampleResponse() })
         val file = newFile()
 
         vm.uploadFile(file)
@@ -227,7 +270,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps a 422 HttpException body detail when present`() {
-        val vm = ScreeningViewModel(app(), FakeApiService {
+        val vm = newVm(FakeApiService {
             throw httpException(422, """{"detail":"Rasm juda xira"}""")
         })
 
@@ -240,7 +283,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps a 404 HttpException without a detail body to the not-found message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(404) })
+        val vm = newVm(FakeApiService { throw httpException(404) })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -251,7 +294,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps a 5xx HttpException to the server error message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(503) })
+        val vm = newVm(FakeApiService { throw httpException(503) })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -262,7 +305,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile maps an unmapped HttpException code to the generic http message with the code`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw httpException(418) })
+        val vm = newVm(FakeApiService { throw httpException(418) })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -273,7 +316,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `checkBackendHealth reflects the injected health check result`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { true })
+        val vm = newVm(FakeApiService { sampleResponse() }, healthCheck = { true })
 
         vm.checkBackendHealth()
 
@@ -282,7 +325,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `checkBackendHealth reports offline when the health check fails`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() }, healthCheck = { throw java.io.IOException("down") })
+        val vm = newVm(FakeApiService { sampleResponse() }, healthCheck = { throw java.io.IOException("down") })
 
         vm.checkBackendHealth()
 
@@ -290,30 +333,56 @@ class ScreeningViewModelTest {
     }
 
     @Test
-    fun `uploadFile maps UnknownHostException to the no-connection message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw UnknownHostException("no dns") })
+    fun `a network failure saves the photo for background sync instead of offering retry`() {
+        val vm = newVm(FakeApiService { throw UnknownHostException("no dns") })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
 
         assertTrue(state is UiState.Error)
-        assertEquals(app().getString(R.string.error_no_connection), (state as UiState.Error).message)
+        assertEquals(false, (state as UiState.Error).canRetry)
+        val pending = File(app().filesDir, "pending_uploads").listFiles().orEmpty()
+        assertEquals(1, pending.size)
     }
 
     @Test
-    fun `uploadFile maps SocketTimeoutException to the timeout message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw SocketTimeoutException("timed out") })
+    fun `a socket timeout is also treated as offline`() {
+        val vm = newVm(FakeApiService { throw SocketTimeoutException("timed out") })
+
+        vm.uploadFile(newFile())
+        val state = awaitTerminalState(vm)
+
+        assertTrue(state is UiState.Error)
+        assertEquals(false, (state as UiState.Error).canRetry)
+    }
+
+    @Test
+    fun `a backend task that never finishes maps to the timeout message`() {
+        val stuck = object : ApiService {
+            override suspend fun predict(
+                fileBytes: ByteArray,
+                fileName: String,
+                patientId: String?,
+                eye: String?,
+                onProgress: ((Float) -> Unit)?,
+            ) = TaskResponse(taskId = "t-1", status = "PENDING", message = "ok")
+
+            override suspend fun getPredictStatus(taskId: String) =
+                TaskStatusResponse(taskId = taskId, status = "PROCESSING")
+        }
+        val vm = ScreeningViewModel(app(), stuck, { true }, PredictPolling(intervalMs = 0, timeoutMs = 50))
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
 
         assertTrue(state is UiState.Error)
         assertEquals(app().getString(R.string.error_timeout), (state as UiState.Error).message)
+        assertTrue(state.canRetry)
     }
 
     @Test
     fun `uploadFile maps UnknownServiceException to the https-required message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw UnknownServiceException("cleartext blocked") })
+        val vm = newVm(FakeApiService { throw UnknownServiceException("cleartext blocked") })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -324,7 +393,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile falls back to the raw exception message for unmapped errors`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException("backend exploded") })
+        val vm = newVm(FakeApiService { throw IllegalStateException("backend exploded") })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -335,7 +404,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `uploadFile falls back to the unknown-error message when the exception has no message`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { throw IllegalStateException() })
+        val vm = newVm(FakeApiService { throw IllegalStateException() })
 
         vm.uploadFile(newFile())
         val state = awaitTerminalState(vm)
@@ -346,7 +415,7 @@ class ScreeningViewModelTest {
 
     @Test
     fun `reset returns to Idle and clears local heuristic and symmetry`() {
-        val vm = ScreeningViewModel(app(), FakeApiService { sampleResponse() })
+        val vm = newVm(FakeApiService { sampleResponse() })
         vm.uploadFile(newFile())
         awaitTerminalState(vm)
 

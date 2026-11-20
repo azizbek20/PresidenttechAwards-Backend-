@@ -41,6 +41,10 @@ class OfflineDrClassifier(context: Context) {
             } else {
                 Log.e("OfflineDrClassifier", "Error loading TFLite model", e)
             }
+        } catch (e: UnsatisfiedLinkError) {
+            // TFLite native kutubxonasi yo'q (masalan, qo'llab-quvvatlanmagan ABI yoki JVM
+            // testlari) — oflayn rejimsiz davom etamiz, ViewModel yaratilishini buzmaymiz.
+            Log.w("OfflineDrClassifier", "TFLite native library unavailable. Offline mode disabled.", e)
         }
     }
 

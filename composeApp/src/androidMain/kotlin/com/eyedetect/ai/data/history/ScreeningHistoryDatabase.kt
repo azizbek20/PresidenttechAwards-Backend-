@@ -12,6 +12,19 @@ abstract class ScreeningHistoryDatabase : RoomDatabase() {
     companion object {
         @Volatile private var instance: ScreeningHistoryDatabase? = null
 
+        /**
+         * Faqat JVM (Robolectric) testlari uchun: SQLCipher'ning native kutubxonasi
+         * JVM'da yuklanmaydi, shu sabab testlar shifrlanmagan in-memory bazani beradi.
+         * `null` berilsa keyingi [getInstance] yana haqiqiy bazani quradi.
+         */
+        @androidx.annotation.VisibleForTesting
+        fun overrideForTests(db: ScreeningHistoryDatabase?) {
+            synchronized(this) {
+                instance?.takeIf { it !== db }?.close()
+                instance = db
+            }
+        }
+
         fun getInstance(context: Context): ScreeningHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(

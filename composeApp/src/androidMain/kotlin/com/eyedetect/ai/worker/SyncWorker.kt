@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.eyedetect.ai.data.ApiClient
+import com.eyedetect.ai.data.predictAndAwait
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.vision.BitmapLoader
 import kotlinx.coroutines.Dispatchers
@@ -44,26 +45,8 @@ class SyncWorker(
                 val pid = pending.patientId?.takeIf { it.isNotBlank() }
                 
                 // API so'rovi
-                val taskResponse = ApiClient.service.predict(finalBytes, file.name, pid, pending.eye)
-                var status = taskResponse.status
-                var result: com.eyedetect.ai.data.PredictResponse? = null
-                
-                // Natijani kutish (Polling)
-                while (status == "PENDING" || status == "PROCESSING") {
-                    kotlinx.coroutines.delay(2000)
-                    val statusResponse = ApiClient.service.getPredictStatus(taskResponse.taskId)
-                    status = statusResponse.status
-                    if (status == "SUCCESS" && statusResponse.result != null) {
-                        result = statusResponse.result
-                    } else if (status == "FAILURE") {
-                        throw Exception("Backend xatosi: ${statusResponse.error ?: "Noma'lum"}")
-                    }
-                }
-                
-                if (result == null) {
-                    throw Exception("Natija kelmadi!")
-                }
-                
+                val result = ApiClient.service.predictAndAwait(finalBytes, file.name, pid, pending.eye)
+
                 // Bazani muvaffaqiyatli natija bilan yangilash
                 repo.update(
                     pending.copy(

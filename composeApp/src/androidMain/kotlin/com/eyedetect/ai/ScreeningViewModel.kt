@@ -8,7 +8,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eyedetect.ai.data.ApiClient
 import com.eyedetect.ai.data.ApiService
+import com.eyedetect.ai.data.PredictPolling
 import com.eyedetect.ai.data.PredictResponse
+import com.eyedetect.ai.data.PredictTimeoutException
+import com.eyedetect.ai.data.predictAndAwait
 import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.history.ScreeningHistoryRepository
 import com.eyedetect.ai.ui.components.QualityLevel
@@ -29,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
@@ -69,6 +72,7 @@ class ScreeningViewModel @JvmOverloads constructor(
     application: Application,
     private val api: ApiService = ApiClient.service,
     private val healthCheck: suspend () -> Boolean = { ApiClient.ping() },
+    private val polling: PredictPolling = PredictPolling(),
 ) : AndroidViewModel(application) {
 
     private val historyRepo = ScreeningHistoryRepository(application)
@@ -175,7 +179,9 @@ class ScreeningViewModel @JvmOverloads constructor(
     }
 
     private suspend fun handleOfflineSync(e: Exception, bytes: ByteArray): Boolean {
-        if (e is java.net.UnknownHostException || e is java.net.ConnectException || e is java.net.SocketTimeoutException) {
+        if (e is java.net.UnknownHostException || e is java.net.ConnectException ||
+            e is java.net.SocketTimeoutException || e is HttpRequestTimeoutException
+        ) {
             val app = getApplication<Application>()
             
             // Faylni diskka saqlash
@@ -366,32 +372,15 @@ class ScreeningViewModel @JvmOverloads constructor(
     private suspend fun doRequest(uploadBytes: ByteArray, fileName: String, rowId: CompletableDeferred<Long?>) {
         val pid = patientId.ifBlank { null }
         
-        val taskResponse = api.predict(
+        val result = api.predictAndAwait(
             fileBytes = uploadBytes,
             fileName = fileName,
             patientId = pid,
             eye = eye,
-            onProgress = { _uploadProgress.value = it }
+            onProgress = { _uploadProgress.value = it },
+            polling = polling,
         )
-        var status = taskResponse.status
-        var result: PredictResponse? = null
-        
-        // 2. Natijani kutish (Polling)
-        while (status == "PENDING" || status == "PROCESSING") {
-            kotlinx.coroutines.delay(2000) // 2 soniya kutish
-            val statusResponse = api.getPredictStatus(taskResponse.taskId)
-            status = statusResponse.status
-            if (status == "SUCCESS" && statusResponse.result != null) {
-                result = statusResponse.result
-            } else if (status == "FAILURE") {
-                throw Exception("Backend xatosi: ${statusResponse.error ?: "Noma'lum"}")
-            }
-        }
-        
-        if (result == null) {
-            throw Exception("Natija kelmadi!")
-        }
-        
+
         _uiState.value = UiState.Success(result)
         // Tarixga saqlash
         val id = runCatching { historyRepo.saveResult(result, _localHeuristic.value) }.getOrNull()
@@ -405,8 +394,12 @@ class ScreeningViewModel @JvmOverloads constructor(
             is java.net.UnknownHostException,
             is java.net.ConnectException ->
                 app.getString(R.string.error_no_connection)
-            is java.net.SocketTimeoutException ->
+            is java.net.SocketTimeoutException,
+            is HttpRequestTimeoutException,
+            is PredictTimeoutException ->
                 app.getString(R.string.error_timeout)
+            is java.net.UnknownServiceException ->
+                app.getString(R.string.error_https_required)
             is ResponseException -> httpErrorMessage(e)
             else -> e.message ?: app.getString(R.string.error_unknown)
         }
