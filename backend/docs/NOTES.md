@@ -166,7 +166,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 - **The one failure is a test bug, left unedited per hard rule 3 and PROMPTS.md.**
   - `tests/unit/test_claude_engine.py:164` expects `(588, 1568)` for a 1200×3136 portrait.
   - The aspect-preserving result is 1200 × 1568/3136 = **600**, which the engine produces; the reviewer confirmed it independently.
-  - Fix in a test-only commit: change `588` to `600`.
+  - Fixed on 2026-11-22 with the owner's approval in a test-only commit (`588` → `600`); see the Phase 3 gate below.
 - Review (2c, Sonnet): no blockers. Its should-fix items are open decisions 1 and 2 below; its nit (image prep on the event loop) is fixed in `e956b45`.
 - **Not done: the manual real-key check.** It needs your four images in `backend/eval/manual/`, which is git-ignored.
 
@@ -185,7 +185,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 - Gate, from a **fresh** venv built from `requirements-dev.txt` (`pip check` clean; no torch, timm, grad-cam, onnx, celery, pika, redis or streamlit):
   - ruff and mypy are clean.
   - `import app.main` loads neither celery nor torch.
-  - `EYE_MODE=demo pytest -q -m "not model and not perf"` gives `449 passed, 1 failed, 1 skipped, 4 deselected`. The failure is the test bug above; the skip is `test_postgres_async.py`, because no `TEST_POSTGRES_URL` or Postgres container was available (no Docker daemon).
+  - `EYE_MODE=demo pytest -q -m "not model and not perf"` gave `449 passed, 1 failed, 1 skipped, 4 deselected`. The failure was the test bug above. After the approved test-only fix it gives **`450 passed, 1 skipped, 4 deselected`** (ruff and mypy still clean). The skip is `test_postgres_async.py`, because no `TEST_POSTGRES_URL` or Postgres container was available (no Docker daemon).
 - Review (3c, Sonnet): no blockers.
   - Blob mode was verified empirically: `import app.main`, startup and `/health/ready` never created `EYE_STORAGE_DIR`.
   - The first async status is `PROCESSING`, both endpoints share `run_screening`, and the URL rewrite and pool are correct.
@@ -200,7 +200,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - Options: raise the default (for example to 4000; you pay only for tokens actually used), or send `thinking={"type": "between_tools"}`. Sonnet 5.5 accepts that setting, but `claude-opus-5-5`, the comparison model, rejects it.
    - For the manual check, run with `CLAUDE_MAX_TOKENS=4000` and look at `output_tokens` in the `claude_call` log line.
 2. **EXIF in unchanged JPEGs (Phase 2 review).** §3.3 sends a JPEG within 1568 px byte-for-byte, so EXIF and comment segments (GPS, device, any typed comment) reach Claude, which conflicts with CLAUDE.md's "only the image". A lossless metadata strip would also change `test_small_jpeg_is_sent_byte_identical` and `test_jpeg_exactly_at_the_limit_is_unchanged`, so it needs your call.
-3. **The test arithmetic bug** above: approve the one-character test-only fix.
+3. ~~**The test arithmetic bug**~~ — approved and fixed (`588` → `600`, test-only commit). Suite: `450 passed, 1 skipped, 4 deselected`.
 4. **`backend/README.md`** still documents the torch install, `download_model.py` and Grad-CAM (Phase 1 review). It is outside every phase's file list. Approve a docs-only update?
 5. **`onnxruntime` on Vercel.**
    - It stays in `requirements.txt` per §12.2, but is useless on Vercel, because `skin.onnx` is not deployed there.
