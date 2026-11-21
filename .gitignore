@@ -11,3 +11,10 @@
 .externalNativeBuild/
 .cxx/
 /.claude/
+
+# Python bytecode (training/ scripts)
+__pycache__/
+
+# Local backups of secret-bearing config (.env, local.properties)
+*.bak
+.env.bak*
