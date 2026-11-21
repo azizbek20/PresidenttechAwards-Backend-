@@ -50,9 +50,9 @@ _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 _HEADER_COMMENT = re.compile(r"\A\s*<!--.*?-->\s*", re.DOTALL)
 _SAFE_VERSION = re.compile(r"[A-Za-z0-9_-]+")
 _JPEG_MAGIC = b"\xff\xd8\xff"
-#: Segments a decoder may need that carry no personal data. Every other APPn
-#: (EXIF, XMP, IPTC, MPF, JFXX, ...) and every COM segment is dropped.
-_KEEP_APP = {0xE0: b"JFIF\x00", 0xE2: b"ICC_PROFILE\x00", 0xEE: b"Adobe"}
+#: Markers a decoder needs, copied as they are: SOF0-15 (C8 is reserved),
+#: DHT (C4), DAC (CC), SOS, DQT, DNL (standard length only) and DRI.
+_DECODING_MARKERS = (frozenset(range(0xC0, 0xD0)) - {0xC8}) | {0xDA, 0xDB, 0xDC, 0xDD}
 _EXIF_ORIENTATION = 0x0112
 
 
@@ -73,17 +73,43 @@ def load_system_prompt(prompt_version: str) -> str:
     return _HEADER_COMMENT.sub("", text, count=1).strip()
 
 
+def _kept_app(marker: int, payload: bytes, seen: set[int]) -> bytes | None:
+    """The cleaned payload of an APPn segment worth keeping, else ``None``.
+
+    Only three carry no personal data, and the two fixed-size ones are rebuilt
+    so nothing can ride along after their fields: JFIF (at most one, without
+    its optional thumbnail), Adobe (at most one, its 12 bytes, needed to
+    decode CMYK) and the ICC colour profile (which says what the pixel colours
+    mean). EXIF, XMP, IPTC, MPF, JFXX, comments and the rest are dropped.
+    """
+    if marker == 0xE0 and payload.startswith(b"JFIF\x00") and len(payload) >= 14:
+        if marker in seen:
+            return None
+        seen.add(marker)
+        return payload[:12] + b"\x00\x00"  # version, units, density; no thumbnail
+    if marker == 0xEE and payload.startswith(b"Adobe") and len(payload) >= 12:
+        if marker in seen:
+            return None
+        seen.add(marker)
+        return payload[:12]
+    if marker == 0xE2 and payload.startswith(b"ICC_PROFILE\x00"):
+        return payload
+    return None
+
+
 def _strip_metadata(raw: bytes) -> bytes | None:
     """A lossless copy of a JPEG keeping only what decoding needs.
 
     The entropy-coded data is copied untouched, so the pixels are identical.
-    Dropped: metadata segments (see ``_KEEP_APP``), comments, including any
-    between progressive scans, and everything after EOI (phone motion-photo
-    videos, MPF secondary images). Returns ``None`` for any structure it does
-    not fully understand; the caller then re-encodes instead.
+    Dropped: metadata segments (see :func:`_kept_app`), comments, including
+    any between progressive scans, and everything after EOI (phone
+    motion-photo videos, MPF secondary images). Returns ``None`` for any
+    marker or structure it does not fully understand; the caller then
+    re-encodes instead.
     """
     n = len(raw)
     out = bytearray(b"\xff\xd8")
+    seen: set[int] = set()
     i = 2
     while i < n:
         if raw[i] != 0xFF:
@@ -97,8 +123,6 @@ def _strip_metadata(raw: bytes) -> bytes | None:
         if marker == 0xD9:  # EOI: nothing after it is sent
             out += b"\xff\xd9"
             return bytes(out)
-        if marker in (0x00, 0x01, 0xD8) or 0xD0 <= marker <= 0xD7:
-            return None  # not valid outside entropy-coded data
         if i + 2 > n:
             return None
         length = int.from_bytes(raw[i : i + 2], "big")
@@ -107,9 +131,12 @@ def _strip_metadata(raw: bytes) -> bytes | None:
         segment = raw[i : i + length]
         i += length
         if 0xE0 <= marker <= 0xEF or marker == 0xFE:
-            keep = _KEEP_APP.get(marker)
-            if keep is None or not segment[2:].startswith(keep):
-                continue
+            kept = _kept_app(marker, segment[2:], seen)
+            if kept is not None:
+                out += bytes((0xFF, marker)) + (len(kept) + 2).to_bytes(2, "big") + kept
+            continue
+        if marker not in _DECODING_MARKERS or (marker == 0xDC and length != 4):
+            return None
         out += bytes((0xFF, marker)) + segment
         if marker == 0xDA:  # SOS: copy the scan up to the next real marker
             start = i
