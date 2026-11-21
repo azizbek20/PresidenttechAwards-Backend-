@@ -54,6 +54,7 @@ import com.eyedetect.ai.data.history.ScreeningHistoryEntity
 import com.eyedetect.ai.data.upload.PendingUploadEntity
 import com.eyedetect.ai.ui.components.QualityLevel
 import com.eyedetect.ai.ui.components.TextActionButton
+import com.eyedetect.ai.ui.components.formatProbabilityPercent
 import com.eyedetect.ai.ui.theme.Sizing
 import com.eyedetect.ai.ui.theme.Spacing
 import com.eyedetect.ai.ui.theme.TrafficRed
@@ -321,7 +322,7 @@ private fun HistoryEntryCard(
                         stringResource(R.string.result_icdr_grade),
                         entry.icdrGrade,
                         entry.gradeLabel,
-                        (entry.probability * 100).toInt(),
+                        formatProbabilityPercent(entry.probability),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

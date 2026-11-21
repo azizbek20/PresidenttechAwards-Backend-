@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import com.eyedetect.ai.data.upload.PendingUploadDao
 import com.eyedetect.ai.data.upload.PendingUploadEntity
 import java.io.File
+import net.sqlcipher.DatabaseErrorHandler
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 
@@ -62,16 +63,22 @@ abstract class ScreeningHistoryDatabase : RoomDatabase() {
         private fun deleteUnreadableLegacyDatabase(context: Context, passphrase: ByteArray) {
             val dbFile = context.getDatabasePath("screening_history.db")
             if (!dbFile.exists()) return
-            // SQLCipher's raw-key PRAGMA format ("x'<hex>'") — the same
-            // encoding `SupportFactory(byte[])` uses internally, so this
-            // probe opens with exactly the key Room will use.
-            val hexKey = "x'" + passphrase.joinToString("") { "%02x".format(it) } + "'"
+            // Room bazani `SupportFactory(byte[])` -> `SQLiteOpenHelper.getWritableDatabase(byte[])`
+            // orqali ochadi, ya'ni baytlar *parol* sifatida (KDF orqali) ishlatiladi. Tekshiruv
+            // ham aynan shu `byte[]` overloadidan foydalanishi shart: avvalgi `"x'<hex>'"`
+            // (xom kalit) varianti boshqa kalit hosil qilardi, tekshiruv har ishga tushishda
+            // muvaffaqiyatsiz bo'lib, butun skrining tarixini o'chirib yuborardi.
+            // `copyOf()` — kutubxona massivni tozalab qo'ysa ham, Room'ga butun parol yetib borsin.
             try {
                 SQLiteDatabase.openDatabase(
                     dbFile.absolutePath,
-                    hexKey,
+                    passphrase.copyOf(),
                     null,
                     SQLiteDatabase.OPEN_READONLY,
+                    null,
+                    // Tekshiruv paytida buzilish topilsa, kutubxonaning standart handleri
+                    // faylni o'zi o'chirmasin — qaror quyidagi catch blokida.
+                    DatabaseErrorHandler { },
                 ).close()
             } catch (_: Exception) {
                 dbFile.delete()
