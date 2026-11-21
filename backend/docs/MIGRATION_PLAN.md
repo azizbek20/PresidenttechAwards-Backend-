@@ -133,6 +133,12 @@ class ClaudeEngine:
   `max_tokens=CLAUDE_MAX_TOKENS`, timeout `CLAUDE_TIMEOUT_S`, `max_retries=0`.
 - Image prep: if the long side > 1568 px, resize with Pillow (keep aspect) and
   re-encode JPEG quality 90; otherwise send the uploaded bytes unchanged.
+  **Amended 2026-11-22 (owner, NOTES.md open decision 2):** "unchanged"
+  now means the same pixels with the file's metadata removed. An upright
+  JPEG within the limit is copied losslessly without EXIF, XMP, IPTC, MPF,
+  comments or bytes after EOI (only JFIF, the ICC profile and Adobe
+  segments stay); an EXIF-rotated JPEG is re-encoded upright; every
+  re-encode carries no metadata. A plain JPEG is still byte-identical.
   PNG uploads are re-encoded to JPEG.
 - Validate the parsed output locally: lower-case enum strings; `icdr_grade`
   in 0..4; `referable_probability` in 0..1. Anything else raises.

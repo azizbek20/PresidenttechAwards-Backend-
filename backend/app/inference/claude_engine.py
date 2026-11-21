@@ -7,7 +7,8 @@ output. Safety rules carried here:
 
 * Only the image and fixed text are sent — :meth:`ClaudeEngine.assess` takes
   image bytes and nothing else, so no patient id, eye or request metadata can
-  reach the API.
+  reach the API, and :func:`prepare_jpeg` removes the file's own metadata
+  (EXIF GPS and camera data, XMP, comments, data appended after the image).
 * No fallback verdict. An SDK error, a timeout, a refusal, a truncated answer
   or output that fails local validation all raise; ``predict.py`` maps that to
   ``500 inference_error``.
@@ -49,6 +50,10 @@ _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 _HEADER_COMMENT = re.compile(r"\A\s*<!--.*?-->\s*", re.DOTALL)
 _SAFE_VERSION = re.compile(r"[A-Za-z0-9_-]+")
 _JPEG_MAGIC = b"\xff\xd8\xff"
+#: Segments a decoder may need that carry no personal data. Every other APPn
+#: (EXIF, XMP, IPTC, MPF, JFXX, ...) and every COM segment is dropped.
+_KEEP_APP = {0xE0: b"JFIF\x00", 0xE2: b"ICC_PROFILE\x00", 0xEE: b"Adobe"}
+_EXIF_ORIENTATION = 0x0112
 
 
 class ClaudeOutputError(RuntimeError):
@@ -68,21 +73,99 @@ def load_system_prompt(prompt_version: str) -> str:
     return _HEADER_COMMENT.sub("", text, count=1).strip()
 
 
-def prepare_jpeg(raw: bytes) -> bytes:
-    """The bytes to send: unchanged for a JPEG within ``MAX_LONG_SIDE``.
+def _strip_metadata(raw: bytes) -> bytes | None:
+    """A lossless copy of a JPEG keeping only what decoding needs.
 
-    Anything larger is downsized keeping its aspect ratio; any non-JPEG (PNG)
-    is re-encoded as JPEG. EXIF orientation is applied when re-encoding so
-    the pixels Claude sees match what the uploader saw.
+    The entropy-coded data is copied untouched, so the pixels are identical.
+    Dropped: metadata segments (see ``_KEEP_APP``), comments, including any
+    between progressive scans, and everything after EOI (phone motion-photo
+    videos, MPF secondary images). Returns ``None`` for any structure it does
+    not fully understand; the caller then re-encodes instead.
+    """
+    n = len(raw)
+    out = bytearray(b"\xff\xd8")
+    i = 2
+    while i < n:
+        if raw[i] != 0xFF:
+            return None
+        while i < n and raw[i] == 0xFF:  # fill bytes
+            i += 1
+        if i >= n:
+            return None
+        marker = raw[i]
+        i += 1
+        if marker == 0xD9:  # EOI: nothing after it is sent
+            out += b"\xff\xd9"
+            return bytes(out)
+        if marker in (0x00, 0x01, 0xD8) or 0xD0 <= marker <= 0xD7:
+            return None  # not valid outside entropy-coded data
+        if i + 2 > n:
+            return None
+        length = int.from_bytes(raw[i : i + 2], "big")
+        if length < 2 or i + length > n:
+            return None
+        segment = raw[i : i + length]
+        i += length
+        if 0xE0 <= marker <= 0xEF or marker == 0xFE:
+            keep = _KEEP_APP.get(marker)
+            if keep is None or not segment[2:].startswith(keep):
+                continue
+        out += bytes((0xFF, marker)) + segment
+        if marker == 0xDA:  # SOS: copy the scan up to the next real marker
+            start = i
+            while True:
+                j = raw.find(b"\xff", i)
+                if j < 0 or j + 1 >= n:
+                    return None
+                follower = raw[j + 1]
+                if follower == 0x00 or 0xD0 <= follower <= 0xD7:
+                    i = j + 2  # stuffed byte or restart marker: still scan data
+                    continue
+                break
+            out += raw[start:j]
+            i = j
+    return None  # no EOI
+
+
+def _decodes_to(data: bytes, size: tuple[int, int]) -> bool:
+    try:
+        with Image.open(io.BytesIO(data)) as check:
+            check.load()
+            return check.format == "JPEG" and check.size == size
+    except Exception:  # noqa: BLE001 - any failure means "re-encode instead"
+        return False
+
+
+def _is_upright(img: Image.Image) -> bool:
+    try:
+        return img.getexif().get(_EXIF_ORIENTATION, 1) == 1
+    except Exception:  # noqa: BLE001 - unreadable EXIF: it is dropped anyway
+        return True
+
+
+def prepare_jpeg(raw: bytes) -> bytes:
+    """The bytes to send to Claude: the image and nothing else.
+
+    A JPEG within ``MAX_LONG_SIDE`` and already upright is copied losslessly
+    with its metadata removed (a plain JPEG comes back byte-identical).
+    Anything else (larger, rotated by EXIF, not a JPEG, or a structure the
+    lossless copy does not understand) is decoded, turned upright, downsized
+    if needed and re-encoded with no metadata at all.
     """
     with Image.open(io.BytesIO(raw)) as opened:
-        is_jpeg = opened.format == "JPEG" and raw.startswith(_JPEG_MAGIC)
-        if is_jpeg and max(opened.size) <= MAX_LONG_SIDE:
-            return raw
+        # Pillow calls a JPEG with an MPF segment "MPO" (phones write one for
+        # depth maps); its first image is an ordinary JPEG.
+        is_jpeg = opened.format in ("JPEG", "MPO") and raw.startswith(_JPEG_MAGIC)
+        if is_jpeg and _is_upright(opened) and max(opened.size) <= MAX_LONG_SIDE:
+            stripped = _strip_metadata(raw)
+            if stripped is not None and _decodes_to(stripped, opened.size):
+                return stripped
         img = ImageOps.exif_transpose(opened) or opened
         img = img.convert("RGB")
     if max(img.size) > MAX_LONG_SIDE:
         img.thumbnail((MAX_LONG_SIDE, MAX_LONG_SIDE), Image.Resampling.LANCZOS)
+    # Pillow copies some of ``info`` (the JPEG comment) into the new file.
+    img.info.clear()
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=JPEG_QUALITY)
     return out.getvalue()
