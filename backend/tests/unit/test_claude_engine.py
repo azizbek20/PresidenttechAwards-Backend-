@@ -161,7 +161,7 @@ def test_jpeg_exactly_at_the_limit_is_unchanged(fake: FakeAnthropic) -> None:
 
 @pytest.mark.parametrize(
     ("size", "expected"),
-    [((2000, 1500), (1568, 1176)), ((1200, 3136), (588, 1568))],
+    [((2000, 1500), (1568, 1176)), ((1200, 3136), (600, 1568))],
     ids=["landscape", "portrait"],
 )
 def test_large_jpeg_is_resized_to_the_long_side_limit(
