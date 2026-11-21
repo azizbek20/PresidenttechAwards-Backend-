@@ -45,7 +45,7 @@ def test_claude_defaults() -> None:
     assert s.anthropic_api_key is None
     assert s.claude_model == "claude-sonnet-5-5"
     assert s.claude_timeout_s == 25.0
-    assert s.claude_max_tokens == 800
+    assert s.claude_max_tokens == 4000
     assert s.prompt_version == "v1"
     assert s.uncertain_refers is True
 
