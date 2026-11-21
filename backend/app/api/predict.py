@@ -56,7 +56,7 @@ from app.schemas import (
     TaskResponse,
     TaskStatusResponse,
 )
-from app.storage import local as storage
+import app.storage as storage
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.inference.claude_engine import ClaudeEngine
@@ -230,6 +230,21 @@ async def predict(
     patient_id: str | None = Form(default=None),
     eye: str | None = Form(default=None),
 ) -> PredictResponse:
+    return await run_screening(request, file, patient_id, eye)
+
+
+async def run_screening(
+    request: Request,
+    file: UploadFile,
+    patient_id: str | None,
+    eye: str | None,
+) -> PredictResponse:
+    """Steps 1-11, shared by ``/predict`` and ``/predict/async`` (plan §3.6).
+
+    One code path means one set of errors: both endpoints raise the same
+    ``ApiError`` at the same step, and neither can produce a verdict the other
+    would not.
+    """
     settings = get_settings()
 
     # ---- 1. eye validation ------------------------------------------------
@@ -440,7 +455,7 @@ def wire_response(
     settings: Settings,
     request_id: str | None = None,
 ) -> PredictResponse:
-    """Step 11, shared by the sync endpoint and the Celery worker.
+    """Step 11 of :func:`run_screening`.
 
     ``request_id`` lets the sync path reuse the id it already logged.
     """
@@ -472,56 +487,20 @@ async def predict_async(
     patient_id: str | None = Form(default=None),
     eye: str | None = Form(default=None),
 ) -> TaskResponse:
-    """Queue the screening on the Celery worker; poll ``/predict/status/{id}``.
+    """Run the screening inline; the phone then polls ``/predict/status/{id}``.
 
-    Steps 1-3b (validation, capped read, decode, C9 gate, dedup) run here so
-    that bad input is rejected synchronously with the same errors as
-    ``/predict``; steps 4-11 run in :func:`app.worker.process_exam_task`.
+    Vercel runs no background worker (issue 2, plan §3.7), so the whole flow
+    runs here through :func:`run_screening` — same steps, same errors, raised
+    immediately as HTTP errors (the app shows ``detail``). The stored exam is
+    then handed back as a ``replay:<exam_id>`` task. The first status MUST be
+    ``PENDING`` or ``PROCESSING``: the app's polling loop throws on any other
+    first status, so it is ``PROCESSING`` even though the result is ready.
     """
-    settings = get_settings()
-
-    eye = _clean(eye)
-    if eye not in _VALID_EYES:
-        raise ApiError(422, "validation_error", _D_EYE)
-    patient_id = _clean(patient_id)
-
-    raw = await _read_capped(request, file, settings.max_upload_bytes)
-    if storage.sniff_ext(raw) is None or preprocessing.load_rgb(raw) is None:
-        raise ApiError(400, "invalid_image", _D_INVALID_IMAGE)
-
-    engine = engine_for(request.app)
-    if not getattr(engine, "model_loaded", False):
-        raise ApiError(503, "model_unavailable", _D_MODEL)
-
-    content_sha256 = hashlib.sha256(raw).hexdigest()
-    idempotency_key = request.headers.get("Idempotency-Key")
-    outcome, stored = await run_in_threadpool(
-        _lookup_replay,
-        content_sha256=content_sha256,
-        idempotency_key=idempotency_key,
-        patient_code=patient_id,
-        eye=eye,
-        window_min=settings.dedup_window_min,
-    )
-    if outcome == "conflict":
-        raise ApiError(409, "idempotency_conflict", _D_IDEMPOTENCY)
-    if outcome == "replay" and stored is not None:
-        logger.info("replaying exam %s for a duplicate upload", stored.get("exam_id"))
-        return TaskResponse(
-            task_id=f"{_REPLAY_PREFIX}{stored.get('exam_id')}",
-            status="PROCESSING",
-            message="Natija topildi, tayyorlanmoqda...",
-        )
-
-    from app.worker import process_exam_task
-
-    task = process_exam_task.delay(
-        str(uuid4()), raw, patient_id, eye, idempotency_key, content_sha256
-    )
+    response = await run_screening(request, file, patient_id, eye)
     return TaskResponse(
-        task_id=task.id,
-        status="PENDING",
-        message="Rasm qabul qilindi, ishlov berilmoqda...",
+        task_id=f"{_REPLAY_PREFIX}{response.exam_id}",
+        status="PROCESSING",
+        message="Rasm tahlil qilindi, natija tayyorlanmoqda...",
     )
 
 
@@ -545,23 +524,9 @@ async def get_predict_status(task_id: str) -> TaskStatusResponse:
         result = PredictResponse.model_validate(fill_additive_keys(exam, settings))
         return TaskStatusResponse(task_id=task_id, status="SUCCESS", result=result)
 
-    from celery.result import AsyncResult
-
-    from app.worker import celery_app
-
-    task_result = AsyncResult(task_id, app=celery_app)
-    state = task_result.state
-    if state in ("PENDING", "STARTED", "RETRY"):
-        return TaskStatusResponse(task_id=task_id, status="PROCESSING")
-    if state == "SUCCESS":
-        return TaskStatusResponse(
-            task_id=task_id,
-            status="SUCCESS",
-            result=PredictResponse.model_validate(task_result.result),
-        )
-    return TaskStatusResponse(
-        task_id=task_id, status="FAILURE", error=str(task_result.info)
-    )
+    # Every task id this server issues is a replay id; anything else (e.g. a
+    # Celery id from an app session started before the migration) is unknown.
+    return TaskStatusResponse(task_id=task_id, status="FAILURE", error="Natija topilmadi")
 
 
 def _to_tensor(img: Any, size: int) -> Any:

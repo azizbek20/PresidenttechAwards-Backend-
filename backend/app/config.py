@@ -33,7 +33,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Which dotenv file to load, if any. Production leaves this unset and gets
@@ -100,6 +100,23 @@ class Settings(BaseSettings):
     # ---- infra -----------------------------------------------------------
     database_url: str = Field(default="sqlite:///./eye.db", alias="DATABASE_URL")
     storage_dir: Path = Field(default=Path("./storage"), alias="EYE_STORAGE_DIR")
+    #: ``local`` = files under ``storage_dir`` served at /static (default);
+    #: ``blob`` = Vercel Blob, nothing written locally (plan §3.8).
+    eye_storage: Literal["local", "blob"] = Field(default="local", alias="EYE_STORAGE")
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _psycopg_scheme(cls, url: str) -> str:
+        """Providers hand out ``postgres://``/``postgresql://`` (issue 7).
+
+        SQLAlchemy 2 reads those as the psycopg2 driver, which is not
+        installed; the project ships psycopg 3, so the scheme is rewritten.
+        Everything after the scheme is kept byte-for-byte.
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix):]
+        return url
 
     @model_validator(mode="after")
     def _enforce_mode(self) -> "Settings":

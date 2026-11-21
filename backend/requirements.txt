@@ -11,10 +11,10 @@ psycopg[binary]==3.2.*
 # Claude vision engine (docs/MIGRATION_PLAN.md §3.3)
 anthropic==2.12.*
 
-# Async queue: app/worker.py stays until Phase 3 (docs/MIGRATION_PLAN.md §6)
-celery==5.4.*
-pika==1.3.*
-redis==5.0.*
+# Vercel Blob media storage, EYE_STORAGE=blob (MIGRATION_PLAN.md §3.8). The
+# standalone Blob client from Vercel's Python SDK (`vercel.blob`), not the full
+# `vercel` meta-package, which also pulls Sandbox/Workflow/Queue clients.
+vercel-blob==0.6.*
 
 # /analyze skin model (OnnxAnalyzer): stays until Phase 5 (MIGRATION_PLAN.md §12.2)
 onnxruntime==1.17.*

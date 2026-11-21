@@ -88,10 +88,13 @@ def static_url(stored: str | None, subdir: str) -> str | None:
     may reasonably hand over either the relative URL or a filesystem path. Both
     are accepted and both read back as the stable relative URL the app persists
     in Room (C6).
+
+    An absolute ``http(s)://`` URL (Vercel Blob, ``EYE_STORAGE=blob``, plan
+    §3.8) is already public and stable: it is returned unchanged.
     """
     if stored is None:
         return None
-    if stored.startswith("/static/"):
+    if stored.startswith(("/static/", "https://", "http://")):
         return stored
     return f"/static/{subdir}/{PurePath(stored).name}"
 
