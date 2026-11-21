@@ -195,10 +195,10 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 
 ## Open decisions for the owner (2026-11-22)
 
-1. **`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**
+1. ~~**`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**~~ — approved and done on 2026-11-22: the default is now **4000** (test `test_claude_defaults` updated first in its own commit; suite `450 passed, 1 skipped, 4 deselected`). The background:
    - The default `claude-sonnet-5-5` runs adaptive thinking when `thinking` is omitted, and thinking tokens count toward `max_tokens`. An answer can therefore hit `max_tokens`, which the engine treats as a 500. That is safe, but it could fail most calls.
    - Options: raise the default (for example to 4000; you pay only for tokens actually used), or send `thinking={"type": "between_tools"}`. Sonnet 5.5 accepts that setting, but `claude-opus-5-5`, the comparison model, rejects it.
-   - For the manual check, run with `CLAUDE_MAX_TOKENS=4000` and look at `output_tokens` in the `claude_call` log line.
+   - During the manual check, look at `output_tokens` in the `claude_call` log line to see how much of the 4000 a real call uses.
 2. **EXIF in unchanged JPEGs (Phase 2 review).** §3.3 sends a JPEG within 1568 px byte-for-byte, so EXIF and comment segments (GPS, device, any typed comment) reach Claude, which conflicts with CLAUDE.md's "only the image". A lossless metadata strip would also change `test_small_jpeg_is_sent_byte_identical` and `test_jpeg_exactly_at_the_limit_is_unchanged`, so it needs your call.
 3. ~~**The test arithmetic bug**~~ — approved and fixed (`588` → `600`, test-only commit). Suite: `450 passed, 1 skipped, 4 deselected`.
 4. **`backend/README.md`** still documents the torch install, `download_model.py` and Grad-CAM (Phase 1 review). It is outside every phase's file list. Approve a docs-only update?
@@ -229,7 +229,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 <!-- Phase 2/3: per image — decision, icdr_grade, image_type, latency, tokens. -->
 
 *Pending.* Put `referable.jpg`, `normal.jpg`, `external_eye.jpg` and `blurred.jpg` in `backend/eval/manual/` (git-ignored). Then, with the key in `backend/.env`:
-1. Start the server: `EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 QUALITY_BLUR_MIN_VAR=8 CLAUDE_MAX_TOKENS=4000 uvicorn app.main:app --port 8000`
+1. Start the server: `EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 QUALITY_BLUR_MIN_VAR=8 uvicorn app.main:app --port 8000`
 2. Run the smoke test: `bash scripts/smoke_claude.sh http://localhost:8000 demo123 eval/manual`
 
 These are the only real API calls before Phase 4, and they are billed.
