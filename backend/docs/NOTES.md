@@ -106,6 +106,17 @@ Patterns searched: `torch`, `gradcam|grad_cam`, `onnx`, `heatmap`,
 5. **`assessment_json` cannot reach the database without `crud.py`.** `crud.create_exam_with_result()` (crud.py L130–146) has no such parameter, and CLAUDE.md's unfrozen list omits `app/db/crud.py`. It needs an added optional kwarg `assessment_json: str | None = None`. Also, `init_db()` uses `create_all`, which **does not add a column to an existing table**: an existing local `eye.db` (or an earlier Postgres) gets `500 persistence_error` until it is recreated or altered.
 6. **Storage return types differ.** `local.save_original()` returns `tuple[Path, str]`, while §3.8 `blob.save_original()` returns `tuple[str, str]`. The selector needs a common type (`tuple[Path | str, str]`, or a Protocol). `predict.py` only uses the URL (`_, image_url = ...`, L315).
 
+**Decisions: all six recommendations approved by the owner on 2026-11-21.** They are binding in `MIGRATION_PLAN.md` §12 and CLAUDE.md.
+
+1. `app/worker.py` gets one Phase 1 edit: step 8 becomes `heatmap_url = None`. Nothing else changes until the file is deleted in Phase 3.
+2. Keep `onnxruntime` in `requirements.txt` until Phase 5, so `/analyze` keeps its real skin model. Phase 1 still removes `onnx`, `timm`, `grad-cam`, `huggingface_hub`, torch and torchvision.
+3. `get_engine()` and `deps.engine_for()` return `InferenceEngine | ClaudeEngine`.
+4. Restructure `Settings._enforce_mode()` as §3.2 describes: shadow refuses `mock` (message contains "shadow"); `EYE_MODEL_SHA256` is required only for `torch`; shadow + `claude` requires `EYE_API_KEY`.
+5. `crud.create_exam_with_result()` gets one optional kwarg, `assessment_json: str | None = None`. Recreate local `eye.db` files after the column is added, because `create_all` does not alter existing tables.
+6. The storage selector's `save_original()` returns `tuple[Path | str, str]`.
+
+Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount stay until Phase 3, so `test_startup_creates_both_media_subdirectories` stays unchanged in Phase 1. Only `integration/test_static_serving.py::test_heatmap_png_is_on_disk` changes in Phase 1, to assert that no heatmap file is written. The Phase 1 count is therefore 240.
+
 ## Phase log
 
 <!-- One entry per phase: date, commits, commands run, counts, surprises. -->

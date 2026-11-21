@@ -1,6 +1,8 @@
 # Migration plan — Claude vision engine + Vercel deployment
 
-Status: ready for Phase 0 · Owner: backend · Date: 2026-11-21
+Status: Phase 0 done, ready for Phase 1 · Owner: backend · Date: 2026-11-21
+
+> **§12 (Phase 0 decisions) overrides §3.3, §3.6, §3.8, §3.10, §4 and §6 where they differ.**
 
 ## 0. Goal and scope
 
@@ -411,3 +413,47 @@ Same pattern: a Claude analyzer returns a score per catalogue condition
 `risk_level="ungradable"`; keep `overall_risk()` and the 0.30 high-risk
 escalation; `is_demo=false`. Skin and nail include melanoma suspicion — start
 only after DR passes §8, and evaluate the same way.
+
+## 12. Phase 0 decisions (approved 2026-11-21)
+
+The evidence for each decision is in `docs/NOTES.md`, under "Edit map", in the
+conflicts list.
+
+1. **`app/worker.py` (Phase 1).** Step 8 calls `predict._render_heatmap`, so
+   Phase 1 changes it to `heatmap_url = None` in the worker too. No other
+   worker change; the file is deleted in Phase 3 as planned.
+2. **`onnxruntime` stays until Phase 5** (overrides §3.10).
+   `app/analysis/analyzer.py` `OnnxAnalyzer` serves the real skin model
+   (`models/analysis/skin.onnx`) through it. Phase 1 still removes `onnx`,
+   `timm`, `grad-cam`, `huggingface_hub`, `torch` and `torchvision`.
+3. **Engine return type** (§3.3). `get_engine()` and `deps.engine_for()` are
+   annotated `InferenceEngine | ClaudeEngine`, because `InferenceEngine` is a
+   Protocol that requires `predict()`, and `ClaudeEngine` only has `assess()`.
+4. **Mode validator** (§3.2, unchanged intent). In `Settings._enforce_mode()`:
+   shadow refuses `mock` (the message contains "shadow"); `EYE_MODEL_SHA256`
+   is required only when the source is `torch` (the message contains
+   "SHA256"); shadow + `claude` requires a non-empty `EYE_API_KEY`.
+5. **`assessment_json` persistence** (§3.6). `crud.create_exam_with_result()`
+   gains one optional kwarg, `assessment_json: str | None = None`. Since
+   `init_db()` uses `create_all`, which never alters an existing table, local
+   `eye.db` files must be recreated after the column is added. Vercel's
+   Postgres starts empty.
+6. **Storage return type** (§3.8). The selector's `save_original()` returns
+   `tuple[Path | str, str]` (local returns a `Path`, Blob a `str`). Callers
+   use only the URL.
+
+**Test list additions** (extends §4).
+
+| File | Change | Phase |
+|---|---|---|
+| `tests/integration/test_static_serving.py::test_heatmap_png_is_on_disk` | Assert that no heatmap file is written | 1 |
+
+`storage.ensure_dirs()` keeps creating `heatmaps/`, and the
+`/static/heatmaps` mount stays, until Phase 3 makes both local-only. So
+`test_startup_creates_both_media_subdirectories` stays unchanged in Phase 1.
+`tests/contract/test_analyze.py` (a shadow + `torch` fixture) is another
+regression guard that must keep passing unchanged.
+
+**Phase 1 done count** (§6): 277 − 24 − 13 = **240 passed** on the default
+suite, with 4 deselected (the `model` tests go away with
+`test_torch_engine.py`).

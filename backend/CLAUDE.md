@@ -50,13 +50,19 @@ Everything that carries a safety rule stays.
 (additions only), `app/api/predict.py`, `app/main.py`, `app/storage/*`,
 `app/db/base.py`, `app/db/models.py` (one new nullable column),
 `requirements*.txt`, plus the new files the plan names.
+Also, per the Phase 0 decisions (plan §12): `app/worker.py` (Phase 1: step 8
+→ `heatmap_url = None`; deleted in Phase 3), `app/db/crud.py` (Phase 2: one
+optional `assessment_json` kwarg on `create_exam_with_result`), and
+`app/api/deps.py` (Phase 2: `engine_for()` return type only).
 
 ## Test files that may change (test-only commits, listed in the plan)
 
 Delete: `tests/unit/test_torch_engine.py`, `tests/unit/test_gradcam.py`.
 Change assertions only: `tests/contract/test_static_serving.py` (no heatmap
 any more), `tests/integration/test_predict_async.py` (Celery → inline replay),
-`tests/perf/test_latency.py` (torch-only cases, if any).
+`tests/perf/test_latency.py` (torch-only cases, if any; Phase 0 found none),
+`tests/integration/test_static_serving.py::test_heatmap_png_is_on_disk`
+(Phase 1: assert no heatmap file is written).
 New test files as each phase lists. **Any other test that starts failing is
 an implementation bug, not a test to fix** — in particular
 `test_frozen_kit.py`, `test_model_unavailable.py` and
