@@ -222,6 +222,25 @@ fun EyeSelector(selected: String, onSelect: (String) -> Unit, modifier: Modifier
 //  NATIJA KOMPONENTLARI (6-hujjat, 6.D)
 // =====================================================================
 
+/**
+ * Referable DR ehtimolini foizda ko'rsatadi. 0 dan katta, lekin 1 % dan kichik qiymat
+ * "0%" emas, "<1%" bo'ladi — aks holda shifokor uni "model hech narsa bilmaydi" deb
+ * o'qishi mumkin.
+ */
+fun formatProbabilityPercent(probability: Double): String =
+    if (isBelowOnePercent(probability)) "<1%" else "${(probability * 100).toInt()}%"
+
+private fun isBelowOnePercent(probability: Double): Boolean = probability > 0.0 && probability < 0.01
+
+/** [formatProbabilityPercent]ning ekran o'quvchi (TalkBack) uchun so'z bilan aytiladigan shakli. */
+@Composable
+private fun spokenProbability(probability: Double): String =
+    if (isBelowOnePercent(probability)) {
+        stringResource(R.string.result_probability_below_one_spoken)
+    } else {
+        stringResource(R.string.result_probability_percent_spoken, (probability * 100).toInt())
+    }
+
 /** Svetofor qaror kartasi — eng tepa, eng katta element. */
 @Composable
 fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
@@ -231,7 +250,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
     val resultContentDesc = if (ungradable) {
         stringResource(R.string.result_content_desc_ungradable, result.decisionText)
     } else {
-        stringResource(R.string.result_content_desc_graded, result.decisionText, (result.probability * 100).toInt())
+        stringResource(R.string.result_content_desc_graded, result.decisionText, spokenProbability(result.probability))
     }
 
     Column(
@@ -259,7 +278,7 @@ fun TrafficLightCard(result: PredictResponse, modifier: Modifier = Modifier) {
             )
         } else {
             Text(
-                "${(result.probability * 100).toInt()}%",
+                formatProbabilityPercent(result.probability),
                 color = Color.White,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -619,14 +638,20 @@ fun QualityPanel(
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        QualityRow(stringResource(R.string.quality_focus), focus)
-        QualityRow(stringResource(R.string.quality_light), light)
-        QualityRow(stringResource(R.string.quality_position), position)
+        QualityRow(stringResource(R.string.quality_focus), focus, textColor = Color.White)
+        QualityRow(stringResource(R.string.quality_light), light, textColor = Color.White)
+        QualityRow(stringResource(R.string.quality_position), position, textColor = Color.White)
     }
 }
 
 @Composable
-private fun QualityRow(label: String, level: QualityLevel) {
+private fun QualityRow(
+    label: String,
+    level: QualityLevel,
+    // Kamera paneli qora fonda turadi (oq matn); natija kartalari esa oq fonda —
+    // u yerda mavzuning oddiy matn rangi kerak, aks holda yozuv ko'rinmay qoladi.
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
     val text = when (level) {
         QualityLevel.GOOD -> stringResource(R.string.quality_good)
         QualityLevel.WARN -> stringResource(R.string.quality_warn)
@@ -634,7 +659,7 @@ private fun QualityRow(label: String, level: QualityLevel) {
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(qualityColor(level)))
-        Text(stringResource(R.string.quality_row_format, label, text), color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.quality_row_format, label, text), color = textColor, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

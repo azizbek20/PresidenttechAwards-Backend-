@@ -31,6 +31,7 @@ import com.eyedetect.ai.ui.components.DisclaimerText
 import com.eyedetect.ai.ui.components.ErrorState
 import com.eyedetect.ai.ui.components.EyeSymmetryCard
 import com.eyedetect.ai.ui.components.HeatmapCard
+import com.eyedetect.ai.ui.components.formatProbabilityPercent
 import com.eyedetect.ai.ui.components.LoadingState
 import com.eyedetect.ai.ui.components.PrimaryButton
 import com.eyedetect.ai.ui.components.PupilHeuristicCard
@@ -45,7 +46,7 @@ import com.eyedetect.ai.ui.theme.isUngradableDecision
 import com.eyedetect.ai.vision.PupilHeuristicResult
 
 /**
- * 3-ekran: yuklanish / natija (svetofor + ishonch + heatmap) / xato.
+ * 3-ekran: yuklanish / natija (svetofor + referable DR ehtimoli + heatmap) / xato.
  * Barcha holatlar 6-hujjat (6.C/6.D/6.F) dizayniga mos, API kontrakti buzilmagan.
  */
 @Composable
@@ -231,7 +232,7 @@ private fun shareResult(context: Context, r: PredictResponse) {
 private fun buildShareText(context: Context, r: PredictResponse): String {
     val ungradable = isUngradableDecision(r.decision)
     val eyeLabel = eyeLabel(context, r.eye)
-    val probabilityText = if (ungradable) "—" else "${(r.probability * 100).toInt()}%"
+    val probabilityText = if (ungradable) "—" else formatProbabilityPercent(r.probability)
     val gradeText = if (ungradable) "—" else "${r.icdrGrade} — ${r.gradeLabel}"
     return context.getString(
         R.string.result_share_text,

@@ -71,7 +71,7 @@
     <string name="result_offline_warning">⚡ Offline AI result: there is no internet, so this result comes from a limited on-device model. The photo is queued and will be re-checked on the server once you are back online.</string>
     <string name="result_new_photo">Another photo</string>
     <string name="result_ungradable">Could not be graded</string>
-    <string name="result_confidence">CONFIDENCE</string>
+    <string name="result_confidence">REFERABLE DR PROBABILITY</string>
     <string name="result_clinical_details">Clinical details</string>
     <string name="result_icdr_grade">ICDR grade</string>
     <string name="result_image_quality">Image quality</string>
@@ -86,7 +86,9 @@
     <string name="result_symmetry_disclaimer">This eye was compared with the other eye\'s previous result — a significant difference may warrant extra attention. Not a diagnosis.</string>
     <string name="result_symmetry_row">Symmetry</string>
     <string name="result_symmetry_compared_with">Compared with: %1$s eye, %2$s</string>
-    <string name="result_content_desc_graded">Result: %1$s, confidence %2$d percent</string>
+    <string name="result_content_desc_graded">Result: %1$s, referable DR probability %2$s</string>
+    <string name="result_probability_percent_spoken">%1$d percent</string>
+    <string name="result_probability_below_one_spoken">less than 1 percent</string>
     <string name="result_content_desc_ungradable">Result: %1$s</string>
 
     <!-- History screen -->
@@ -95,7 +97,7 @@
     <string name="history_delete_content_desc">Delete entry</string>
     <string name="history_patient_eye_row">Patient / eye: %1$s · %2$s</string>
     <string name="history_local_heuristic_row">Local: opacity — %1$s, red reflex — %2$s</string>
-    <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$d%%)</string>
+    <string name="history_icdr_grade_row">%1$s: %2$d — %3$s (%4$s)</string>
     <string name="history_search_placeholder">Search by patient ID</string>
     <string name="history_search_empty">No results found.</string>
     <string name="history_select_button">Select</string>
@@ -118,7 +120,7 @@
     <string name="result_recommendation_ungradable">Next step: retake the photo (mind focus/lighting) or refer to a specialist.</string>
     <string name="result_share_button">Share</string>
     <string name="result_share_chooser_title">Share result</string>
-    <string name="result_share_text">%1$s — screening result\n\nPatient: %2$s\nEye: %3$s\nDecision: %4$s\nConfidence: %5$s\nICDR grade: %6$s\nDate: %7$s\n\n%8$s</string>
+    <string name="result_share_text">%1$s — screening result\n\nPatient: %2$s\nEye: %3$s\nDecision: %4$s\nReferable DR probability: %5$s\nICDR grade: %6$s\nDate: %7$s\n\n%8$s</string>
 
     <!-- Loading / error states -->
     <string name="loading_title">Analyzing…</string>
