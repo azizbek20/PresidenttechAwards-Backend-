@@ -17,6 +17,7 @@ output. Safety rules carried here:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import math
@@ -149,7 +150,9 @@ class ClaudeEngine:
         """One Claude call for one image. Raises on every failure."""
         if self._client is None:  # predict.py's 3c gate normally stops this first
             raise ClaudeOutputError("ANTHROPIC_API_KEY is not configured")
-        image = base64.standard_b64encode(prepare_jpeg(jpeg)).decode("ascii")
+        # Pillow decode/resize/re-encode is CPU work: keep it off the event loop.
+        prepared = await asyncio.to_thread(prepare_jpeg, jpeg)
+        image = base64.standard_b64encode(prepared).decode("ascii")
         settings = self._settings
         started = time.perf_counter()
         response = await self._client.messages.parse(
