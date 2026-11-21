@@ -171,3 +171,101 @@ def test_keyless_shadow_claude_predict_is_503_model_unavailable(
     body = response.json()
     assert body["error"] == "model_unavailable"
     assert set(body) == {"error", "detail"}
+
+
+# --------------------------------------------------------------------------
+# Phase 3: Postgres URL rewrite, pool settings, EYE_STORAGE (plan §3.2, §3.8, §3.9)
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        (
+            "postgres://u:p@host.example:5432/db?sslmode=require",
+            "postgresql+psycopg://u:p@host.example:5432/db?sslmode=require",
+        ),
+        (
+            "postgresql://u:p@host.example/db",
+            "postgresql+psycopg://u:p@host.example/db",
+        ),
+        (
+            "postgresql+psycopg://u:p@host.example/db",
+            "postgresql+psycopg://u:p@host.example/db",
+        ),
+        ("sqlite:///./eye.db", "sqlite:///./eye.db"),
+        ("sqlite:////tmp/x/test.db", "sqlite:////tmp/x/test.db"),
+    ],
+    ids=["postgres", "postgresql", "psycopg-kept", "sqlite", "sqlite-abs"],
+)
+def test_database_url_is_rewritten_for_psycopg(
+    monkeypatch: pytest.MonkeyPatch, given: str, expected: str
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", given)
+    assert settings_cls()().database_url == expected
+
+
+def test_eye_storage_defaults_to_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("EYE_STORAGE", raising=False)
+    assert settings_cls()().eye_storage == "local"
+
+
+def test_eye_storage_accepts_blob(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EYE_STORAGE", "blob")
+    assert settings_cls()().eye_storage == "blob"
+
+
+@pytest.mark.parametrize("bad", ["s3", "", "LOCAL "])
+def test_eye_storage_rejects_other_values(
+    monkeypatch: pytest.MonkeyPatch, bad: str
+) -> None:
+    monkeypatch.setenv("EYE_STORAGE", bad)
+    with pytest.raises(ValueError):
+        settings_cls()()
+
+
+def test_postgres_engine_uses_the_small_serverless_pool(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from tests.contract._appkit import purge_app_modules
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@localhost:5432/eye")
+    monkeypatch.setenv("EYE_STORAGE_DIR", str(tmp_path / "storage"))
+    purge_app_modules()
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    import app.db.base as db_base
+
+    try:
+        engine = db_base.get_engine()  # creating an engine never connects
+        assert engine.url.drivername == "postgresql+psycopg"
+        assert engine.pool.size() == 2  # type: ignore[attr-defined]
+        assert engine.pool._max_overflow == 2  # type: ignore[attr-defined]
+        assert engine.pool._pre_ping is True  # type: ignore[attr-defined]
+    finally:
+        db_base.dispose_engine()
+        purge_app_modules()
+
+
+def test_sqlite_engine_keeps_its_setup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from tests.contract._appkit import purge_app_modules
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'x.db'}")
+    purge_app_modules()
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    import app.db.base as db_base
+
+    try:
+        engine = db_base.get_engine()
+        assert engine.url.get_backend_name() == "sqlite"
+        assert engine.pool._pre_ping is True  # type: ignore[attr-defined]
+        with db_base.get_session() as session:
+            from sqlalchemy import text
+
+            assert session.execute(text("SELECT 1")).scalar() == 1
+    finally:
+        db_base.dispose_engine()
+        purge_app_modules()
