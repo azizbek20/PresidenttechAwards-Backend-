@@ -1,0 +1,1112 @@
+{
+  "backend/admin/dashboard.py": {
+    "mtime": 1795285535.2009678,
+    "seen": 1795285980.8451688,
+    "ast_hash": "21c9b9a2cdda2e11a98da74fc451a9c1",
+    "semantic_hash": "21c9b9a2cdda2e11a98da74fc451a9c1"
+  },
+  "backend/app/__init__.py": {
+    "mtime": 1795285535.2010345,
+    "seen": 1795285980.845171,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/analysis/__init__.py": {
+    "mtime": 1795285535.2019324,
+    "seen": 1795285980.845172,
+    "ast_hash": "5084a3acdf4e2d6ed596318b8698b97c",
+    "semantic_hash": "5084a3acdf4e2d6ed596318b8698b97c"
+  },
+  "backend/app/analysis/analyzer.py": {
+    "mtime": 1795285535.2023687,
+    "seen": 1795285980.845172,
+    "ast_hash": "6c215f03e17daef6f2889ebde0d05ebd",
+    "semantic_hash": "6c215f03e17daef6f2889ebde0d05ebd"
+  },
+  "backend/app/analysis/catalog.py": {
+    "mtime": 1795285535.2027414,
+    "seen": 1795285980.845173,
+    "ast_hash": "c3ac56a2bbb7bb2c2ac7027377223089",
+    "semantic_hash": "c3ac56a2bbb7bb2c2ac7027377223089"
+  },
+  "backend/app/analysis/schemas.py": {
+    "mtime": 1795285535.1932743,
+    "seen": 1795285980.845174,
+    "ast_hash": "f5c3f8e2a680792bf463b376d44ad6aa",
+    "semantic_hash": "f5c3f8e2a680792bf463b376d44ad6aa"
+  },
+  "backend/app/api/__init__.py": {
+    "mtime": 1795285535.193405,
+    "seen": 1795285980.845174,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/api/analyze.py": {
+    "mtime": 1795285535.1939862,
+    "seen": 1795285980.845176,
+    "ast_hash": "1b94d56a9300329469911a8c68ad1891",
+    "semantic_hash": "1b94d56a9300329469911a8c68ad1891"
+  },
+  "backend/app/api/deps.py": {
+    "mtime": 1795285535.1943612,
+    "seen": 1795285980.8451772,
+    "ast_hash": "76ec72127dce0c639eef9d173acaf875",
+    "semantic_hash": "76ec72127dce0c639eef9d173acaf875"
+  },
+  "backend/app/api/exams.py": {
+    "mtime": 1795285535.194958,
+    "seen": 1795285980.8451772,
+    "ast_hash": "14dd6957e747940d1bae6a4aeb929703",
+    "semantic_hash": "14dd6957e747940d1bae6a4aeb929703"
+  },
+  "backend/app/api/predict.py": {
+    "mtime": 1795285535.1957798,
+    "seen": 1795285980.8451781,
+    "ast_hash": "3e62956407838bbfa9a3eabf52349893",
+    "semantic_hash": "3e62956407838bbfa9a3eabf52349893"
+  },
+  "backend/app/config.py": {
+    "mtime": 1795285535.196408,
+    "seen": 1795285980.8451781,
+    "ast_hash": "7dbdf62b95bedf5d01e08e7acf4637ea",
+    "semantic_hash": "7dbdf62b95bedf5d01e08e7acf4637ea"
+  },
+  "backend/app/core/__init__.py": {
+    "mtime": 1795285535.1969614,
+    "seen": 1795285980.8451788,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/core/errors.py": {
+    "mtime": 1795285535.1978633,
+    "seen": 1795285980.8451788,
+    "ast_hash": "59e24e8a090b4e60bcb2b298b6fe756d",
+    "semantic_hash": "59e24e8a090b4e60bcb2b298b6fe756d"
+  },
+  "backend/app/core/limits.py": {
+    "mtime": 1795285535.1984208,
+    "seen": 1795285980.8451798,
+    "ast_hash": "a03de6432a7168a480aa65f473296155",
+    "semantic_hash": "a03de6432a7168a480aa65f473296155"
+  },
+  "backend/app/core/rate_limit.py": {
+    "mtime": 1795285535.1990304,
+    "seen": 1795285980.8451798,
+    "ast_hash": "c53ba57bbf2d72560aa67115628ee1d4",
+    "semantic_hash": "c53ba57bbf2d72560aa67115628ee1d4"
+  },
+  "backend/app/core/security.py": {
+    "mtime": 1795285535.20004,
+    "seen": 1795285980.845181,
+    "ast_hash": "4e65d8bc6ca5e1a7fe6e9a45551e8294",
+    "semantic_hash": "4e65d8bc6ca5e1a7fe6e9a45551e8294"
+  },
+  "backend/app/db/__init__.py": {
+    "mtime": 1795285535.2001426,
+    "seen": 1795285980.845181,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/db/analysis_crud.py": {
+    "mtime": 1795285535.2015774,
+    "seen": 1795285980.845181,
+    "ast_hash": "18cdc86721907d6f700061da6090547a",
+    "semantic_hash": "18cdc86721907d6f700061da6090547a"
+  },
+  "backend/app/db/base.py": {
+    "mtime": 1795285535.202094,
+    "seen": 1795285980.845182,
+    "ast_hash": "1638c25b2048921bd3919b222f9b088e",
+    "semantic_hash": "1638c25b2048921bd3919b222f9b088e"
+  },
+  "backend/app/db/crud.py": {
+    "mtime": 1795285535.1932788,
+    "seen": 1795285980.845182,
+    "ast_hash": "6010cc43378af4b907438845f5f46b00",
+    "semantic_hash": "6010cc43378af4b907438845f5f46b00"
+  },
+  "backend/app/db/models.py": {
+    "mtime": 1795285535.1934683,
+    "seen": 1795285980.845183,
+    "ast_hash": "72fd78fd424091487082e30f664ebf84",
+    "semantic_hash": "72fd78fd424091487082e30f664ebf84"
+  },
+  "backend/app/inference/__init__.py": {
+    "mtime": 1795285535.1935234,
+    "seen": 1795285980.845183,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/inference/decision.py": {
+    "mtime": 1795285535.1940143,
+    "seen": 1795285980.845184,
+    "ast_hash": "574ba289bf0bebab31513d53d70a45b1",
+    "semantic_hash": "574ba289bf0bebab31513d53d70a45b1"
+  },
+  "backend/app/inference/engine.py": {
+    "mtime": 1795285535.194483,
+    "seen": 1795285980.845184,
+    "ast_hash": "0ba113dc6059a7e73e8c7e1e19c3ef87",
+    "semantic_hash": "0ba113dc6059a7e73e8c7e1e19c3ef87"
+  },
+  "backend/app/inference/gradcam.py": {
+    "mtime": 1795285535.1950371,
+    "seen": 1795285980.845185,
+    "ast_hash": "41009da8cd7576b294027a6581abcc3d",
+    "semantic_hash": "41009da8cd7576b294027a6581abcc3d"
+  },
+  "backend/app/inference/mock_engine.py": {
+    "mtime": 1795285535.1954985,
+    "seen": 1795285980.845185,
+    "ast_hash": "7871ae6008c4cd60be9e6445709f3a02",
+    "semantic_hash": "7871ae6008c4cd60be9e6445709f3a02"
+  },
+  "backend/app/inference/onnx_engine.py": {
+    "mtime": 1795285535.1964521,
+    "seen": 1795285980.845186,
+    "ast_hash": "101377dd8f482b02e18e493a33b86408",
+    "semantic_hash": "101377dd8f482b02e18e493a33b86408"
+  },
+  "backend/app/inference/preprocess.py": {
+    "mtime": 1795285535.1968784,
+    "seen": 1795285980.845186,
+    "ast_hash": "18b1860d666b4481af9c8c94d5b87697",
+    "semantic_hash": "18b1860d666b4481af9c8c94d5b87697"
+  },
+  "backend/app/inference/quality.py": {
+    "mtime": 1795285535.1973972,
+    "seen": 1795285980.845186,
+    "ast_hash": "77790c1531caa65589f52f3e423da973",
+    "semantic_hash": "77790c1531caa65589f52f3e423da973"
+  },
+  "backend/app/inference/torch_engine.py": {
+    "mtime": 1795285535.198723,
+    "seen": 1795285980.8451872,
+    "ast_hash": "c7373b21dd5e12d2a4ec99771f2063eb",
+    "semantic_hash": "c7373b21dd5e12d2a4ec99771f2063eb"
+  },
+  "backend/app/main.py": {
+    "mtime": 1795285535.1993086,
+    "seen": 1795285980.8451872,
+    "ast_hash": "29611c25f284bcdaa0509f773b736f7e",
+    "semantic_hash": "29611c25f284bcdaa0509f773b736f7e"
+  },
+  "backend/app/schemas.py": {
+    "mtime": 1795285535.1999373,
+    "seen": 1795285980.8451881,
+    "ast_hash": "52d1e0ec6ffb900f4276bc90350e2cda",
+    "semantic_hash": "52d1e0ec6ffb900f4276bc90350e2cda"
+  },
+  "backend/app/storage/__init__.py": {
+    "mtime": 1795285535.200745,
+    "seen": 1795285980.8451881,
+    "ast_hash": "c77c0e112473cded317d71eb84744a99",
+    "semantic_hash": "c77c0e112473cded317d71eb84744a99"
+  },
+  "backend/app/storage/local.py": {
+    "mtime": 1795285535.201668,
+    "seen": 1795285980.845189,
+    "ast_hash": "3226f2f3298828cf5a18ef79feefc081",
+    "semantic_hash": "3226f2f3298828cf5a18ef79feefc081"
+  },
+  "backend/app/worker.py": {
+    "mtime": 1795285535.1932797,
+    "seen": 1795285980.845189,
+    "ast_hash": "32163f3e41d44702d5684d392fbb9355",
+    "semantic_hash": "32163f3e41d44702d5684d392fbb9355"
+  },
+  "backend/scripts/download_model.py": {
+    "mtime": 1795285535.1983607,
+    "seen": 1795285980.8451898,
+    "ast_hash": "73054ab1ca9845317897de85c49151fb",
+    "semantic_hash": "73054ab1ca9845317897de85c49151fb"
+  },
+  "backend/scripts/export_onnx.py": {
+    "mtime": 1795285535.1988816,
+    "seen": 1795285980.8451898,
+    "ast_hash": "2fb3450ce27a89c4859fd4bd1e6d5dca",
+    "semantic_hash": "2fb3450ce27a89c4859fd4bd1e6d5dca"
+  },
+  "backend/scripts/make_test_images.py": {
+    "mtime": 1795285535.199872,
+    "seen": 1795285980.845191,
+    "ast_hash": "be23fcb0dba35b5ada9f9db962f11016",
+    "semantic_hash": "be23fcb0dba35b5ada9f9db962f11016"
+  },
+  "backend/scripts/smoke_test.sh": {
+    "mtime": 1795285535.2004142,
+    "seen": 1795285980.845191,
+    "ast_hash": "32835878a0f0d245f9a26ae638472e47",
+    "semantic_hash": "32835878a0f0d245f9a26ae638472e47"
+  },
+  "backend/tests/__init__.py": {
+    "mtime": 1795285535.1924365,
+    "seen": 1795285980.845192,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/tests/conftest.py": {
+    "mtime": 1795285535.193489,
+    "seen": 1795285980.845192,
+    "ast_hash": "02df06d81be3cef61ab1ebfcfd8728dd",
+    "semantic_hash": "02df06d81be3cef61ab1ebfcfd8728dd"
+  },
+  "backend/tests/contract/__init__.py": {
+    "mtime": 1795285535.193768,
+    "seen": 1795285980.845193,
+    "ast_hash": "3b2459771bdcab4daa29809260541c75",
+    "semantic_hash": "3b2459771bdcab4daa29809260541c75"
+  },
+  "backend/tests/contract/_appkit.py": {
+    "mtime": 1795285535.1942427,
+    "seen": 1795285980.845193,
+    "ast_hash": "989be157998bcaacf6ed2bc1ea89d67d",
+    "semantic_hash": "989be157998bcaacf6ed2bc1ea89d67d"
+  },
+  "backend/tests/contract/_shim.py": {
+    "mtime": 1795285535.1951208,
+    "seen": 1795285980.845194,
+    "ast_hash": "127bea0a2f41335b1ff2cc67f2ecc0ad",
+    "semantic_hash": "127bea0a2f41335b1ff2cc67f2ecc0ad"
+  },
+  "backend/tests/contract/conftest.py": {
+    "mtime": 1795285535.1957836,
+    "seen": 1795285980.845194,
+    "ast_hash": "317da3a8c7b7e4d046fba924b1a17683",
+    "semantic_hash": "317da3a8c7b7e4d046fba924b1a17683"
+  },
+  "backend/tests/contract/test_analyze.py": {
+    "mtime": 1795285535.1964238,
+    "seen": 1795285980.845194,
+    "ast_hash": "d515a8c8443d5cbfc6715d35487b4ab9",
+    "semantic_hash": "d515a8c8443d5cbfc6715d35487b4ab9"
+  },
+  "backend/tests/contract/test_audit_regressions.py": {
+    "mtime": 1795285535.1975343,
+    "seen": 1795285980.845195,
+    "ast_hash": "5ef87cf508e7a4938d3c8fb010a79cc9",
+    "semantic_hash": "5ef87cf508e7a4938d3c8fb010a79cc9"
+  },
+  "backend/tests/contract/test_auth.py": {
+    "mtime": 1795285535.1980474,
+    "seen": 1795285980.845195,
+    "ast_hash": "5bee63e9f75f202297c55b727baf10fa",
+    "semantic_hash": "5bee63e9f75f202297c55b727baf10fa"
+  },
+  "backend/tests/contract/test_db_failure.py": {
+    "mtime": 1795285535.1984327,
+    "seen": 1795285980.845196,
+    "ast_hash": "2db656aab3f61ca9678806b15c6be8c3",
+    "semantic_hash": "2db656aab3f61ca9678806b15c6be8c3"
+  },
+  "backend/tests/contract/test_duplicate_retry.py": {
+    "mtime": 1795285535.1993182,
+    "seen": 1795285980.845196,
+    "ast_hash": "a84bb14d9ff0c94792312ceb684b8cde",
+    "semantic_hash": "a84bb14d9ff0c94792312ceb684b8cde"
+  },
+  "backend/tests/contract/test_engine_spy.py": {
+    "mtime": 1795285535.199994,
+    "seen": 1795285980.845197,
+    "ast_hash": "b15b44e6a05292ee7eebb61c204c4ab5",
+    "semantic_hash": "b15b44e6a05292ee7eebb61c204c4ab5"
+  },
+  "backend/tests/contract/test_error_detail_is_string.py": {
+    "mtime": 1795285535.2011569,
+    "seen": 1795285980.845197,
+    "ast_hash": "8e74efca6392f10456dcd881603630f2",
+    "semantic_hash": "8e74efca6392f10456dcd881603630f2"
+  },
+  "backend/tests/contract/test_error_envelope.py": {
+    "mtime": 1795285535.201851,
+    "seen": 1795285980.845197,
+    "ast_hash": "72c0f48082568a052ce5818e88f5394a",
+    "semantic_hash": "72c0f48082568a052ce5818e88f5394a"
+  },
+  "backend/tests/contract/test_model_unavailable.py": {
+    "mtime": 1795285535.202304,
+    "seen": 1795285980.8451982,
+    "ast_hash": "57758a42111457dff19590008729e4f9",
+    "semantic_hash": "57758a42111457dff19590008729e4f9"
+  },
+  "backend/tests/contract/test_patient_autogen.py": {
+    "mtime": 1795285535.193621,
+    "seen": 1795285980.8451982,
+    "ast_hash": "01ae61a6f31a76c890381afbad9c20b6",
+    "semantic_hash": "01ae61a6f31a76c890381afbad9c20b6"
+  },
+  "backend/tests/contract/test_predict_contract.py": {
+    "mtime": 1795285535.1938384,
+    "seen": 1795285980.845199,
+    "ast_hash": "06b1dc5af4e8c3bb615e58b816b363a2",
+    "semantic_hash": "06b1dc5af4e8c3bb615e58b816b363a2"
+  },
+  "backend/tests/contract/test_predict_step_failures.py": {
+    "mtime": 1795285535.194274,
+    "seen": 1795285980.845199,
+    "ast_hash": "cc51f2d558dfa2eb1a72abc0e75455ee",
+    "semantic_hash": "cc51f2d558dfa2eb1a72abc0e75455ee"
+  },
+  "backend/tests/contract/test_rate_limit.py": {
+    "mtime": 1795285535.194997,
+    "seen": 1795285980.8451998,
+    "ast_hash": "af87b6778316d71d7c969cd0e4e7f82e",
+    "semantic_hash": "af87b6778316d71d7c969cd0e4e7f82e"
+  },
+  "backend/tests/contract/test_static_serving.py": {
+    "mtime": 1795285535.1954522,
+    "seen": 1795285980.8451998,
+    "ast_hash": "ab67a2464c4db147b9b2e733982294d9",
+    "semantic_hash": "ab67a2464c4db147b9b2e733982294d9"
+  },
+  "backend/tests/contract/test_ungradable_wire.py": {
+    "mtime": 1795285535.1957715,
+    "seen": 1795285980.8452008,
+    "ast_hash": "481bb319afeaca1303c26605fe7ec615",
+    "semantic_hash": "481bb319afeaca1303c26605fe7ec615"
+  },
+  "backend/tests/fixtures/golden_predict.json": {
+    "mtime": 1795285535.1964068,
+    "seen": 1795285980.8452008,
+    "ast_hash": "ba6f11b23daa83b807b53d0d686e2e34",
+    "semantic_hash": "ba6f11b23daa83b807b53d0d686e2e34"
+  },
+  "backend/tests/integration/__init__.py": {
+    "mtime": 1795285535.1966422,
+    "seen": 1795285980.845202,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/tests/integration/test_auth.py": {
+    "mtime": 1795285535.1974359,
+    "seen": 1795285980.845202,
+    "ast_hash": "f03ffd9499e42bf7ebaefbc90ab5705f",
+    "semantic_hash": "f03ffd9499e42bf7ebaefbc90ab5705f"
+  },
+  "backend/tests/integration/test_db_failure.py": {
+    "mtime": 1795285535.1982386,
+    "seen": 1795285980.845203,
+    "ast_hash": "d7b54bd85a158be7bc254abeedc3e353",
+    "semantic_hash": "d7b54bd85a158be7bc254abeedc3e353"
+  },
+  "backend/tests/integration/test_persistence.py": {
+    "mtime": 1795285535.1993399,
+    "seen": 1795285980.845203,
+    "ast_hash": "6a86fc41ac838d8dbdbcd8f44441f8b4",
+    "semantic_hash": "6a86fc41ac838d8dbdbcd8f44441f8b4"
+  },
+  "backend/tests/integration/test_predict_async.py": {
+    "mtime": 1795285535.199768,
+    "seen": 1795285980.845203,
+    "ast_hash": "a378e0107abf62d3a34c5a9e229240a6",
+    "semantic_hash": "a378e0107abf62d3a34c5a9e229240a6"
+  },
+  "backend/tests/integration/test_static_serving.py": {
+    "mtime": 1795285535.2010808,
+    "seen": 1795285980.8452039,
+    "ast_hash": "d506b97854de529bb3f1091decb70493",
+    "semantic_hash": "d506b97854de529bb3f1091decb70493"
+  },
+  "backend/tests/perf/__init__.py": {
+    "mtime": 1795285535.2019567,
+    "seen": 1795285980.8452039,
+    "ast_hash": "e54231c53fa4b6e3026813eb00c87cdc",
+    "semantic_hash": "e54231c53fa4b6e3026813eb00c87cdc"
+  },
+  "backend/tests/perf/test_latency.py": {
+    "mtime": 1795285535.202378,
+    "seen": 1795285980.845205,
+    "ast_hash": "edd2ef75b42656230f560de462890291",
+    "semantic_hash": "edd2ef75b42656230f560de462890291"
+  },
+  "backend/tests/synthetic.py": {
+    "mtime": 1795285535.193502,
+    "seen": 1795285980.845205,
+    "ast_hash": "db91e8cca2378f7432be1fb1ace9cf43",
+    "semantic_hash": "db91e8cca2378f7432be1fb1ace9cf43"
+  },
+  "backend/tests/test_frozen_kit.py": {
+    "mtime": 1795285535.19403,
+    "seen": 1795285980.845206,
+    "ast_hash": "087aa8006944ced4efd284d80d1881ef",
+    "semantic_hash": "087aa8006944ced4efd284d80d1881ef"
+  },
+  "backend/tests/unit/__init__.py": {
+    "mtime": 1795285535.1948252,
+    "seen": 1795285980.845206,
+    "ast_hash": "7fb2219caab1af55e309cf28622118e7",
+    "semantic_hash": "7fb2219caab1af55e309cf28622118e7"
+  },
+  "backend/tests/unit/test_gradcam.py": {
+    "mtime": 1795285535.195249,
+    "seen": 1795285980.845207,
+    "ast_hash": "05138f1879021583c7e801c783aa9e7d",
+    "semantic_hash": "05138f1879021583c7e801c783aa9e7d"
+  },
+  "backend/tests/unit/test_preprocess.py": {
+    "mtime": 1795285535.1960213,
+    "seen": 1795285980.845207,
+    "ast_hash": "8bbd995dfe89470584f5db01b3ca940b",
+    "semantic_hash": "8bbd995dfe89470584f5db01b3ca940b"
+  },
+  "backend/tests/unit/test_quality.py": {
+    "mtime": 1795285535.196755,
+    "seen": 1795285980.845207,
+    "ast_hash": "1902eea0e51ef072d2488abb02718c44",
+    "semantic_hash": "1902eea0e51ef072d2488abb02718c44"
+  },
+  "backend/tests/unit/test_torch_engine.py": {
+    "mtime": 1795285535.1978807,
+    "seen": 1795285980.8452082,
+    "ast_hash": "8795be9d4149f70ab0e6df1808ec297a",
+    "semantic_hash": "8795be9d4149f70ab0e6df1808ec297a"
+  },
+  "build.gradle.kts": {
+    "mtime": 1795285535.1995966,
+    "seen": 1795285980.8452082,
+    "ast_hash": "0abeb4522f308b6090c32e910df8006f",
+    "semantic_hash": "0abeb4522f308b6090c32e910df8006f"
+  },
+  "composeApp/build.gradle.kts": {
+    "mtime": 1795285535.201314,
+    "seen": 1795285980.8452091,
+    "ast_hash": "f054c162311b45ea7a7255f02a7c4dda",
+    "semantic_hash": "f054c162311b45ea7a7255f02a7c4dda"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/AnalysisViewModel.kt": {
+    "mtime": 1795285535.2054384,
+    "seen": 1795285980.8452091,
+    "ast_hash": "29a090157c4eaa15c88d6738a444de2c",
+    "semantic_hash": "29a090157c4eaa15c88d6738a444de2c"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ErrorMessages.kt": {
+    "mtime": 1795285535.205502,
+    "seen": 1795285980.84521,
+    "ast_hash": "7b15cbbb7967278124cfa407bdac4220",
+    "semantic_hash": "7b15cbbb7967278124cfa407bdac4220"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/EyeCareApp.kt": {
+    "mtime": 1795285535.2055593,
+    "seen": 1795285980.84521,
+    "ast_hash": "1562ceb7498b8887b9c5d489d8c31559",
+    "semantic_hash": "1562ceb7498b8887b9c5d489d8c31559"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/LocalePrefs.kt": {
+    "mtime": 1795285535.2056146,
+    "seen": 1795285980.8452108,
+    "ast_hash": "db691480c531ce68bd6ba2c31b0b8486",
+    "semantic_hash": "db691480c531ce68bd6ba2c31b0b8486"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/MainActivity.kt": {
+    "mtime": 1795285535.205708,
+    "seen": 1795285980.8452108,
+    "ast_hash": "f5f1dddb5ade7bf28411cafdf3567eed",
+    "semantic_hash": "f5f1dddb5ade7bf28411cafdf3567eed"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ScreeningViewModel.kt": {
+    "mtime": 1795285535.2058167,
+    "seen": 1795285980.845212,
+    "ast_hash": "37dfc84a587bbcf1180c3b9e06985ad2",
+    "semantic_hash": "37dfc84a587bbcf1180c3b9e06985ad2"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/AppConfig.kt": {
+    "mtime": 1795285535.2058764,
+    "seen": 1795285980.845212,
+    "ast_hash": "72f296f57681cd78dbb6b5b4e21545b6",
+    "semantic_hash": "72f296f57681cd78dbb6b5b4e21545b6"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/Eye.kt": {
+    "mtime": 1795285535.2059329,
+    "seen": 1795285980.845213,
+    "ast_hash": "1878913f532807554e1706288a35584f",
+    "semantic_hash": "1878913f532807554e1706288a35584f"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/eyecare/EyeCareModels.kt": {
+    "mtime": 1795285535.2059953,
+    "seen": 1795285980.845213,
+    "ast_hash": "4ba0725ac972e0b80f6c4090ace1886a",
+    "semantic_hash": "4ba0725ac972e0b80f6c4090ace1886a"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/eyecare/EyeCarePreferencesRepository.kt": {
+    "mtime": 1795285535.2060645,
+    "seen": 1795285980.845214,
+    "ast_hash": "7eca1e0710ec0d3390efc956a76759ed",
+    "semantic_hash": "7eca1e0710ec0d3390efc956a76759ed"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/history/DatabaseKeyProvider.kt": {
+    "mtime": 1795285535.2061234,
+    "seen": 1795285980.845214,
+    "ast_hash": "909f77411f4b979773473b464a89b15e",
+    "semantic_hash": "909f77411f4b979773473b464a89b15e"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/history/ScreeningHistoryDao.kt": {
+    "mtime": 1795285535.2061765,
+    "seen": 1795285980.845215,
+    "ast_hash": "cb11a136006300d83e019d9270e387f2",
+    "semantic_hash": "cb11a136006300d83e019d9270e387f2"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/history/ScreeningHistoryDatabase.kt": {
+    "mtime": 1795285535.2062457,
+    "seen": 1795285980.845215,
+    "ast_hash": "76e83b7e3f97710883aca61922b307ff",
+    "semantic_hash": "76e83b7e3f97710883aca61922b307ff"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/history/ScreeningHistoryEntity.kt": {
+    "mtime": 1795285535.206304,
+    "seen": 1795285980.845216,
+    "ast_hash": "bda799bde1056b597b5610f6c58021a3",
+    "semantic_hash": "bda799bde1056b597b5610f6c58021a3"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/history/ScreeningHistoryRepository.kt": {
+    "mtime": 1795285535.1942096,
+    "seen": 1795285980.845216,
+    "ast_hash": "1a44850835f997c0609e8dc6737d6828",
+    "semantic_hash": "1a44850835f997c0609e8dc6737d6828"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/upload/PendingUploadDao.kt": {
+    "mtime": 1795285535.1946952,
+    "seen": 1795285980.845217,
+    "ast_hash": "0c89a74b20fcc4216a90cb0cb33c71e5",
+    "semantic_hash": "0c89a74b20fcc4216a90cb0cb33c71e5"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/upload/PendingUploadEntity.kt": {
+    "mtime": 1795285535.195181,
+    "seen": 1795285980.845217,
+    "ast_hash": "aa3d603c8fc90e413edf2615c275b947",
+    "semantic_hash": "aa3d603c8fc90e413edf2615c275b947"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/data/upload/PendingUploadRepository.kt": {
+    "mtime": 1795285535.1961584,
+    "seen": 1795285980.845218,
+    "ast_hash": "8bfd4883c80f5c2ec2cdc7a2fa7b58a0",
+    "semantic_hash": "8bfd4883c80f5c2ec2cdc7a2fa7b58a0"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/BlinkPalmViewModel.kt": {
+    "mtime": 1795285535.1967041,
+    "seen": 1795285980.845218,
+    "ast_hash": "130fd7bb1afd2d750499c8c121f70823",
+    "semantic_hash": "130fd7bb1afd2d750499c8c121f70823"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/ExerciseTimer.kt": {
+    "mtime": 1795285535.1974242,
+    "seen": 1795285980.8452191,
+    "ast_hash": "42aa08fef99a52e658228179ad80df21",
+    "semantic_hash": "42aa08fef99a52e658228179ad80df21"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/FocusShiftViewModel.kt": {
+    "mtime": 1795285535.1982143,
+    "seen": 1795285980.8452191,
+    "ast_hash": "d61e3645074da70b57622cb0d5ca18e5",
+    "semantic_hash": "d61e3645074da70b57622cb0d5ca18e5"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/FollowDotViewModel.kt": {
+    "mtime": 1795285535.19922,
+    "seen": 1795285980.84522,
+    "ast_hash": "447a353b7dababb40bea2118fdaa0e46",
+    "semantic_hash": "447a353b7dababb40bea2118fdaa0e46"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/NotificationHelper.kt": {
+    "mtime": 1795285535.1997344,
+    "seen": 1795285980.84522,
+    "ast_hash": "12f5c938e8cc2cbaec55ffc34642a919",
+    "semantic_hash": "12f5c938e8cc2cbaec55ffc34642a919"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/PomodoroScheduler.kt": {
+    "mtime": 1795285535.200724,
+    "seen": 1795285980.84522,
+    "ast_hash": "8831b3c60c703adc2e3a5dbad592074e",
+    "semantic_hash": "8831b3c60c703adc2e3a5dbad592074e"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/PomodoroViewModel.kt": {
+    "mtime": 1795285535.2015796,
+    "seen": 1795285980.845221,
+    "ast_hash": "c33a13d63ae98b0fce941d21c25cca33",
+    "semantic_hash": "c33a13d63ae98b0fce941d21c25cca33"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/PomodoroWorker.kt": {
+    "mtime": 1795285535.202225,
+    "seen": 1795285980.845221,
+    "ast_hash": "66ff3e822fc484e0af652a316438d7cc",
+    "semantic_hash": "66ff3e822fc484e0af652a316438d7cc"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/ReminderScheduler.kt": {
+    "mtime": 1795285535.2024643,
+    "seen": 1795285980.845222,
+    "ast_hash": "8eb62b6335eee652e57846feb7bb848b",
+    "semantic_hash": "8eb62b6335eee652e57846feb7bb848b"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/ReminderSettingsViewModel.kt": {
+    "mtime": 1795285535.2026737,
+    "seen": 1795285980.845222,
+    "ast_hash": "3f61432ebca8510886a5788e55293872",
+    "semantic_hash": "3f61432ebca8510886a5788e55293872"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/eyecare/ReminderWorker.kt": {
+    "mtime": 1795285535.2028813,
+    "seen": 1795285980.845223,
+    "ast_hash": "2a050423defdb9ca1a51c4c6e5a14bac",
+    "semantic_hash": "2a050423defdb9ca1a51c4c6e5a14bac"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/CameraScreen.kt": {
+    "mtime": 1795285535.1937144,
+    "seen": 1795285980.845223,
+    "ast_hash": "44a201b25257be628f53d90f534c96e7",
+    "semantic_hash": "44a201b25257be628f53d90f534c96e7"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/EyeLabels.kt": {
+    "mtime": 1795285535.1941898,
+    "seen": 1795285980.845224,
+    "ast_hash": "075398d1bfec36aac61c6efbccaed4e2",
+    "semantic_hash": "075398d1bfec36aac61c6efbccaed4e2"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/HistoryScreen.kt": {
+    "mtime": 1795285535.1952877,
+    "seen": 1795285980.845224,
+    "ast_hash": "b8e64dcd26f17a87530ead17311080a5",
+    "semantic_hash": "b8e64dcd26f17a87530ead17311080a5"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/HistoryViewModel.kt": {
+    "mtime": 1795285535.1957512,
+    "seen": 1795285980.8452249,
+    "ast_hash": "b733b6f478640cbfe3215e8be67235ef",
+    "semantic_hash": "b733b6f478640cbfe3215e8be67235ef"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/HomeScreen.kt": {
+    "mtime": 1795285535.1962771,
+    "seen": 1795285980.8452249,
+    "ast_hash": "31fe536fecbd831833574f841ad15829",
+    "semantic_hash": "31fe536fecbd831833574f841ad15829"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/PatientScreen.kt": {
+    "mtime": 1795285535.1968718,
+    "seen": 1795285980.8452249,
+    "ast_hash": "44bc098878ff46f655873a5f7ff2cedd",
+    "semantic_hash": "44bc098878ff46f655873a5f7ff2cedd"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/ResultScreen.kt": {
+    "mtime": 1795285535.1974213,
+    "seen": 1795285980.845226,
+    "ast_hash": "2435352c6268f736806d7c2cadfcf835",
+    "semantic_hash": "2435352c6268f736806d7c2cadfcf835"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/analysis/AnalysisScreens.kt": {
+    "mtime": 1795285535.199069,
+    "seen": 1795285980.845226,
+    "ast_hash": "a1e1dccec58b7db48cff854db26210ef",
+    "semantic_hash": "a1e1dccec58b7db48cff854db26210ef"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/components/EyeCareComponents.kt": {
+    "mtime": 1795285535.2005053,
+    "seen": 1795285980.845227,
+    "ast_hash": "d4caa98bd73dc808f669821bcf9e1880",
+    "semantic_hash": "d4caa98bd73dc808f669821bcf9e1880"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/components/EyeComponents.kt": {
+    "mtime": 1795285535.2013528,
+    "seen": 1795285980.845227,
+    "ast_hash": "11acbf2276c18a785d5281836770d4f2",
+    "semantic_hash": "11acbf2276c18a785d5281836770d4f2"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/components/LanguagePicker.kt": {
+    "mtime": 1795285535.2019434,
+    "seen": 1795285980.845228,
+    "ast_hash": "ef825bb6a1aad239ed2519667e2408bc",
+    "semantic_hash": "ef825bb6a1aad239ed2519667e2408bc"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/BlinkPalmScreen.kt": {
+    "mtime": 1795285535.202434,
+    "seen": 1795285980.845228,
+    "ast_hash": "1a589341a12a98394e37c91e8265508d",
+    "semantic_hash": "1a589341a12a98394e37c91e8265508d"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/EyeCareMenuScreen.kt": {
+    "mtime": 1795285535.2027254,
+    "seen": 1795285980.8452291,
+    "ast_hash": "d77705d3a2cea305afad8e847fc42ca9",
+    "semantic_hash": "d77705d3a2cea305afad8e847fc42ca9"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/FocusShiftScreen.kt": {
+    "mtime": 1795285535.2028809,
+    "seen": 1795285980.8452291,
+    "ast_hash": "ac68cf6e5b70bcb724c4b9cfa2d21941",
+    "semantic_hash": "ac68cf6e5b70bcb724c4b9cfa2d21941"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/FollowDotScreen.kt": {
+    "mtime": 1795285535.2030528,
+    "seen": 1795285980.8452291,
+    "ast_hash": "be732e13c6671c9e86e817f51c3c271a",
+    "semantic_hash": "be732e13c6671c9e86e817f51c3c271a"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/PomodoroScreen.kt": {
+    "mtime": 1795285535.1938353,
+    "seen": 1795285980.84523,
+    "ast_hash": "28bbfd126606acd5c800b44f1ea86fd6",
+    "semantic_hash": "28bbfd126606acd5c800b44f1ea86fd6"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/eyecare/ReminderSettingsScreen.kt": {
+    "mtime": 1795285535.1943712,
+    "seen": 1795285980.84523,
+    "ast_hash": "4652d21fcca916b0db3c5fc2b3012f43",
+    "semantic_hash": "4652d21fcca916b0db3c5fc2b3012f43"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/theme/Color.kt": {
+    "mtime": 1795285535.1950073,
+    "seen": 1795285980.845231,
+    "ast_hash": "62f3c351369d49b0cfbf8d77f6ef7746",
+    "semantic_hash": "62f3c351369d49b0cfbf8d77f6ef7746"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/theme/Dimens.kt": {
+    "mtime": 1795285535.1961648,
+    "seen": 1795285980.845231,
+    "ast_hash": "273d93c7376156f4e5b1bfa6d4b20422",
+    "semantic_hash": "273d93c7376156f4e5b1bfa6d4b20422"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/theme/Theme.kt": {
+    "mtime": 1795285535.1968338,
+    "seen": 1795285980.845232,
+    "ast_hash": "d65c22d112bea4500ac143cdd9f0d9eb",
+    "semantic_hash": "d65c22d112bea4500ac143cdd9f0d9eb"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/ui/theme/Type.kt": {
+    "mtime": 1795285535.1974764,
+    "seen": 1795285980.845232,
+    "ast_hash": "1715b9af5181163a15616a62521f1053",
+    "semantic_hash": "1715b9af5181163a15616a62521f1053"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/upload/UploadScheduler.kt": {
+    "mtime": 1795285535.1984117,
+    "seen": 1795285980.845233,
+    "ast_hash": "e65d8768b340c816c8fd55fe5a806493",
+    "semantic_hash": "e65d8768b340c816c8fd55fe5a806493"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/upload/UploadWorker.kt": {
+    "mtime": 1795285535.1988802,
+    "seen": 1795285980.845233,
+    "ast_hash": "9fd512ab692c871afd629a1a9f25ad56",
+    "semantic_hash": "9fd512ab692c871afd629a1a9f25ad56"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/BitmapLoader.kt": {
+    "mtime": 1795285535.1997955,
+    "seen": 1795285980.845233,
+    "ast_hash": "27b9e84df8b5c7a30685b56a405d4465",
+    "semantic_hash": "27b9e84df8b5c7a30685b56a405d4465"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/EyeDetectionAnalyzer.kt": {
+    "mtime": 1795285535.2005033,
+    "seen": 1795285980.845234,
+    "ast_hash": "4958e82b91586ede95367ab610fa93d0",
+    "semantic_hash": "4958e82b91586ede95367ab610fa93d0"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/EyeSymmetryAnalyzer.kt": {
+    "mtime": 1795285535.2016213,
+    "seen": 1795285980.845234,
+    "ast_hash": "657d90dd0f60c4cd4ec6f20e1dd4ad0c",
+    "semantic_hash": "657d90dd0f60c4cd4ec6f20e1dd4ad0c"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/FrameQualityAnalyzer.kt": {
+    "mtime": 1795285535.2020197,
+    "seen": 1795285980.8452349,
+    "ast_hash": "34290cd0960bdaadb390806c2d4dbba8",
+    "semantic_hash": "34290cd0960bdaadb390806c2d4dbba8"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/IrisLandmarker.kt": {
+    "mtime": 1795285535.202374,
+    "seen": 1795285980.8452349,
+    "ast_hash": "d49154e9ad83306b813dbd9cae02db55",
+    "semantic_hash": "d49154e9ad83306b813dbd9cae02db55"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/OfflineDrClassifier.kt": {
+    "mtime": 1795285535.2027054,
+    "seen": 1795285980.845236,
+    "ast_hash": "2e96d99c68aa80373cc38442d262fc2e",
+    "semantic_hash": "2e96d99c68aa80373cc38442d262fc2e"
+  },
+  "composeApp/src/androidMain/kotlin/com/eyedetect/ai/vision/PupilHeuristics.kt": {
+    "mtime": 1795285535.202958,
+    "seen": 1795285980.845236,
+    "ast_hash": "6c8f5b615912f82bb5bd46b23302c21e",
+    "semantic_hash": "6c8f5b615912f82bb5bd46b23302c21e"
+  },
+  "composeApp/src/androidTest/java/com/eyedetect/ai/MainFlowTest.kt": {
+    "mtime": 1795285535.1980789,
+    "seen": 1795285980.845237,
+    "ast_hash": "66ec28bad61aea2325a3a80a2756c515",
+    "semantic_hash": "66ec28bad61aea2325a3a80a2756c515"
+  },
+  "composeApp/src/androidTest/java/com/eyedetect/ai/ui/ResultScreenTest.kt": {
+    "mtime": 1795285535.1989079,
+    "seen": 1795285980.845237,
+    "ast_hash": "b1cf2cec35a66558e19d4f465b25a432",
+    "semantic_hash": "b1cf2cec35a66558e19d4f465b25a432"
+  },
+  "composeApp/src/commonMain/kotlin/com/eyedetect/ai/data/AnalysisApi.kt": {
+    "mtime": 1795285535.1998506,
+    "seen": 1795285980.845237,
+    "ast_hash": "ae79dbbdcd7065df9f89f6c8a8b08dd4",
+    "semantic_hash": "ae79dbbdcd7065df9f89f6c8a8b08dd4"
+  },
+  "composeApp/src/commonMain/kotlin/com/eyedetect/ai/data/ApiClient.kt": {
+    "mtime": 1795285535.2012944,
+    "seen": 1795285980.845238,
+    "ast_hash": "56c43b016ce2d628b0d037ecb6217887",
+    "semantic_hash": "56c43b016ce2d628b0d037ecb6217887"
+  },
+  "composeApp/src/commonMain/kotlin/com/eyedetect/ai/data/ApiService.kt": {
+    "mtime": 1795285535.201763,
+    "seen": 1795285980.845238,
+    "ast_hash": "78d6129a1de85b0a272014b512722ef1",
+    "semantic_hash": "78d6129a1de85b0a272014b512722ef1"
+  },
+  "composeApp/src/commonMain/kotlin/com/eyedetect/ai/data/AppConfig.kt": {
+    "mtime": 1795285535.2023807,
+    "seen": 1795285980.845239,
+    "ast_hash": "0386c66507867a3125abf69014c3a213",
+    "semantic_hash": "0386c66507867a3125abf69014c3a213"
+  },
+  "composeApp/src/commonMain/kotlin/com/eyedetect/ai/data/PredictResponse.kt": {
+    "mtime": 1795285535.202655,
+    "seen": 1795285980.845239,
+    "ast_hash": "d01d57609d8a11703baf5886f4554416",
+    "semantic_hash": "d01d57609d8a11703baf5886f4554416"
+  },
+  "composeApp/src/iosMain/kotlin/com/eyedetect/ai/data/AppConfig.kt": {
+    "mtime": 1795285535.2030542,
+    "seen": 1795285980.84524,
+    "ast_hash": "1a91d8e54655b330d0eeb316f9194867",
+    "semantic_hash": "1a91d8e54655b330d0eeb316f9194867"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/ScreeningViewModelTest.kt": {
+    "mtime": 1795285535.1958618,
+    "seen": 1795285980.84524,
+    "ast_hash": "a0650cb481e2261d91537c07ff343354",
+    "semantic_hash": "a0650cb481e2261d91537c07ff343354"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/data/ApiServiceTest.kt": {
+    "mtime": 1795285535.1967487,
+    "seen": 1795285980.84524,
+    "ast_hash": "0ab6343ccd60a3e3904b47ef791b584d",
+    "semantic_hash": "0ab6343ccd60a3e3904b47ef791b584d"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/eyecare/PomodoroWorkerTest.kt": {
+    "mtime": 1795285535.1974602,
+    "seen": 1795285980.845241,
+    "ast_hash": "7920e7931a01fc66fd703167051b1b29",
+    "semantic_hash": "7920e7931a01fc66fd703167051b1b29"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/eyecare/ReminderWorkerTest.kt": {
+    "mtime": 1795285535.1983008,
+    "seen": 1795285980.845241,
+    "ast_hash": "d4aeeb7af5f9635fda58136852338449",
+    "semantic_hash": "d4aeeb7af5f9635fda58136852338449"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/vision/BitmapLoaderTest.kt": {
+    "mtime": 1795285535.198968,
+    "seen": 1795285980.845242,
+    "ast_hash": "8306a23a1a169d21460329d9ce172e47",
+    "semantic_hash": "8306a23a1a169d21460329d9ce172e47"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/vision/EyeSymmetryAnalyzerTest.kt": {
+    "mtime": 1795285535.1997488,
+    "seen": 1795285980.845242,
+    "ast_hash": "cb09e6747c0d588995f3a77417b6a2bc",
+    "semantic_hash": "cb09e6747c0d588995f3a77417b6a2bc"
+  },
+  "composeApp/src/test/java/com/eyedetect/ai/vision/PupilHeuristicsTest.kt": {
+    "mtime": 1795285535.2005072,
+    "seen": 1795285980.845243,
+    "ast_hash": "59a54f94e300153de69227bbef96ba38",
+    "semantic_hash": "59a54f94e300153de69227bbef96ba38"
+  },
+  "make_dummy_model.py": {
+    "mtime": 1795285535.2022886,
+    "seen": 1795285980.845243,
+    "ast_hash": "bff6d015dcc72de613406c1cf97258ca",
+    "semantic_hash": "bff6d015dcc72de613406c1cf97258ca"
+  },
+  "settings.gradle.kts": {
+    "mtime": 1795285535.203128,
+    "seen": 1795285980.845244,
+    "ast_hash": "4ede5b42d8df0740e96cb12d244ed00e",
+    "semantic_hash": "4ede5b42d8df0740e96cb12d244ed00e"
+  },
+  "training/eval_backend_dr.py": {
+    "mtime": 1795285535.2033594,
+    "seen": 1795285980.845244,
+    "ast_hash": "59bb073a03b4f42c72c047c4af1de4f4",
+    "semantic_hash": "59bb073a03b4f42c72c047c4af1de4f4"
+  },
+  "training/fetch_skin.py": {
+    "mtime": 1795285535.2034414,
+    "seen": 1795285980.845245,
+    "ast_hash": "62f0ade3266eaaf8cf10acfcef564302",
+    "semantic_hash": "62f0ade3266eaaf8cf10acfcef564302"
+  },
+  "training/prepare_dr.py": {
+    "mtime": 1795285535.203504,
+    "seen": 1795285980.845245,
+    "ast_hash": "c49cbe68d1153106dcfaaf4b9585dfe2",
+    "semantic_hash": "c49cbe68d1153106dcfaaf4b9585dfe2"
+  },
+  "training/train_dr.py": {
+    "mtime": 1795285535.203605,
+    "seen": 1795285980.8452458,
+    "ast_hash": "3f7e15f8f9f73ff709aa14390e3ce613",
+    "semantic_hash": "3f7e15f8f9f73ff709aa14390e3ce613"
+  },
+  "training/train_skin.py": {
+    "mtime": 1795285535.203696,
+    "seen": 1795285980.8452458,
+    "ast_hash": "f664e09ce4449cdb17f3379400f5a5dd",
+    "semantic_hash": "f664e09ce4449cdb17f3379400f5a5dd"
+  },
+  ".github/workflows/backend-ci.yml": {
+    "mtime": 1795285535.1932726,
+    "seen": 1795285980.8452458,
+    "ast_hash": "a82ff24b2c73a2b727b9af1d0be252c7",
+    "semantic_hash": "a82ff24b2c73a2b727b9af1d0be252c7"
+  },
+  "PLAN.md": {
+    "mtime": 1795285535.1935453,
+    "seen": 1795285980.845247,
+    "ast_hash": "3b9dcdc8cfc6e16a72ce8865a8ba8d3d",
+    "semantic_hash": "3b9dcdc8cfc6e16a72ce8865a8ba8d3d"
+  },
+  "README.md": {
+    "mtime": 1795285535.193871,
+    "seen": 1795285980.845247,
+    "ast_hash": "b741b8a36881aac0bc81f1f607cd4cce",
+    "semantic_hash": "b741b8a36881aac0bc81f1f607cd4cce"
+  },
+  "backend/CLAUDE.md": {
+    "mtime": 1795285535.1962721,
+    "seen": 1795285980.845248,
+    "ast_hash": "870ef54cfc32f3c49e9508f33f37528a",
+    "semantic_hash": "870ef54cfc32f3c49e9508f33f37528a"
+  },
+  "backend/README.md": {
+    "mtime": 1795285535.1981711,
+    "seen": 1795285980.845248,
+    "ast_hash": "65617428763bc5949dfc47452da4c9a0",
+    "semantic_hash": "65617428763bc5949dfc47452da4c9a0"
+  },
+  "backend/SPEC.md": {
+    "mtime": 1795285535.1998243,
+    "seen": 1795285980.845249,
+    "ast_hash": "e51d43beed529d69dc5b86dd83837579",
+    "semantic_hash": "e51d43beed529d69dc5b86dd83837579"
+  },
+  "backend/docker-compose.yml": {
+    "mtime": 1795285535.1934578,
+    "seen": 1795285980.845249,
+    "ast_hash": "6ecfd7de86fbf9c2a9c2ea86e19ed00b",
+    "semantic_hash": "6ecfd7de86fbf9c2a9c2ea86e19ed00b"
+  },
+  "backend/requirements-dev.txt": {
+    "mtime": 1795285535.1950579,
+    "seen": 1795285980.8452501,
+    "ast_hash": "3008abda28ee24e3f24d718583fb2e13",
+    "semantic_hash": "3008abda28ee24e3f24d718583fb2e13"
+  },
+  "backend/requirements-torch.txt": {
+    "mtime": 1795285535.195501,
+    "seen": 1795285980.8452501,
+    "ast_hash": "eefa9c92fb747303e5e1b65f847e3269",
+    "semantic_hash": "eefa9c92fb747303e5e1b65f847e3269"
+  },
+  "backend/requirements.txt": {
+    "mtime": 1795285535.1961253,
+    "seen": 1795285980.8452501,
+    "ast_hash": "e270ed54933984ba3c3fbd1cbda821d7",
+    "semantic_hash": "e270ed54933984ba3c3fbd1cbda821d7"
+  },
+  "backend_spec_v4.md": {
+    "mtime": 1795285535.1990669,
+    "seen": 1795285980.845251,
+    "ast_hash": "e51d43beed529d69dc5b86dd83837579",
+    "semantic_hash": "e51d43beed529d69dc5b86dd83837579"
+  },
+  "clean-code-solid-dry-kiss.md": {
+    "mtime": 1795285535.200479,
+    "seen": 1795285980.845252,
+    "ast_hash": "fa3f9ff485619c00d7eb4ec5a76113a6",
+    "semantic_hash": "fa3f9ff485619c00d7eb4ec5a76113a6"
+  },
+  "docs/superpowers/plans/2026-08-03-release-api-url.md": {
+    "mtime": 1795285535.2024176,
+    "seen": 1795285980.845252,
+    "ast_hash": "81b8c7cd3e599aec2f44a97790c3e27a",
+    "semantic_hash": "81b8c7cd3e599aec2f44a97790c3e27a"
+  },
+  "docs/superpowers/plans/2026-08-03-security-hardening.md": {
+    "mtime": 1795285535.202824,
+    "seen": 1795285980.8452532,
+    "ast_hash": "705a82932d22a74503b6fa2afd9ac60e",
+    "semantic_hash": "705a82932d22a74503b6fa2afd9ac60e"
+  },
+  "docs/superpowers/specs/2026-07-31-clean-architecture-refactor-design.md": {
+    "mtime": 1795285535.203048,
+    "seen": 1795285980.8452532,
+    "ast_hash": "b92ad64c514f3f0a2a8cda85e055383d",
+    "semantic_hash": "b92ad64c514f3f0a2a8cda85e055383d"
+  },
+  "docs/superpowers/specs/2026-08-03-release-api-url-design.md": {
+    "mtime": 1795285535.203161,
+    "seen": 1795285980.845254,
+    "ast_hash": "74756b1738bb7b750c04b21d2d9ece67",
+    "semantic_hash": "74756b1738bb7b750c04b21d2d9ece67"
+  },
+  "docs/superpowers/specs/2026-08-03-security-hardening-design.md": {
+    "mtime": 1795285535.2033043,
+    "seen": 1795285980.845254,
+    "ast_hash": "723dcc5b266513b5f8a7e49c1005aec2",
+    "semantic_hash": "723dcc5b266513b5f8a7e49c1005aec2"
+  },
+  "training/README.md": {
+    "mtime": 1795285535.2032347,
+    "seen": 1795285980.845254,
+    "ast_hash": "50ffd8546834fee30ef2d95a3a234e44",
+    "semantic_hash": "50ffd8546834fee30ef2d95a3a234e44"
+  },
+  ".claude/settings.json": {
+    "mtime": 1795286023.286103,
+    "seen": 1795286049.690155,
+    "ast_hash": "3b541b9935fcf0831355da956f897645",
+    "semantic_hash": ""
+  },
+  ".claude/skills/android-build/SKILL.md": {
+    "mtime": 1795285873.0790195,
+    "seen": 1795286049.69024,
+    "ast_hash": "3cc453e698d481ba018736585045ca64",
+    "semantic_hash": ""
+  },
+  ".claude/skills/api-contract/SKILL.md": {
+    "mtime": 1795285873.0944648,
+    "seen": 1795286049.690241,
+    "ast_hash": "590ea8711cd4302bd1fda87f59b52ef6",
+    "semantic_hash": ""
+  },
+  ".claude/skills/backend-verify/SKILL.md": {
+    "mtime": 1795285846.7235098,
+    "seen": 1795286049.690241,
+    "ast_hash": "14aec4567b1e194a9e3ce00f5f244715",
+    "semantic_hash": ""
+  },
+  ".claude/skills/model-training/SKILL.md": {
+    "mtime": 1795285846.7638605,
+    "seen": 1795286049.690242,
+    "ast_hash": "ad5db19958c2cbfeec2eff531d3b0c55",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1795286023.2859168,
+    "seen": 1795286049.690243,
+    "ast_hash": "eee5bc46d96577d8912001cc8f0f6890",
+    "semantic_hash": ""
+  },
+  "composeApp/src/androidMain/assets/README.md": {
+    "mtime": 1795285535.202676,
+    "seen": 1795286049.690249,
+    "ast_hash": "b256fb56484b259a489a92652a43b806",
+    "semantic_hash": ""
+  }
+}

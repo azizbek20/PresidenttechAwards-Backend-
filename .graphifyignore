@@ -1,0 +1,16 @@
+# graphify: keep the knowledge graph to code + docs (gitignore syntax).
+# Images here are launcher icons / screenshots and binaries are model weights;
+# indexing them costs tokens and adds no architecture signal.
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.tflite
+*.task
+*.onnx
+*.pt
+*.pth
+gradle/wrapper/
+gradlew
+gradlew.bat
+graphify-out/
