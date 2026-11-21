@@ -179,8 +179,8 @@ def test_high_risk_condition_escalates_even_when_not_top() -> None:
     probs = [0.0] * len(codes)
     probs[codes.index("benign_nevus")] = 0.6
     probs[codes.index("melanoma_suspect")] = 0.35
-    probs[codes.index("normal")] = 0.05
+    probs[codes.index("benign_keratosis")] = 0.05
     assert overall_risk(skin, probs) == "high"
     probs[codes.index("melanoma_suspect")] = 0.1
-    probs[codes.index("normal")] = 0.3
+    probs[codes.index("benign_keratosis")] = 0.3
     assert overall_risk(skin, probs) == "low"

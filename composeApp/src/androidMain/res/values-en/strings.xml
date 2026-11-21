@@ -252,7 +252,7 @@
     <string name="analysis_type_external_eye">External eye</string>
     <string name="analysis_type_external_eye_sub">Redness, jaundice, eyelid swelling, cataract signs</string>
     <string name="analysis_type_skin">Skin</string>
-    <string name="analysis_type_skin_sub">Spots, moles, rashes and other skin changes</string>
+    <string name="analysis_type_skin_sub">Moles, spots and signs of skin tumours</string>
     <string name="analysis_type_oral">Oral cavity</string>
     <string name="analysis_type_oral_sub">Tongue, gum and mucosa changes</string>
     <string name="analysis_type_nail">Nails</string>

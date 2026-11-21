@@ -252,7 +252,7 @@
     <string name="analysis_type_external_eye">Наружный глаз</string>
     <string name="analysis_type_external_eye_sub">Покраснение, желтушность, отёк век, признаки катаракты</string>
     <string name="analysis_type_skin">Кожа</string>
-    <string name="analysis_type_skin_sub">Пятна, родинки, сыпь и другие изменения кожи</string>
+    <string name="analysis_type_skin_sub">Родинки, пятна и признаки опухолей кожи</string>
     <string name="analysis_type_oral">Полость рта</string>
     <string name="analysis_type_oral_sub">Изменения языка, дёсен и слизистой</string>
     <string name="analysis_type_nail">Ногти</string>

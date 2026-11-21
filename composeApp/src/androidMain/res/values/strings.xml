@@ -252,7 +252,7 @@
     <string name="analysis_type_external_eye">Tashqi ko\'z</string>
     <string name="analysis_type_external_eye_sub">Qizarish, sariqlik, qovoq shishi, katarakta belgilari</string>
     <string name="analysis_type_skin">Teri</string>
-    <string name="analysis_type_skin_sub">Dog\', xol, toshma va boshqa teri o\'zgarishlari</string>
+    <string name="analysis_type_skin_sub">Xol, dog\' va teri o\'smalari belgilari</string>
     <string name="analysis_type_oral">Og\'iz bo\'shlig\'i</string>
     <string name="analysis_type_oral_sub">Til, milk va shilliq qavat o\'zgarishlari</string>
     <string name="analysis_type_nail">Tirnoq</string>
