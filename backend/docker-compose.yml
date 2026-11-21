@@ -30,7 +30,7 @@ x-eye-env: &eye-env
   INFERENCE_CONCURRENCY: ${INFERENCE_CONCURRENCY:-2}
   DEDUP_WINDOW_MIN: ${DEDUP_WINDOW_MIN:-10}
   EYE_REFERABLE_THRESHOLD: ${EYE_REFERABLE_THRESHOLD:-0.5}
-  QUALITY_BLUR_MIN_VAR: ${QUALITY_BLUR_MIN_VAR:-50.0}
+  QUALITY_BLUR_MIN_VAR: ${QUALITY_BLUR_MIN_VAR:-8.0}  # calibrated on IDRiD, see .env.example
   # Four slashes = absolute path. The sqlite file lives on the storage volume
   # so `compose down && up` does not silently empty the admin panel.
   #

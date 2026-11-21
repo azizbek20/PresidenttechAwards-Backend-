@@ -57,13 +57,15 @@ ANALYSIS_TYPES: tuple[AnalysisType, ...] = (
     AnalysisType(
         code="skin",
         label="Teri",
-        description="Teri dog'lari, xollar va toshmalar",
+        description="Xol, dog' va teri o'smalari belgilari",
         specialist="dermatolog",
+        # Order == training/train_skin.py CLASSES (ISIC Archive, CC-0/CC-BY only).
+        # The model classifies a *lesion*; it has no "healthy skin" class.
         conditions=(
-            Condition("normal", "Sezilarli o'zgarish topilmadi", "low", "normal"),
-            Condition("benign_nevus", "Xavfsiz ko'rinishdagi xol (nevus)", "low", "pale"),
-            Condition("eczema_dermatitis", "Ekzema / dermatit belgilari", "medium", "red"),
-            Condition("fungal_infection", "Zamburug'li infeksiya belgilari", "medium", "yellow"),
+            Condition("benign_nevus", "Xavfsiz ko'rinishdagi xol (nevus)", "low", "normal"),
+            Condition("benign_keratosis", "Xavfsiz keratoz (seboreik keratoz, lentigo)", "low", "yellow"),
+            Condition("actinic_keratosis", "Aktinik keratoz (saraton oldi holati)", "medium", "red"),
+            Condition("carcinoma_suspect", "Teri karsinomasiga shubha (bazalioma / yassi hujayrali)", "high", "pale"),
             Condition("melanoma_suspect", "Melanomaga shubhali dog'", "high", "dark"),
         ),
         asks_body_site=True,
