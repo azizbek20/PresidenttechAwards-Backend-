@@ -58,7 +58,9 @@ Patterns searched: `torch`, `gradcam|grad_cam`, `onnx`, `heatmap`,
 - `tests/test_frozen_kit.py::test_demo_defaults_are_safe` (L204) asserts `s.eye_device == "cpu"`. **`eye_device` must not be removed** (§3.2 allows removal only "if nothing else reads them"; this frozen test reads it).
 - Unaffected: `contract/test_auth.py` L84 (heatmap check is conditional), `contract/test_predict_contract.py` L72 (allows `None`), `contract/test_ungradable_wire.py` L41 (already `None`), `integration/test_persistence.py` (writes `heatmap_path` through `crud` directly, which keeps the column), `fixtures/golden_predict.json` (frozen; `heatmap_url` is a string, and `str | None` still validates).
 
-**Watch-out.** `tests/contract/_shim.py` installs a stub `app.inference.gradcam` whenever the real file is absent. Once Phase 1 deletes `gradcam.py`, a forgotten `import app.inference.gradcam` in `predict.py` would still pass the **contract** suite on the stub. Only the integration suite, which has no shim, would catch it.
+**Watch-out.** `tests/contract/_shim.py` installs a stub `app.inference.gradcam` whenever the real file is absent. Once Phase 1 deletes `gradcam.py`, a forgotten `import app.inference.gradcam` in `predict.py` would still pass the **contract** suite on the stub.
+
+*Correction (Phase 1):* the integration suite does not catch it either. `integration/test_auth.py`, `test_db_failure.py` and `test_static_serving.py` also call `_shim.install()`, the finder lives in `sys.meta_path` for the whole pytest process, and `mypy.ini` sets `ignore_missing_imports = True`. The reliable guard is a plain `python -c "import app.main"` outside pytest, plus a grep.
 
 ## Edit map
 
@@ -128,6 +130,26 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 - Commands and counts: see Baseline (ruff 0, mypy 0, `277 passed, 7 deselected`).
 - Surprises: plan §1 test counts are off (contract 133 / unit 80, not 130 / 78); six plan-vs-code conflicts are listed under Edit map and need decisions before Phases 1–3; two integration tests are missing from §4.
 - `eye-detect-claude-kit.zip` sits untracked at the repo root and was deliberately not committed.
+
+### 2026-11-22 — Phase 1 (delete model code)
+
+- Commits: `e750dd6` (test-only: delete `unit/test_torch_engine.py` and `unit/test_gradcam.py`; `contract/test_static_serving.py` asserts that REFER has `heatmap_url is None`; `integration/test_static_serving.py::test_no_heatmap_file_is_written`). Red before implementation: `2 failed, 238 passed, 4 deselected`. Then the implementation commit "refactor: remove torch/onnx/grad-cam model code (phase 1)", which touches no tests.
+- Deleted: `app/inference/{torch_engine,onnx_engine,gradcam}.py`, `scripts/{download_model,export_onnx}.py`, `requirements-torch.txt`, and the dead `storage.local.heatmap_target()`.
+- Changed:
+  - `engine.get_engine()`: onnx branch removed. The torch branch is kept and now always gives `UnavailableEngine`.
+  - `config`: `eye_model_source` is `mock | torch`.
+  - `predict.py`: no `gradcam` import, `_render_heatmap` removed, step 8 is `heatmap_url = None`, unused `Path` import removed.
+  - `worker.py` (§12.1): step 8 is `heatmap_url = None`.
+  - Requirements split into `requirements.txt` (prod; keeps `onnxruntime` per §12.2 and celery/pika/redis until Phase 3), `requirements-dev.txt` and `requirements-admin.txt` (streamlit, requests).
+  - `Dockerfile`: no torch index, no opencv fix; installs prod + admin requirements; the runtime guard imports `cv2, onnxruntime, streamlit`.
+  - CI: single `pip install -r requirements-dev.txt`, opencv-fix steps removed.
+- Gate, in a **fresh** venv built only from `requirements-dev.txt` (no torch, torchvision, timm, grad-cam, huggingface_hub or onnx installed; `onnxruntime`, `opencv-python-headless 4.10.0.84` and celery present):
+  - `ruff check app tests` → `All checks passed!`
+  - `mypy app` → `Success: no issues found in 32 source files`
+  - `python -c "import app.main"` outside pytest → ok, `torch`/`gradcam` not in `sys.modules`
+  - `EYE_MODE=demo pytest -q -m "not model and not perf"` → **`240 passed, 4 deselected`**, matching the §12 target (277 − 24 − 13).
+- Not verified here: `docker build`. Docker is installed but no daemon was running. CI's docker job will be the first real build of the new Dockerfile.
+- Not changed (outside Phase 1's file list): `backend/README.md` still documents `pip install -r requirements-torch.txt`, `torch_engine.py`, `download_model.py` and the gradcam layout (L25, L254–268, L392–400). `training/` keeps its own torch venv and is untouched. `app/inference/preprocess.display_copy()` is now unused by the app, but `preprocess.py` is not on the editable list.
 
 ## Manual Claude checks
 
