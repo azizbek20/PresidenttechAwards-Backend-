@@ -200,6 +200,237 @@ def test_large_png_is_resized_and_jpeg(fake: FakeAnthropic) -> None:
 
 
 # --------------------------------------------------------------------------
+# image metadata is never sent
+# --------------------------------------------------------------------------
+SECRET_MAKE = b"SECRET-MAKE-7Q"
+SECRET_MODEL = b"SECRET-MODEL-4Z"
+SECRET_DESC = b"SECRET-DESC-9K"
+SECRET_COMMENT = b"SECRET-COMMENT-2X"
+SECRET_XMP = b"SECRET-XMP-5V"
+SECRET_IPTC = b"SECRET-IPTC-8R"
+SECRET_TAIL = b"SECRET-TAIL-3M"
+ALL_SECRETS = [
+    SECRET_MAKE,
+    SECRET_MODEL,
+    SECRET_DESC,
+    SECRET_COMMENT,
+    SECRET_XMP,
+    SECRET_IPTC,
+    SECRET_TAIL,
+]
+XMP_HEADER = b"http://ns.adobe.com/xap/1.0/\x00"
+
+
+def exif_blob(orientation: int | None = None) -> bytes:
+    ex = Image.Exif()
+    ex[0x010F] = SECRET_MAKE.decode()
+    ex[0x0110] = SECRET_MODEL.decode()
+    ex[0x010E] = SECRET_DESC.decode()
+    if orientation is not None:
+        ex[0x0112] = orientation
+    return ex.tobytes()
+
+
+def jpeg_with(width: int, height: int, **save_kwargs: Any) -> bytes:
+    """A patterned JPEG saved with the given Pillow options (exif, comment, ...)."""
+    img = Image.open(io.BytesIO(jpeg_bytes(width, height))).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95, **save_kwargs)
+    return buf.getvalue()
+
+
+def insert_segment(jpeg: bytes, marker: int, payload: bytes, at: int = 2) -> bytes:
+    """Splice a raw ``FF <marker> <len> <payload>`` segment at offset ``at``."""
+    seg = b"\xff" + bytes([marker]) + (len(payload) + 2).to_bytes(2, "big") + payload
+    return jpeg[:at] + seg + jpeg[at:]
+
+
+def sos_offsets(jpeg: bytes) -> list[int]:
+    """Offsets of every SOS marker, found by walking the marker structure."""
+    found: list[int] = []
+    i = 2
+    while i < len(jpeg) - 1:
+        if jpeg[i] != 0xFF:
+            i += 1
+            continue
+        marker = jpeg[i + 1]
+        if marker == 0xFF:
+            i += 1
+        elif marker == 0x00 or 0xD0 <= marker <= 0xD7 or marker == 0x01:
+            i += 2
+        elif marker == 0xD9:
+            break
+        else:
+            if marker == 0xDA:
+                found.append(i)
+            i += 2 + int.from_bytes(jpeg[i + 2 : i + 4], "big")
+    return found
+
+
+def pixels(data: bytes) -> bytes:
+    with Image.open(io.BytesIO(data)) as im:
+        return im.tobytes()
+
+
+def send(fake: FakeAnthropic, raw: bytes) -> bytes:
+    run_assess(make_engine(fake), raw)
+    block, data = sent_image(fake.calls[0])
+    assert block["source"]["media_type"] == "image/jpeg"
+    return data
+
+
+def assert_clean(data: bytes) -> None:
+    for secret in ALL_SECRETS:
+        assert secret not in data
+    assert b"Exif\x00\x00" not in data
+
+
+def assert_lossless_copy(data: bytes, raw: bytes) -> None:
+    assert_clean(data)
+    assert pixels(data) == pixels(raw)
+    assert len(data) <= len(raw)
+
+
+def test_small_jpeg_exif_and_comment_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600, exif=exif_blob(), comment=SECRET_COMMENT)
+    assert SECRET_MAKE in raw and SECRET_COMMENT in raw  # the fixture is dirty
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+
+
+def test_small_jpeg_exif_orientation_1_is_a_lossless_copy(
+    fake: FakeAnthropic,
+) -> None:
+    raw = jpeg_with(800, 600, exif=exif_blob(1))
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.size == (800, 600)
+
+
+def test_small_jpeg_lossless_copy_has_the_same_size_in_bytes_as_the_clean_input(
+    fake: FakeAnthropic,
+) -> None:
+    clean = jpeg_with(800, 600)
+    dirty = jpeg_with(800, 600, exif=exif_blob(), comment=SECRET_COMMENT)
+    assert send(fake, dirty) == clean
+
+
+def test_small_jpeg_xmp_and_iptc_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600)
+    xmp = XMP_HEADER + b"<x:xmpmeta>" + SECRET_XMP + b"</x:xmpmeta>"
+    raw = insert_segment(raw, 0xE1, xmp)
+    raw = insert_segment(raw, 0xED, b"Photoshop 3.0\x00" + SECRET_IPTC)
+    assert SECRET_XMP in raw and SECRET_IPTC in raw
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    assert b"xmpmeta" not in data
+    assert b"Photoshop" not in data
+
+
+def test_small_jpeg_mpf_and_jfxx_segments_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600)
+    raw = insert_segment(raw, 0xE2, b"MPF\x00" + SECRET_TAIL)
+    raw = insert_segment(raw, 0xE0, b"JFXX\x00" + SECRET_DESC)
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    assert b"MPF\x00" not in data
+    assert b"JFXX" not in data
+
+
+def test_bytes_after_eoi_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600) + b"ftypmp42" + SECRET_TAIL * 50
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    assert data.endswith(b"\xff\xd9")
+    assert b"ftypmp42" not in data
+
+
+def test_icc_profile_is_kept(fake: FakeAnthropic) -> None:
+    ImageCms = pytest.importorskip("PIL.ImageCms")
+    profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    raw = jpeg_with(800, 600, icc_profile=profile, exif=exif_blob())
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.info.get("icc_profile") == profile
+
+
+def test_progressive_jpeg_exif_and_comment_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(
+        800, 600, progressive=True, exif=exif_blob(), comment=SECRET_COMMENT
+    )
+    assert len(sos_offsets(raw)) > 1
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    assert len(sos_offsets(data)) == len(sos_offsets(raw))
+
+
+def test_restart_marker_jpeg_exif_is_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600, restart_marker_blocks=2, exif=exif_blob())
+    assert b"\xff\xdd" in raw  # DRI present
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+    assert b"\xff\xdd" in data
+
+
+def test_comment_between_progressive_scans_is_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(800, 600, progressive=True)
+    scans = sos_offsets(raw)
+    assert len(scans) >= 2
+    raw = insert_segment(raw, 0xFE, SECRET_COMMENT, at=scans[1])
+    assert SECRET_COMMENT in raw
+    data = send(fake, raw)
+    assert_lossless_copy(data, raw)
+
+
+def test_small_jpeg_with_orientation_6_is_reencoded_upright(
+    fake: FakeAnthropic,
+) -> None:
+    raw = jpeg_with(800, 500, exif=exif_blob(6), comment=SECRET_COMMENT)
+    data = send(fake, raw)
+    assert_clean(data)
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.size == (500, 800)
+        assert sent.getexif().get(0x0112) in (None, 1)
+
+
+def test_large_jpeg_exif_and_comment_are_dropped(fake: FakeAnthropic) -> None:
+    raw = jpeg_with(2000, 1500, exif=exif_blob(), comment=SECRET_COMMENT)
+    data = send(fake, raw)
+    assert_clean(data)
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.size == (1568, 1176)
+        assert not sent.getexif()
+        assert "comment" not in sent.info
+
+
+def test_large_jpeg_xmp_is_dropped(fake: FakeAnthropic) -> None:
+    raw = insert_segment(
+        jpeg_with(2000, 1500), 0xE1, XMP_HEADER + b"<x:xmpmeta>" + SECRET_XMP
+    )
+    data = send(fake, raw)
+    assert_clean(data)
+    assert b"xmpmeta" not in data
+
+
+def test_png_text_chunk_is_not_sent(fake: FakeAnthropic) -> None:
+    from PIL import PngImagePlugin
+
+    info = PngImagePlugin.PngInfo()
+    info.add_text("Comment", SECRET_COMMENT.decode())
+    buf = io.BytesIO()
+    Image.new("RGB", (800, 600), (200, 80, 40)).save(buf, "PNG", pnginfo=info)
+    raw = buf.getvalue()
+    assert SECRET_COMMENT in raw
+    data = send(fake, raw)
+    assert_clean(data)
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.format == "JPEG"
+        assert "comment" not in sent.info
+
+
+# --------------------------------------------------------------------------
 # the result
 # --------------------------------------------------------------------------
 def test_returns_the_assessment_version_latency_and_tokens() -> None:
