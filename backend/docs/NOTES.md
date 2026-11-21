@@ -133,7 +133,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 
 ### 2026-11-22 — Phase 1 (delete model code)
 
-- Commits: `e750dd6` (test-only: delete `unit/test_torch_engine.py` and `unit/test_gradcam.py`; `contract/test_static_serving.py` asserts that REFER has `heatmap_url is None`; `integration/test_static_serving.py::test_no_heatmap_file_is_written`). Red before implementation: `2 failed, 238 passed, 4 deselected`. Then the implementation commit "refactor: remove torch/onnx/grad-cam model code (phase 1)", which touches no tests.
+- Commits: `e750dd6` (test-only: delete `unit/test_torch_engine.py` and `unit/test_gradcam.py`; `contract/test_static_serving.py` asserts that REFER has `heatmap_url is None`; `integration/test_static_serving.py::test_no_heatmap_file_is_written`). Red before implementation: `2 failed, 238 passed, 4 deselected`. Then `955207f`, the implementation commit "refactor: remove torch/onnx/grad-cam model code (phase 1)", which touches no tests. Review (1c, Sonnet): no blockers. Its one should-fix is the stale `backend/README.md`, listed below.
 - Deleted: `app/inference/{torch_engine,onnx_engine,gradcam}.py`, `scripts/{download_model,export_onnx}.py`, `requirements-torch.txt`, and the dead `storage.local.heatmap_target()`.
 - Changed:
   - `engine.get_engine()`: onnx branch removed. The torch branch is kept and now always gives `UnavailableEngine`.
@@ -151,9 +151,88 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 - Not verified here: `docker build`. Docker is installed but no daemon was running. CI's docker job will be the first real build of the new Dockerfile.
 - Not changed (outside Phase 1's file list): `backend/README.md` still documents `pip install -r requirements-torch.txt`, `torch_engine.py`, `download_model.py` and the gradcam layout (L25, L254–268, L392–400). `training/` keeps its own torch venv and is untouched. `app/inference/preprocess.display_copy()` is now unused by the app, but `preprocess.py` is not on the editable list.
 
+### 2026-11-22 — Phase 2 (Claude engine)
+
+- Roles as in PROMPTS.md: tests by a Sonnet test writer, `2d58ca6` (176 tests: decision 119, engine 33, wiring 12, config 12, plus `tests/fakes/`). Implementation `8672baa` and `e956b45`, neither touching tests.
+- Implementation:
+  - `ClaudeEngine.assess(jpeg)` makes one `AsyncAnthropic.messages.parse(output_format=FundusAssessment, timeout=CLAUDE_TIMEOUT_S)` call, and the client is built with `max_retries=0` (`anthropic==2.12.*`).
+  - It raises on refusal, `max_tokens`, a missing parse result, or local validation failure (lower-case enums, grade 0..4, probability 0..1 and finite).
+  - `decide_from_assessment()` follows §3.5 exactly, next to the untouched `decide()`.
+  - `predict.py` branches on `wants_jpeg`, and its `model_version` is the engine's even on a quality-gate UNGRADABLE. `assessment_json` is persisted, and there is one `claude_call` log line per call with ids, latency, tokens, image type and decision.
+  - Config: the `claude` source and its fields, plus the §12.4 validator.
+- Additive interface beyond the plan sketch: `ClaudePrediction` also carries `latency_ms`, `input_tokens` and `output_tokens` for the log line, and `wire_response()` takes an optional `request_id` so the logged id matches the response.
+- The Celery worker refuses the Claude engine before any side effect. This was a two-line typing guard forced by the §12.3 union return type, and the worker was deleted in Phase 3 anyway.
+- Gate: ruff and mypy are clean (34 files); `415 passed, 1 failed, 4 deselected`.
+- **The one failure is a test bug, left unedited per hard rule 3 and PROMPTS.md.**
+  - `tests/unit/test_claude_engine.py:164` expects `(588, 1568)` for a 1200×3136 portrait.
+  - The aspect-preserving result is 1200 × 1568/3136 = **600**, which the engine produces; the reviewer confirmed it independently.
+  - Fix in a test-only commit: change `588` to `600`.
+- Review (2c, Sonnet): no blockers. Its should-fix items are open decisions 1 and 2 below; its nit (image prep on the event loop) is fixed in `e956b45`.
+- **Not done: the manual real-key check.** It needs your four images in `backend/eval/manual/`, which is git-ignored.
+
+### 2026-11-22 — Phase 3 (Vercel-ready, not deployed)
+
+- Tests by the Sonnet test writer: `05d9f4f` (async rewrite 11, storage switch 14, Postgres 1, config Phase 3 rows, `tests/fakes/blob.py`). Implementation: `ad04f01`, which touches no tests.
+- Implementation:
+  - `run_screening()` is shared by `/predict` and `/predict/async`. Async runs inline and returns `replay:<exam_id>` with `PROCESSING`; issue 10 is fixed by sharing that path.
+  - The status endpoint keeps only the replay branch; `app/worker.py` and Celery, pika and redis are removed.
+  - Storage switch: `app/storage/blob.py` uses `vercel.blob.sync.put_blob` (public access, random suffix), and `app.storage` selects the backend. Blob mode writes nothing locally (import, startup, readiness), mounts no `/static`, and readiness checks `BLOB_READ_WRITE_TOKEN`.
+  - Database: `postgres://` and `postgresql://` are rewritten to `postgresql+psycopg://`, and Postgres uses `pool_size=2, max_overflow=2`.
+  - The rate limiter logs its key and `X-Forwarded-For` once per new bucket (issue 9); keying is unchanged.
+  - Also added: `.python-version` (3.12), `vercel.json` (matching Vercel's own FastAPI docs example) and `scripts/smoke_claude.sh`.
+- Changed outside CLAUDE.md's editable list, because it was needed: `app/db/models.py` `static_url()` now returns absolute `http(s)` URLs unchanged. Without that, a stored Blob URL read back as `/static/images/...` on status, replay and `/exams`, which the storage tests caught. `app/core/rate_limit.py` changed for issue 9, and `pytest.ini` for the marker.
+- `requirements.txt` uses `vercel-blob==0.6.*`, Vercel's standalone Blob client providing the same `vercel.blob` module, instead of the `vercel` meta-package. The meta-package also pulls the Sandbox, Workflow and Queue clients plus websockets.
+- Gate, from a **fresh** venv built from `requirements-dev.txt` (`pip check` clean; no torch, timm, grad-cam, onnx, celery, pika, redis or streamlit):
+  - ruff and mypy are clean.
+  - `import app.main` loads neither celery nor torch.
+  - `EYE_MODE=demo pytest -q -m "not model and not perf"` gives `449 passed, 1 failed, 1 skipped, 4 deselected`. The failure is the test bug above; the skip is `test_postgres_async.py`, because no `TEST_POSTGRES_URL` or Postgres container was available (no Docker daemon).
+- Review (3c, Sonnet): no blockers.
+  - Blob mode was verified empirically: `import app.main`, startup and `/health/ready` never created `EYE_STORAGE_DIR`.
+  - The first async status is `PROCESSING`, both endpoints share `run_screening`, and the URL rewrite and pool are correct.
+  - The Python 3.12 Linux wheels exist for every pin.
+  - Should-fix items are open decisions 5 and 6 below. Nit: the rate-limit line logs client IPs at INFO, which is intended for issue 9 and noted for privacy.
+- Not done here: `vercel deploy`, the live smoke test, and the Postgres round trip. They need your Vercel account and stores; steps below.
+
+## Open decisions for the owner (2026-11-22)
+
+1. **`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**
+   - The default `claude-sonnet-5-5` runs adaptive thinking when `thinking` is omitted, and thinking tokens count toward `max_tokens`. An answer can therefore hit `max_tokens`, which the engine treats as a 500. That is safe, but it could fail most calls.
+   - Options: raise the default (for example to 4000; you pay only for tokens actually used), or send `thinking={"type": "between_tools"}`. Sonnet 5.5 accepts that setting, but `claude-opus-5-5`, the comparison model, rejects it.
+   - For the manual check, run with `CLAUDE_MAX_TOKENS=4000` and look at `output_tokens` in the `claude_call` log line.
+2. **EXIF in unchanged JPEGs (Phase 2 review).** §3.3 sends a JPEG within 1568 px byte-for-byte, so EXIF and comment segments (GPS, device, any typed comment) reach Claude, which conflicts with CLAUDE.md's "only the image". A lossless metadata strip would also change `test_small_jpeg_is_sent_byte_identical` and `test_jpeg_exactly_at_the_limit_is_unchanged`, so it needs your call.
+3. **The test arithmetic bug** above: approve the one-character test-only fix.
+4. **`backend/README.md`** still documents the torch install, `download_model.py` and Grad-CAM (Phase 1 review). It is outside every phase's file list. Approve a docs-only update?
+5. **`onnxruntime` on Vercel.**
+   - It stays in `requirements.txt` per §12.2, but is useless on Vercel, because `skin.onnx` is not deployed there.
+   - Measured installed sizes (macOS; Linux is smaller): cv2 152 MB, numpy 60, onnxruntime 59 plus its dependency **sympy 79 and mpmath 5**, anthropic 33, sqlalchemy 20, PIL 14. The whole production set is about 461 MB on macOS.
+   - The Phase 3 reviewer estimates 350–400 MB on Linux. Vercel's FastAPI docs give a standard **500 MB** Python bundle limit (up to 5 GB on Fluid compute, in beta), so it should fit.
+   - If a deploy fails on size, `onnxruntime` and sympy (about 150 MB) are the first thing to drop. For example, move it to a `requirements-analysis.txt` that only the Dockerfile installs.
+6. **Windows launchers (Phase 3 review).** `backend/run_backend_hidden.bat:5` still starts `celery -A app.worker.celery_app worker`, and `stop_backend.bat` kills Celery processes. `app/worker.py` no longer exists, so the launcher would fail. Both files are outside every phase's file list. Approve removing the Celery lines?
+
+## Vercel deploy steps (for the owner; nothing was deployed)
+
+1. Merge or push `feature/claude-engine` as you prefer (the kit forbids me pushing).
+2. Vercel → Add New → Project → import the repository. Set **Root Directory = `backend`**. Vercel finds the FastAPI `app` at `app/main.py` and reads `.python-version` (3.12) and `requirements.txt`.
+3. Storage → **Blob** → create a store → connect it to the project. This adds `BLOB_READ_WRITE_TOKEN`.
+4. Storage or Marketplace → **Postgres** (e.g. Neon) → connect it to the project. Copy its **pooled** URL into `DATABASE_URL`; `postgres://` is fine, the config rewrites it.
+5. Settings → Environment Variables: every name in `backend/.env.vercel.example`.
+   - `EYE_MODE=shadow`, `EYE_MODEL_SOURCE=claude`, `EYE_STORAGE=blob`, `QUALITY_BLUR_MIN_VAR=8`, `MAX_UPLOAD_MB=4`.
+   - `EYE_API_KEY` from `openssl rand -hex 32`, the same value as the app's `API_KEY`.
+   - `ANTHROPIC_API_KEY`, and `CLAUDE_MAX_TOKENS` per decision 1.
+6. Deploy. Then:
+   - `bash scripts/smoke_claude.sh https://<project>.vercel.app <EYE_API_KEY> eval/manual`
+   - Check the function logs for `claude_call` lines (and none for the blurred image), and for `rate_limit new_bucket key=... x_forwarded_for=...` (issue 9: is `key` the phone's IP or a proxy IP?).
+7. Postgres round trip, run once by hand: `TEST_POSTGRES_URL=<pooled URL> EYE_MODE=demo pytest -q tests/integration/test_postgres_async.py`
+
 ## Manual Claude checks
 
 <!-- Phase 2/3: per image — decision, icdr_grade, image_type, latency, tokens. -->
+
+*Pending.* Put `referable.jpg`, `normal.jpg`, `external_eye.jpg` and `blurred.jpg` in `backend/eval/manual/` (git-ignored). Then, with the key in `backend/.env`:
+1. Start the server: `EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 QUALITY_BLUR_MIN_VAR=8 CLAUDE_MAX_TOKENS=4000 uvicorn app.main:app --port 8000`
+2. Run the smoke test: `bash scripts/smoke_claude.sh http://localhost:8000 demo123 eval/manual`
+
+These are the only real API calls before Phase 4, and they are billed.
 
 ## Eval results
 
