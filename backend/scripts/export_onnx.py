@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 
 import torch
-import onnx
 from onnxruntime.quantization import quantize_dynamic, QuantType
 
 # app.config va app.inference import qilish orqali mavjud TorchEngine'dan foydalanamiz
