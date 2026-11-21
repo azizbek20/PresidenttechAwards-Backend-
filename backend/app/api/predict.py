@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
@@ -40,8 +40,13 @@ from app.api.deps import engine_for, fill_additive_keys, semaphore_for
 from app.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.db import crud
-from app.inference.decision import DecisionResult, decide
-from app.inference.engine import ModelUnavailable
+from app.inference.decision import DecisionResult, decide, decide_from_assessment
+from app.inference.engine import (
+    ClaudePrediction,
+    InferenceEngine,
+    ModelUnavailable,
+    Prediction,
+)
 from app.schemas import (
     DISCLAIMER,
     Decision,
@@ -52,6 +57,9 @@ from app.schemas import (
     TaskStatusResponse,
 )
 from app.storage import local as storage
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.inference.claude_engine import ClaudeEngine
 
 logger = logging.getLogger("eyedetect.predict")
 
@@ -186,6 +194,7 @@ def _persist(
     heatmap_url: str | None,
     processed_at: datetime,
     idempotency_key: str | None,
+    assessment_json: str | None = None,
 ) -> None:
     """Step 10. One transaction, owned by Agent B's ``crud``.
 
@@ -210,6 +219,7 @@ def _persist(
             heatmap_path=heatmap_url,
             processed_at=processed_at,
             idempotency_key=idempotency_key,
+            assessment_json=assessment_json,
         )
 
 
@@ -303,28 +313,49 @@ async def predict(
     report = await run_in_threadpool(quality_gate.assess, img, settings)
 
     # ---- 6. inference, only when the gate passed -------------------------
-    pred = None
+    # Two engine kinds (plan §3.6): a `wants_jpeg` engine (Claude) is awaited
+    # with the uploaded bytes and nothing else — never patient_id or eye; the
+    # mock still receives the normalised tensor.
+    wants_jpeg = bool(getattr(engine, "wants_jpeg", False))
+    pred: Prediction | None = None
+    claude_pred: ClaudePrediction | None = None
     # The C9 gate ran at 3c, before dedup and before anything was written.
     if report.ok:
         try:
-            tensor = await run_in_threadpool(
-                _to_tensor, img, settings.engine_input_size
-            )
-            # `async with` (not acquire/release): a client that navigates away
-            # mid-request is cancelled here, and the permit must still come
-            # back or the server dies of slow permit exhaustion (C16).
-            async with semaphore_for(request.app):
-                pred = await run_in_threadpool(engine.predict, tensor)
+            if wants_jpeg:
+                claude = cast("ClaudeEngine", engine)
+                # `async with` (not acquire/release): a client that navigates
+                # away mid-request is cancelled here, and the permit must still
+                # come back or the server dies of slow permit exhaustion (C16).
+                async with semaphore_for(request.app):
+                    claude_pred = await claude.assess(raw)
+            else:
+                tensor = await run_in_threadpool(
+                    _to_tensor, img, settings.engine_input_size
+                )
+                tensor_engine = cast(InferenceEngine, engine)
+                async with semaphore_for(request.app):
+                    pred = await run_in_threadpool(tensor_engine.predict, tensor)
         except ModelUnavailable as exc:
             raise ApiError(503, "model_unavailable", _D_MODEL) from exc
         except ApiError:
             raise
         except Exception as exc:
+            # No fallback verdict: an API error, timeout, refusal or invalid
+            # model output is a 500 and nothing is persisted (CLAUDE.md).
             logger.exception("inference failed for exam %s", exam_id)
             raise ApiError(500, "inference_error", _D_INFERENCE) from exc
 
     # ---- 7. verdict (threshold lives server-side, only here) -------------
-    result = decide(pred, report.ok, settings.referable_threshold)
+    if wants_jpeg:
+        result = decide_from_assessment(
+            claude_pred["assessment"] if claude_pred else None,
+            report.ok,
+            settings.referable_threshold,
+            settings.uncertain_refers,
+        )
+    else:
+        result = decide(pred, report.ok, settings.referable_threshold)
 
     # ---- 8. heatmap: removed in the Claude migration (plan §3.1) ----------
     heatmap_url: str | None = None
@@ -334,7 +365,32 @@ async def predict(
 
     # ---- 10. unconditional persistence (C10) -----------------------------
     processed_at = _utc_now()
-    model_version = pred["model_version"] if pred else settings.eye_model_version
+    request_id = str(uuid4())
+    if wants_jpeg:
+        # The engine's version even when the gate stopped the call, so a
+        # Claude deployment never records "mock-v0".
+        model_version = str(getattr(engine, "model_version", settings.eye_model_version))
+    else:
+        model_version = pred["model_version"] if pred else settings.eye_model_version
+    assessment_json = (
+        claude_pred["assessment"].model_dump_json() if claude_pred else None
+    )
+    if claude_pred is not None:
+        # One line per Claude call (backend/CLAUDE.md). Never the image bytes,
+        # the key or the patient id.
+        logger.info(
+            "claude_call request_id=%s exam_id=%s model_version=%s "
+            "latency_ms=%.0f input_tokens=%d output_tokens=%d image_type=%s "
+            "decision=%s",
+            request_id,
+            exam_id,
+            claude_pred["model_version"],
+            claude_pred["latency_ms"],
+            claude_pred["input_tokens"],
+            claude_pred["output_tokens"],
+            claude_pred["assessment"].image_type,
+            result.decision,
+        )
     try:
         await run_in_threadpool(
             _persist,
@@ -350,6 +406,7 @@ async def predict(
             heatmap_url=heatmap_url,
             processed_at=processed_at,
             idempotency_key=idempotency_key,
+            assessment_json=assessment_json,
         )
     except Exception as exc:  # C10 is unconditional: ANY failure is a 500.
         logger.exception("persistence failed for exam %s", exam_id)
@@ -366,6 +423,7 @@ async def predict(
         model_version=model_version,
         processed_at=processed_at,
         settings=settings,
+        request_id=request_id,
     )
 
 
@@ -380,8 +438,12 @@ def wire_response(
     model_version: str,
     processed_at: datetime,
     settings: Settings,
+    request_id: str | None = None,
 ) -> PredictResponse:
-    """Step 11, shared by the sync endpoint and the Celery worker."""
+    """Step 11, shared by the sync endpoint and the Celery worker.
+
+    ``request_id`` lets the sync path reuse the id it already logged.
+    """
     return PredictResponse(
         exam_id=exam_id,
         patient_id=patient_code,
@@ -398,7 +460,7 @@ def wire_response(
         model_version=model_version,
         processed_at=_wire_time(processed_at),
         disclaimer=DISCLAIMER,
-        request_id=str(uuid4()),
+        request_id=request_id or str(uuid4()),
         mode=settings.eye_mode,
     )
 

@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import numpy as np
 
+    from app.inference.assessment import FundusAssessment
+    from app.inference.claude_engine import ClaudeEngine
+
 logger = logging.getLogger("eyedetect.engine")
 
 #: ImageNet normalisation constants. FROZEN and shared: ``preprocess.to_model_input``
@@ -44,6 +47,19 @@ class Prediction(TypedDict):
     grade: int  # 0..4
     probs: list[float]  # len 5, sums to 1.0
     model_version: str
+
+
+class ClaudePrediction(TypedDict):
+    """What :meth:`ClaudeEngine.assess` returns (plan §3.3, additive).
+
+    The token and latency fields feed the per-call log line in ``predict.py``.
+    """
+
+    assessment: "FundusAssessment"
+    model_version: str
+    latency_ms: float
+    input_tokens: int
+    output_tokens: int
 
 
 @runtime_checkable
@@ -70,13 +86,19 @@ class UnavailableEngine:
         raise ModelUnavailable(self.reason)
 
 
-def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
+def get_engine(settings) -> "InferenceEngine | ClaudeEngine":  # noqa: ANN001
     """Build the engine for the configured source.
 
     ``torch``: ``app.inference.torch_engine`` no longer exists (migration
     Phase 1), so the import below fails and the result is
     :class:`UnavailableEngine` (503 at the API) — never a silent mock
     substitution.
+
+    ``claude``: a :class:`ClaudeEngine`. Without ``ANTHROPIC_API_KEY`` it
+    reports ``model_loaded = False`` (503, like a missing checkpoint); a
+    missing prompt file raises here — a boot error, not a fallback (§3.3).
+    The return type is widened per plan §12.3: ``ClaudeEngine`` has
+    ``assess()``, not ``predict()``.
     """
     source = settings.eye_model_source
 
@@ -102,4 +124,11 @@ def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
             logger.error("torch engine failed to load: %s", exc)
             return UnavailableEngine(str(exc))
 
-    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch)")
+    if source == "claude":
+        from app.inference.claude_engine import ClaudeEngine
+
+        return ClaudeEngine(settings)
+
+    raise ValueError(
+        f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch|claude)"
+    )

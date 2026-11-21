@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from celery import Celery
 from celery.signals import worker_process_init
@@ -24,6 +24,9 @@ from app.inference.decision import decide
 from app.inference.engine import InferenceEngine, get_engine
 from app.storage import local as storage
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.inference.claude_engine import ClaudeEngine
+
 logger = logging.getLogger("eyedetect.worker")
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "sqla+sqlite:///celery_broker.db")
@@ -31,10 +34,10 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "db+sqlite:///celery_
 
 celery_app = Celery("eyedetect_worker", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
 
-_engine: InferenceEngine | None = None
+_engine: "InferenceEngine | ClaudeEngine | None" = None
 
 
-def _get_engine() -> InferenceEngine:
+def _get_engine() -> "InferenceEngine | ClaudeEngine":
     """Load the engine once per worker process (lazily if the signal did not fire)."""
     global _engine
     if _engine is None:
@@ -60,7 +63,13 @@ def process_exam_task(
 ) -> dict[str, Any]:
     """Run steps 4-11 and return the JSON-ready ``PredictResponse`` dict."""
     settings = get_settings()
-    engine = _get_engine()
+    loaded = _get_engine()
+    if getattr(loaded, "wants_jpeg", False):
+        # The Claude engine is async and takes JPEG bytes; it runs inline in
+        # the API process from Phase 3 (plan §3.7), when this worker is
+        # deleted. Until then refuse before any side effect — never a verdict.
+        raise RuntimeError(predict_flow._D_INFERENCE)
+    engine = cast("InferenceEngine", loaded)
 
     img = preprocessing.load_rgb(raw_bytes)
     if img is None:

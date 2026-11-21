@@ -211,6 +211,10 @@ class Result(Base):
     #: response the phone originally received.
     decision_text: Mapped[str] = mapped_column(Text, nullable=False)
     model_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Claude migration (plan §3.6): the raw structured assessment, as JSON, for
+    #: the admin panel and the eval. NULL for the mock engine and for a
+    #: quality-gate UNGRADABLE (no model call was made).
+    assessment_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow
     )

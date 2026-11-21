@@ -8,6 +8,9 @@ numpy==1.26.*
 opencv-python-headless==4.10.*
 psycopg[binary]==3.2.*
 
+# Claude vision engine (docs/MIGRATION_PLAN.md §3.3)
+anthropic==2.12.*
+
 # Async queue: app/worker.py stays until Phase 3 (docs/MIGRATION_PLAN.md §6)
 celery==5.4.*
 pika==1.3.*
