@@ -74,7 +74,6 @@ def process_exam_task(
 
     # 6. inference only when the gate passed
     pred = None
-    tensor = None
     if report.ok:
         if not getattr(engine, "model_loaded", False):
             raise RuntimeError(predict_flow._D_MODEL)
@@ -88,12 +87,8 @@ def process_exam_task(
     # 7. verdict
     result = decide(pred, report.ok, settings.referable_threshold)
 
-    # 8. heatmap, best effort
+    # 8. heatmap: removed in the Claude migration (plan §3.1, §12.1)
     heatmap_url: str | None = None
-    if report.ok:
-        heatmap_path, candidate_url = storage.heatmap_target(exam_id)
-        if predict_flow._render_heatmap(engine, img, tensor, heatmap_path):
-            heatmap_url = candidate_url
 
     # 9. patient code is non-null from here on
     patient_code = patient_id or crud.generate_patient_code()

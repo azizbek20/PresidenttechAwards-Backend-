@@ -19,7 +19,9 @@ from the operator instructions instead:
     run on cpu, always. Deterministic and portable.
   * ``EYE_DEVICE=mps``  — Apple-silicon dev runs only. Never gates anything.
   * ``EYE_DEVICE=auto`` — mps when actually available, else cpu with a WARNING.
-Grad-CAM always runs on cpu regardless of this setting (see gradcam.py).
+Since the Claude migration's Phase 1 no engine reads ``EYE_DEVICE``; the field
+stays because ``tests/test_frozen_kit.py`` pins its ``cpu`` default.
+``EYE_MODEL_SOURCE=torch`` is likewise a legacy value (always 503, plan §3.2).
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ class Settings(BaseSettings):
 
     # ---- mode / model ----------------------------------------------------
     eye_mode: Literal["demo", "shadow"] = Field(default="demo", alias="EYE_MODE")
-    eye_model_source: Literal["mock", "torch", "onnx"] = Field(
+    eye_model_source: Literal["mock", "torch"] = Field(
         default="mock", alias="EYE_MODEL_SOURCE"
     )
     eye_model_dir: Path = Field(default=Path("./models"), alias="EYE_MODEL_DIR")

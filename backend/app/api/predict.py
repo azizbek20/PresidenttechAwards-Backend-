@@ -13,7 +13,7 @@ ordering carries real safety weight:
 * persistence (step 10) is unconditional — a result the admin panel cannot
   corroborate never reaches the phone (C10).
 
-Agent A (`preprocess`, `quality`, `gradcam`) and Agent B (`db.base`, the
+Agent A (`preprocess`, `quality`) and Agent B (`db.base`, the
 `crud` bodies) supply the modules imported below; this file only orchestrates
 them against the frozen signatures.
 """
@@ -23,19 +23,17 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-# Agent A delivers `preprocess`/`quality`/`gradcam` and Agent B delivers
+# Agent A delivers `preprocess`/`quality` and Agent B delivers
 # `db.base` at the Phase 2 merge. They are imported as modules (not as loose
 # functions) so tests can substitute them by dotted string, and aliased so the
 # import form stays resolvable for the type checker on every branch.
 import app.db.base as db_base
-import app.inference.gradcam as heatmaps
 import app.inference.preprocess as preprocessing
 import app.inference.quality as quality_gate
 from app.api.deps import engine_for, fill_additive_keys, semaphore_for
@@ -174,25 +172,6 @@ def _lookup_replay(
         return "replay", dict(prior)
 
 
-def _render_heatmap(
-    engine: Any, img: Any, tensor: Any, out_path: Path
-) -> bool:
-    """Step 8, best effort: a missing heatmap is never a failed screening."""
-    try:
-        display = preprocessing.display_copy(img)
-        model = getattr(engine, "model", None)
-        # A real torch model gets Grad-CAM; the mock path gets the stand-in
-        # overlay, and a failed render just means no heatmap.
-        if model is not None and tensor is not None and heatmaps.render_heatmap(
-            model, tensor, display, out_path
-        ):
-            return True
-        return bool(heatmaps.mock_heatmap(display, out_path))
-    except Exception:
-        logger.warning("heatmap rendering failed", exc_info=True)
-        return False
-
-
 def _persist(
     *,
     exam_id: str,
@@ -325,7 +304,6 @@ async def predict(
 
     # ---- 6. inference, only when the gate passed -------------------------
     pred = None
-    tensor = None
     # The C9 gate ran at 3c, before dedup and before anything was written.
     if report.ok:
         try:
@@ -348,14 +326,8 @@ async def predict(
     # ---- 7. verdict (threshold lives server-side, only here) -------------
     result = decide(pred, report.ok, settings.referable_threshold)
 
-    # ---- 8. heatmap, best effort ------------------------------------------
+    # ---- 8. heatmap: removed in the Claude migration (plan §3.1) ----------
     heatmap_url: str | None = None
-    if report.ok:
-        heatmap_path, candidate_url = storage.heatmap_target(exam_id)
-        if await run_in_threadpool(
-            _render_heatmap, engine, img, tensor, heatmap_path
-        ):
-            heatmap_url = candidate_url
 
     # ---- 9. C2: the patient code is non-null from here on ----------------
     patient_code = patient_id or crud.generate_patient_code()

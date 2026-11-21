@@ -1,0 +1,4 @@
+# Admin panel (admin/dashboard.py). Installed in the Docker image because the
+# compose `admin` service runs from it; locally: pip install -r requirements-admin.txt
+streamlit==1.37.*
+requests==2.31.*

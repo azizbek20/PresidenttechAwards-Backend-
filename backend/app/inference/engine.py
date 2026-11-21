@@ -1,10 +1,17 @@
-"""Frozen engine contract (spec §4.5, C9). DO NOT EDIT.
+"""Engine contract (spec §4.5, C9).
+
+Frozen under the v4 spec; the Claude migration (``docs/MIGRATION_PLAN.md``)
+unfreezes it for additive changes only — existing signatures stay.
 
 NOTE on the ``auto`` source: §4.5's parenthetical still mentions
 ``mock | torch | auto``, but that is residual v1 wording — C9 and §4.9 DELETE
 ``auto``. A deployment that silently degrades to mock predictions is a safety
 failure, not a convenience. Only ``mock`` and ``torch`` are accepted here; the
 config layer rejects anything else before this module is reached.
+
+``torch`` is a legacy value since Phase 1 of the migration: its engine module
+was deleted, so it always yields :class:`UnavailableEngine` (503). It stays
+because the frozen tests pin the shadow + torch rules (plan §3.2).
 """
 
 from __future__ import annotations
@@ -66,9 +73,10 @@ class UnavailableEngine:
 def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
     """Build the engine for the configured source.
 
-    ``torch_engine`` is imported lazily so the mock path never imports torch.
-    A missing/invalid checkpoint yields :class:`UnavailableEngine` (503 at the
-    API), never a silent mock substitution.
+    ``torch``: ``app.inference.torch_engine`` no longer exists (migration
+    Phase 1), so the import below fails and the result is
+    :class:`UnavailableEngine` (503 at the API) — never a silent mock
+    substitution.
     """
     source = settings.eye_model_source
 
@@ -94,16 +102,4 @@ def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
             logger.error("torch engine failed to load: %s", exc)
             return UnavailableEngine(str(exc))
 
-    if source == "onnx":
-        try:
-            from app.inference.onnx_engine import OnnxEngine
-        except ImportError as exc:
-            logger.error("onnx engine unavailable: %s", exc)
-            return UnavailableEngine(f"onnx engine import failed: {exc}")
-        try:
-            return OnnxEngine(settings)
-        except Exception as exc:
-            logger.error("onnx engine failed to load: %s", exc)
-            return UnavailableEngine(str(exc))
-
-    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch|onnx)")
+    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch)")
