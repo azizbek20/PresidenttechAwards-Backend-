@@ -430,6 +430,115 @@ def test_png_text_chunk_is_not_sent(fake: FakeAnthropic) -> None:
         assert "comment" not in sent.info
 
 
+SECRET_APP = b"SECRET-APPN-6H"
+
+
+def header_segments(jpeg: bytes, marker: int) -> list[bytes]:
+    """Every ``marker`` segment (``FF <marker>`` + length + payload) before the first SOS."""
+    found: list[bytes] = []
+    i = 2
+    while i < len(jpeg) - 3 and jpeg[i + 1] != 0xDA:
+        length = int.from_bytes(jpeg[i + 2 : i + 4], "big")
+        if jpeg[i + 1] == marker:
+            found.append(jpeg[i : i + 2 + length])
+        i += 2 + length
+    return found
+
+
+def jfif_with_thumbnail(raw: bytes, w: int, h: int, secret: bytes) -> bytes:
+    """Replace Pillow's 18-byte JFIF APP0 by one carrying a w*h RGB thumbnail."""
+    assert raw[2:4] == b"\xff\xe0" and raw[6:11] == b"JFIF\x00"
+    head = raw[11:18]  # version(2) units(1) xdensity(2) ydensity(2)
+    thumb = secret.ljust(3 * w * h, b"\x00")
+    payload = b"JFIF\x00" + head + bytes([w, h]) + thumb
+    seg = b"\xff\xe0" + (len(payload) + 2).to_bytes(2, "big") + payload
+    return raw[:2] + seg + raw[20:]
+
+
+def test_jfif_thumbnail_is_dropped_and_app0_is_rebuilt(fake: FakeAnthropic) -> None:
+    base = jpeg_with(800, 600)
+    raw = jfif_with_thumbnail(base, 4, 3, SECRET_APP)
+    assert SECRET_APP in raw
+    data = send(fake, raw)
+    assert SECRET_APP not in data
+    assert pixels(data) == pixels(raw)
+    assert header_segments(data, 0xE0) == [
+        b"\xff\xe0\x00\x10JFIF\x00" + base[11:18] + b"\x00\x00"
+    ]
+
+
+def test_jfif_extra_bytes_after_zero_thumbnail_are_dropped(
+    fake: FakeAnthropic,
+) -> None:
+    base = jpeg_with(800, 600)
+    payload = b"JFIF\x00" + base[11:18] + b"\x00\x00" + SECRET_APP
+    raw = base[:2] + b"\xff\xe0" + (len(payload) + 2).to_bytes(2, "big") + payload
+    raw += base[20:]
+    assert SECRET_APP in raw
+    data = send(fake, raw)
+    assert SECRET_APP not in data
+    assert pixels(data) == pixels(base)
+    assert header_segments(data, 0xE0) == [
+        b"\xff\xe0\x00\x10JFIF\x00" + base[11:18] + b"\x00\x00"
+    ]
+
+
+def test_second_jfif_app0_is_dropped(fake: FakeAnthropic) -> None:
+    raw = insert_segment(
+        jpeg_with(800, 600), 0xE0, b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01" + SECRET_APP
+    )
+    assert len(header_segments(raw, 0xE0)) == 2
+    data = send(fake, raw)
+    assert SECRET_APP not in data
+    assert len(header_segments(data, 0xE0)) == 1
+
+
+def cmyk_jpeg() -> bytes:
+    buf = io.BytesIO()
+    Image.new("CMYK", (300, 200), (10, 20, 30, 40)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def test_plain_cmyk_jpeg_is_byte_identical(fake: FakeAnthropic) -> None:
+    raw = cmyk_jpeg()
+    assert len(header_segments(raw, 0xEE)) == 1
+    assert send(fake, raw) == raw
+
+
+def test_adobe_app14_is_cut_to_its_fixed_payload(fake: FakeAnthropic) -> None:
+    raw = cmyk_jpeg()
+    (adobe,) = header_segments(raw, 0xEE)
+    longer = adobe + SECRET_APP
+    longer = longer[:2] + (len(longer) - 2).to_bytes(2, "big") + longer[4:]
+    raw_dirty = raw.replace(adobe, longer, 1)
+    assert SECRET_APP in raw_dirty
+    data = send(fake, raw_dirty)
+    assert SECRET_APP not in data
+    assert pixels(data) == pixels(raw)
+    assert header_segments(data, 0xEE) == [adobe[:2] + b"\x00\x0e" + adobe[4:16]]
+
+
+def test_dnl_with_a_long_payload_is_not_kept(fake: FakeAnthropic) -> None:
+    base = jpeg_with(800, 600)
+    dnl = b"\xff\xdc" + (len(SECRET_APP) + 2).to_bytes(2, "big") + SECRET_APP
+    raw = base[:-2] + dnl + base[-2:]
+    data = send(fake, raw)
+    assert SECRET_APP not in data
+    with Image.open(io.BytesIO(data)) as sent:
+        assert sent.format == "JPEG"
+        assert sent.size == (800, 600)
+
+
+@pytest.mark.parametrize("marker", [0xF0, 0xF5, 0xDE, 0xDF])
+def test_unknown_marker_makes_the_copier_give_up(marker: int) -> None:
+    from app.inference import claude_engine
+
+    base = jpeg_with(800, 600)
+    raw = insert_segment(base, marker, SECRET_APP, at=sos_offsets(base)[0])
+    assert SECRET_APP in raw
+    assert claude_engine._strip_metadata(raw) is None
+
+
 # --------------------------------------------------------------------------
 # the result
 # --------------------------------------------------------------------------
