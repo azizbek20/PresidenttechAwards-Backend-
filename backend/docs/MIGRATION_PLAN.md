@@ -136,8 +136,9 @@ class ClaudeEngine:
   **Amended 2026-11-22 (owner, NOTES.md open decision 2):** "unchanged"
   now means the same pixels with the file's metadata removed. An upright
   JPEG within the limit is copied losslessly without EXIF, XMP, IPTC, MPF,
-  comments or bytes after EOI (only JFIF, the ICC profile and Adobe
-  segments stay); an EXIF-rotated JPEG is re-encoded upright; every
+  comments or bytes after EOI (only JFIF, rebuilt without a thumbnail, the
+  ICC profile and Adobe segments stay, and only known decoding markers are
+  copied); an EXIF-rotated JPEG is re-encoded upright; every
   re-encode carries no metadata. A plain JPEG is still byte-identical.
   PNG uploads are re-encoded to JPEG.
 - Validate the parsed output locally: lower-case enum strings; `icdr_grade`
