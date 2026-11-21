@@ -71,8 +71,11 @@ class Settings(BaseSettings):
     claude_timeout_s: float = Field(
         default=25.0, gt=0.0, le=300.0, alias="CLAUDE_TIMEOUT_S"
     )
+    #: Thinking tokens count toward this cap (Sonnet 5.5 thinks adaptively by
+    #: default), and a cut-off answer is a 500, so leave room. Billing is for
+    #: tokens actually used, not for the cap.
     claude_max_tokens: int = Field(
-        default=800, ge=1, le=128_000, alias="CLAUDE_MAX_TOKENS"
+        default=4000, ge=1, le=128_000, alias="CLAUDE_MAX_TOKENS"
     )
     #: Selects app/inference/prompts/fundus_<version>.md; also part of
     #: model_version, so bump it whenever the prompt changes.

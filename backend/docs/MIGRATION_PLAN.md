@@ -91,7 +91,8 @@ pass bar in §8 and the ophthalmologist's sign-off.
 - New fields: `anthropic_api_key` (`ANTHROPIC_API_KEY`, optional),
   `claude_model` (`CLAUDE_MODEL`, default `claude-sonnet-5-5`),
   `claude_timeout_s` (`CLAUDE_TIMEOUT_S`, default 25.0),
-  `claude_max_tokens` (`CLAUDE_MAX_TOKENS`, default 800),
+  `claude_max_tokens` (`CLAUDE_MAX_TOKENS`, default 4000 — raised from 800
+  on 2026-11-22, see NOTES.md open decision 1),
   `prompt_version` (`PROMPT_VERSION`, default `v1`),
   `uncertain_refers` (`UNCERTAIN_REFERS`, default true),
   `eye_storage` (`EYE_STORAGE`, `local` | `blob`, default `local`) — Phase 3.
