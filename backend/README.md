@@ -11,52 +11,73 @@ rasm yuboradi, server sifatni tekshiradi, baho beradi va `REFER` / `NO_REFER` /
 `SPEC.md` — yagona haqiqat manbai. Bu fayl bilan ziddiyat bo'lsa, `SPEC.md`
 ustun turadi.
 
+The DR assessment is made by **Claude vision** (Anthropic API) since the
+migration in `docs/MIGRATION_PLAN.md`; the PyTorch / ONNX / Grad-CAM engine is
+gone. For the inference engine, decision rules, storage and deployment, the
+plan takes precedence over `SPEC.md` (see `CLAUDE.md`). What was done,
+measured and is still open is logged in `docs/NOTES.md`.
+
 ---
 
 ## 1. Run it locally
 
-Python 3.11. The install order matters and is identical in the venv, the
-Dockerfile and CI — torch resolves only from its own pinned index, and PyPI
-packages only from PyPI (dependency-confusion guard):
+Python 3.11 locally and in CI; Vercel runs 3.12 (`.python-version`). One
+install, everything from PyPI:
 
 ```bash
 cd backend
 python3.11 -m venv venv && source venv/bin/activate
-pip install -r requirements-torch.txt
 pip install -r requirements-dev.txt
+pip install -r requirements-admin.txt    # only for the admin panel
 ```
 
-Then the **one extra step nobody guesses**, described in §6 below:
-
-```bash
-pip uninstall -y opencv-python
-pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
-python -c "import cv2; print(cv2.__version__)"   # -> 4.10.0
-```
-
-Run:
+Run with the **mock engine** (no key, no cost):
 
 ```bash
 cp .env.example .env          # then edit: at minimum set EYE_API_KEY
-EYE_API_KEY=demo123 uvicorn app.main:app --port 8000
+EYE_MODE=demo EYE_MODEL_SOURCE=mock EYE_API_KEY=demo123 uvicorn app.main:app --port 8000
 
 # admin panel — step 5 of the demo script
 API_URL=http://localhost:8000 EYE_API_KEY=demo123 streamlit run admin/dashboard.py
 ```
 
+Run with **Claude** (each screening that passes the quality gate is one
+billed API call). Put `ANTHROPIC_API_KEY` in `backend/.env` (git-ignored) or
+your shell, never in a tracked file:
+
+```bash
+EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 \
+  QUALITY_BLUR_MIN_VAR=8 uvicorn app.main:app --port 8000
+```
+
+* Without `ANTHROPIC_API_KEY` the app still starts, but `/health/ready` is 503
+  and `/api/v1/predict` returns `503 model_unavailable`.
+* Shadow mode with `claude` refuses to boot without a non-empty `EYE_API_KEY`.
+* `QUALITY_BLUR_MIN_VAR=8`: the config default of 50 rejects most sharp real
+  fundus photos (the IDRiD calibration is in `.env.example`).
+* An `eye.db` created before the migration lacks the new `assessment_json`
+  column (`create_all` never alters an existing table). Delete it and let the
+  app recreate it.
+
+On Windows, `start_24_7.vbs` runs `run_backend_hidden.bat` (uvicorn in the
+background, settings from `.env`), and `stop_backend.bat` stops it.
+
 Checks:
 
 ```bash
-pytest -q -m "not model and not perf"    # the default suite, mock engine
-ruff check && mypy app       # rule set pinned by ruff.toml / mypy.ini
+EYE_MODE=demo pytest -q -m "not model and not perf"    # the default suite
+ruff check app tests && mypy app    # rule set pinned by ruff.toml / mypy.ini
 
 python scripts/make_test_images.py                    # -> scripts/out/, 5 files
 bash scripts/smoke_test.sh http://localhost:8000 demo123
 ```
 
+The test suite never calls the real Claude API; it uses a fake client.
+
 `scripts/make_test_images.py` imports the generators from the **frozen**
 `tests/synthetic.py` rather than re-implementing them, so the smoke test and
-the test suite can never disagree about which image is REFER. Measured values:
+the test suite can never disagree about which image is REFER. Measured values
+(the expected verdicts are the mock engine's):
 
 | file | mean gray | blur var | expected |
 |---|---|---|---|
@@ -66,18 +87,33 @@ the test suite can never disagree about which image is REFER. Measured values:
 | `dark.jpg` | **8.06** | 411 | `UNGRADABLE` (brightness gate) |
 | `not_an_image.txt` | — | — | `400 invalid_image` |
 
+For the Claude engine, `scripts/smoke_claude.sh` checks real images instead.
+Put `referable.jpg`, `normal.jpg`, `external_eye.jpg` and `blurred.jpg` in
+`eval/manual/` (git-ignored; never patient images), then run it against a
+server started with `EYE_MODEL_SOURCE=claude`. It makes up to four billed
+calls:
+
+```bash
+bash scripts/smoke_claude.sh http://localhost:8000 demo123 eval/manual
+```
+
 ---
 
 ## 2. Run it in Docker
 
+The image runs the **mock demo stack** (`EYE_MODE=demo`,
+`EYE_MODEL_SOURCE=mock`). The Claude engine runs locally (§1) or on Vercel
+(§6), not here: compose passes no `ANTHROPIC_API_KEY`, and `.dockerignore`
+drops every `.md` file, including the prompt in `app/inference/prompts/`.
+
 Built **natively for the host architecture**. On Apple silicon that is
-`linux/arm64` — never pass `--platform amd64`; an emulated torch build is slow
-and proves nothing the native one does not.
+`linux/arm64` — never pass `--platform amd64`; an emulated build is slow and
+proves nothing the native one does not.
 
 ```bash
 cd backend
 cp .env.example .env      # set EYE_API_KEY; keep the placeholders elsewhere
-mkdir -p models           # bind-mount source for the read-only weights volume
+mkdir -p models           # bind-mount source for the read-only models volume
 
 docker build -t eye-backend:dev .
 docker compose up -d api admin        # api :8000, admin :8501
@@ -88,20 +124,25 @@ docker compose down
 * `api` and `admin` share **one image** — `admin/dashboard.py` is inside it on
   purpose (the v1 Dockerfile copied only `app/` and the admin container
   crashed on startup).
-* `models/` is mounted `:ro`. Weights are delivered air-gapped; the API never
-  downloads anything at import or request time.
-* Storage is a named volume, and the sqlite file lives on it, so
+* `models/` is mounted `:ro`. The DR engine needs no weights; the folder only
+  holds the optional `/analyze` skin model (`models/analysis/skin.onnx`).
+  Nothing is downloaded at import or request time.
+* Storage is a named volume, and the sqlite file has its own volume, so
   `down && up` does not silently empty the admin panel.
 * Postgres is behind a profile: `docker compose --profile prod up -d`. Set a
   real `POSTGRES_PASSWORD` in `.env` first — the compose default is a
   placeholder, not a password.
 * **MinIO is deliberately absent.** An S3 service with no S3 adapter in the
-  code is decoration; it returns at pilot phase with the adapter that uses it.
+  code is decoration.
+* The build fails if a GUI `opencv-python` ever comes back (slim images have
+  no libGL), so that regression cannot reach production. `libgl1` is
+  deliberately **not** installed: the bug must fail loudly, not hide.
 
 The image runs as **uid 10001**, single worker (`--workers 1` — the inference
-semaphore and the dedup window are per-process state), and its `HEALTHCHECK`
-polls `/health/ready`, not `/health/live`, because a container that is alive
-but cannot reach its database should not be considered up.
+semaphore, the dedup window and the rate limiter are per-process state), and
+its `HEALTHCHECK` polls `/health/ready`, not `/health/live`, because a
+container that is alive but cannot reach its database should not be
+considered up.
 
 ---
 
@@ -139,6 +180,7 @@ Find this machine's address with `ipconfig getifaddr en0`.
 | Emulator on this host | omit the key — the default is `http://10.0.2.2:8000/` |
 | Real phone, same Wi-Fi | `http://<THIS-MACHINE-LAN-IP>:8000/` |
 | ngrok fallback (different networks / captive Wi-Fi) | `https://xxxx.ngrok-free.app/` |
+| Deployed on Vercel (§6) | `https://<project>.vercel.app/` (release builds: `RELEASE_API_URL`) |
 
 `10.0.2.2` is the **Android emulator's** alias for the host loopback. On a real
 phone it resolves to nothing and every request fails, which is why it is only
@@ -179,12 +221,22 @@ mis-keyed.
 
 `EYE_REFERABLE_THRESHOLD` (default `0.5`) lives **only** in `app/config.py`,
 read from the environment. `app/inference/decision.py` is the only place a
-verdict is computed:
+verdict is computed. It has two functions, and both return the same
+`DecisionResult`:
 
-```python
-p_ref = round(sum(pred["probs"][2:]), 4)     # P(ICDR >= 2) = referable DR
-referable = p_ref >= threshold
-```
+* `decide()` (frozen) for the mock engine's five class probabilities:
+
+  ```python
+  p_ref = round(sum(pred["probs"][2:]), 4)     # P(ICDR >= 2) = referable DR
+  referable = p_ref >= threshold
+  ```
+
+* `decide_from_assessment()` for Claude's structured `FundusAssessment`. Not a
+  fundus photo, or not gradable, is `UNGRADABLE`. The lesion checklist can
+  only raise Claude's grade, never lower it. `REFER` when the final grade is
+  2 or more, when macular edema signs are present or uncertain, or (with
+  `UNCERTAIN_REFERS=true`, the default) when any grade-2 lesion is uncertain.
+  The probability is then clamped so it agrees with the verdict.
 
 The response carries the **already-made decision** (`decision`, `referable`,
 `decision_text`) and the phone renders it. The client never compares
@@ -205,8 +257,16 @@ That is a safety property, not a style preference:
 Related invariants worth knowing before changing anything:
 
 * **The quality gate runs before the DR engine, always.** A blurry or dark
-  image is `UNGRADABLE` and `engine.predict` is never called — pinned by
-  `tests/contract/test_engine_spy.py`.
+  image is `UNGRADABLE` and the engine is never called, so it costs zero
+  Claude calls — pinned by `tests/contract/test_engine_spy.py` and
+  `tests/contract/test_claude_wiring.py`.
+* **No fallback verdict.** A Claude API error, a timeout, a refusal or output
+  that fails local validation is `500 inference_error`. No error path returns
+  `NO_REFER`.
+* **Only the image goes to Claude.** The request holds the image and a fixed
+  instruction — never `patient_id` or any other patient data. The image's own
+  metadata (EXIF GPS and camera data, XMP, comments, data appended after the
+  image) is removed first; the pixels are unchanged.
 * **C3 split truth.** `UNGRADABLE` goes over the wire with non-null
   placeholders (`probability=0.0`, `icdr_grade=0`, `grade_label="Baholab
   bo'lmadi"`) because the deployed APK crashes on nulls, while the DB stores
@@ -217,56 +277,35 @@ Related invariants worth knowing before changing anything:
 * **C14 dedup.** The client's `retry()` resends the same retained bytes, so a
   server-success + client-timeout + retry would otherwise create a duplicate
   exam. The server dedups on `sha256(bytes) + patient_code + eye` inside
-  `DEDUP_WINDOW_MIN` (default 10) and replays the stored response. Known demo
-  limitation: check-then-insert has a small race window for two genuinely
-  concurrent identical uploads; a locking upgrade is pilot work.
-
-### Device policy
-
-`SPEC.md` ships with **no §10 macOS/MPS addendum**, so the device contract is
-pinned in `app/config.py` instead:
-
-* `EYE_DEVICE=cpu` — the default, and **mandatory** for tests, CI, Docker and
-  every gate assertion. MPS never gates anything.
-* `EYE_DEVICE=mps` — Apple-silicon dev runs only.
-* `EYE_DEVICE=auto` — mps when genuinely available, else cpu with a WARNING.
-* Grad-CAM always runs on cpu regardless of this setting.
+  `DEDUP_WINDOW_MIN` (default 10) and replays the stored response, without a
+  second Claude call. Known demo limitation: check-then-insert has a small
+  race window for two genuinely concurrent identical uploads; a locking
+  upgrade is pilot work.
+* **`/predict/async` runs inline.** There is no background worker (Vercel runs
+  none). The screening runs in the request, and the returned task id is
+  `replay:<exam_id>`, which the status endpoint answers from the stored exam.
 
 ### Mode enforcement (C9)
 
-`EYE_MODE=demo` may use the mock engine, and every response carries
-`mode="demo"` + `model_version="mock-v0"` so it cannot be mistaken for a live
-model. `EYE_MODE=shadow` requires `EYE_MODEL_SOURCE=torch` **and** a
-digest-verified artifact; without a loaded model `/health/ready` stays 503 and
-`/api/v1/predict` returns `503 model_unavailable`. It never serves mock output.
-The v1 `auto` model source was deleted: silently degrading to mock predictions
-in a live deployment is a safety failure, not a convenience.
+* `EYE_MODE=demo` may use the mock engine, whose responses carry
+  `mode="demo"` + `model_version="mock-v0"` so they cannot be mistaken for a
+  live model. `demo` + `claude` is allowed for local trials.
+* `EYE_MODE=shadow` never serves mock output: it refuses to boot with
+  `EYE_MODEL_SOURCE=mock`, and with `claude` it also refuses to boot without a
+  non-empty `EYE_API_KEY`. Without `ANTHROPIC_API_KEY`, `/health/ready` stays
+  503 and `/api/v1/predict` returns `503 model_unavailable`.
+* Claude responses carry `model_version="<CLAUDE_MODEL>/prompt-<PROMPT_VERSION>"`,
+  e.g. `claude-sonnet-5-5/prompt-v1`. Bump `PROMPT_VERSION` whenever the prompt
+  file in `app/inference/prompts/` changes.
+* `EYE_MODEL_SOURCE=torch` and `EYE_DEVICE` are legacy settings kept only
+  because the frozen tests pin them: `torch` always answers 503, and no engine
+  reads `EYE_DEVICE`.
+* The v1 `auto` model source was deleted: silently degrading to mock
+  predictions in a live deployment is a safety failure, not a convenience.
 
-**A real checkpoint has been staged and verified once, manually — not
-clinically validated.** `seige-ml/DERETFound_DR_APTOS2019` (Apache-2.0, timm
-`vit_large_patch16_224`, HF snapshot layout: `pytorch_model.bin` +
-`config.json`) loads under `EYE_MODE=shadow` with a strict state_dict match,
-and `/api/v1/predict` returns sane-looking REFER/NO_REFER verdicts with
-working Grad-CAM heatmaps end-to-end. Two things to know before trusting it
-further:
-
-* Its `pretrained_cfg` declares `mean=std=[0.5,0.5,0.5]`, not the frozen
-  ImageNet stats `to_model_input` always applies — `torch_engine.py` now
-  reads a checkpoint's own normalisation from `config.json` and re-expresses
-  the shared ImageNet-normalised tensor in it before inference, so this
-  checkpoint (and any future one with different declared stats) isn't fed
-  silently-wrong pixels. See `TorchEngine._renormalise`.
-* `download_model.py` refuses `.bin`/`.pkl` files by policy (arbitrary code
-  execution risk), and this repo ships no `.safetensors` alternative — the
-  artifact used here was fetched with a one-off script that bypasses that
-  gate for this specific, manually reviewed case, relying on the same
-  `torch.load(..., weights_only=True)` protection the script's allowed
-  formats already depend on. Re-review before reusing that shortcut for any
-  other `.bin`/`.pkl` artifact.
-
-Its reported accuracy is unverified (no lawfully-sourced labeled APTOS
-samples exist in this repo to check against — see `tests/unit/test_torch_engine.py`'s
-`needs_real_samples` skip). Nothing here is "the production model" until it
+**The Claude engine is not clinically validated.** The accuracy eval (plan
+§8, Phase 4) has not been run, and the manual real-key check is still pending
+(`docs/NOTES.md`). Nothing here is a production screening model until it
 clears that gate.
 
 ---
@@ -281,43 +320,38 @@ lint (ruff + mypy) -> pytest -m "not model and not perf" -> docker build
   -> compose up api (mock, sqlite) -> scripts/smoke_test.sh -> compose down
 ```
 
-No secrets, no push, no deploy. The API key in the workflow is a literal
-CI-only string so the smoke test's "wrong key → 401" step is meaningful; it
-protects nothing.
+No secrets, no push, no deploy, and no Claude calls. The API key in the
+workflow is a literal CI-only string so the smoke test's "wrong key → 401"
+step is meaningful; it protects nothing.
 
-`model` tests need a licensed checkpoint that is never in CI; `perf` tests are
-a timing guard a shared runner cannot measure honestly. Both are excluded by
-marker, not skipped silently.
+`perf` tests are a timing guard a shared runner cannot measure honestly, so
+they are excluded by marker, not skipped silently. The `model` marker has had
+no tests since the torch engine was removed. The one `postgres` test is
+skipped unless `TEST_POSTGRES_URL` points at a real Postgres.
 
 ---
 
-## 6. The opencv packaging trap (read before debugging a container)
+## 6. Deploy on Vercel
 
-`grad-cam` depends on **`opencv-python`** — the GUI build — while
-`requirements.txt` pins **`opencv-python-headless`**. pip installs both, and
-they overwrite the *same* `cv2` package directory. Whichever lands last wins.
+Prepared, not yet deployed. Step-by-step instructions are in `docs/NOTES.md`
+under "Vercel deploy steps". In short:
 
-On a laptop this is invisible: macOS and desktop Linux have the GL libraries.
-In a container it fails at `import cv2`:
+* Vercel project **Root Directory = `backend`**. It runs `app/main.py` as one
+  Python 3.12 function (`vercel.json`: `maxDuration` 60 s).
+* Media go to **Vercel Blob** (`EYE_STORAGE=blob`, `BLOB_READ_WRITE_TOKEN`).
+  Nothing is written to the read-only filesystem, `/static` is not mounted,
+  and image URLs are absolute Blob URLs.
+* The database is **Postgres**, shared by all instances, so a status poll that
+  lands on another instance still finds the exam. `postgres://` URLs are
+  rewritten to `postgresql+psycopg://`.
+* The variable names are in `.env.vercel.example`. `MAX_UPLOAD_MB=4`, because
+  Vercel rejects request bodies over 4.5 MB.
 
-```
-ImportError: libGL.so.1: cannot open shared object file: No such file or directory
-```
-
-So the venv, the Dockerfile and CI all run the same two lines after the two
-pip installs:
+After deploying, run the live check:
 
 ```bash
-pip uninstall -y opencv-python
-pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
+bash scripts/smoke_claude.sh https://<project>.vercel.app "$EYE_API_KEY" eval/manual
 ```
-
-`--no-deps` keeps numpy's pin intact. Verified: `cv2` reports `4.10.0` and
-`pytorch_grad_cam` still imports. The Dockerfile asserts this at build time in
-the **runtime** stage (`RUN python -c "import cv2, torch, pytorch_grad_cam"`),
-where the shipped system libraries are — so a regression fails the build
-instead of production. `libgl1` is deliberately **not** installed in the image:
-if it were, the bug would hide instead of failing loudly.
 
 ---
 
@@ -329,15 +363,16 @@ oversight; each serves an actor or a data volume that does not exist yet.
 * **Per-device hashed credentials** — today a single shared `EYE_API_KEY`.
 * **Multi-tenant RLS** — no second tenant exists.
 * **Consent tables** — demo runs on synthetic/non-PHI data (C13).
-* **Outbox / durable job queue** — no async fan-out yet.
-* **MinIO / S3 storage adapter** — returns *together with* the adapter that
-  uses it, not before.
+* **Outbox / durable job queue** — `/predict/async` runs inline; no async
+  fan-out yet.
+* **MinIO / S3 storage adapter** — still absent. The cloud adapter that exists
+  is Vercel Blob (`app/storage/blob.py`).
 * **Encounters + DME model** — `patient_id`+`eye` is a *linkage*, not an
   encounter identifier: it can pair images from different visits (the app's own
   symmetry feature shares this caveat).
-* **Authenticated media / refresh URLs (C6)** — `/static/...` is
-  unauthenticated because Coil sends no API key and the app persists URLs in
-  Room, so short-lived tokens would break history thumbnails. Requires a
+* **Authenticated media / refresh URLs (C6)** — `/static/...` and Blob URLs
+  are unauthenticated because Coil sends no API key and the app persists URLs
+  in Room, so short-lived tokens would break history thumbnails. Requires a
   coordinated Android change.
 * **Nullable wire fields (`PredictResponseV2`)** — **not implemented; planned.**
   SPEC.md §9 describes it as an unrouted stub, but no such model exists in
@@ -345,16 +380,19 @@ oversight; each serves an actor or a data volume that does not exist yet.
   UNGRADABLE fields, activated only together with the Android nullability
   patch. The current non-null placeholders are a versioned compatibility
   surface, not the permanent contract.
-* **SQLite → PostgreSQL** — code-portable by construction, but the migration
-  *event* needs an Alembic baseline, a data migration, and the integration
-  suite re-run against real Postgres. An explicit pilot gate, not a URL flip.
-* **Rate limiting / 429** — deferred with the error-model work.
+* **Schema migrations** — the app creates tables with `create_all`, and a
+  fresh Postgres starts empty. Moving existing SQLite data, or changing the
+  schema of a live database, needs an Alembic baseline first.
+* **A shared rate limiter** — today it is in memory, per process: 30 requests
+  per minute per client IP on `/api/v1`. On Vercel each instance keeps its own
+  window, and whether the key is the phone's IP or a proxy IP is checked after
+  the first deploy (plan issue 9).
 
 ---
 
 ## 8. Android backlog — out of backend scope, tracked here (C8)
 
-Two items the backend cannot fix and must not paper over:
+Items the backend cannot fix and must not paper over:
 
 **8.1 `allowBackup="true"` + unencrypted Room = PHI exposure.**
 The manifest allows Android's cloud/adb backup of the app's data directory, and
@@ -378,30 +416,44 @@ on the verdict, and would break the admin panel and any export. The fix belongs
 in the Android label: either relabel it "Referable DR ehtimoli" or show
 `1 - probability` under an explicitly named "confidence" field.
 
+**8.3 The heatmap card is always empty now.**
+Grad-CAM was removed with the torch engine, so `heatmap_url` is always `null`.
+The key stays on the wire (the app expects it); the card simply shows nothing.
+
 ---
 
 ## 9. Layout
 
 ```
 backend/
-├── SPEC.md, CLAUDE.md          frozen — the contract
+├── SPEC.md                     the original contract
+├── CLAUDE.md                   rules for Claude Code during the migration
+├── docs/
+│   ├── MIGRATION_PLAN.md       Claude engine + Vercel migration plan
+│   └── NOTES.md                what was done and measured; open decisions
 ├── app/
-│   ├── config.py, schemas.py   frozen — settings + wire contract
-│   ├── core/errors.py          frozen — {"error","detail"} envelope
-│   ├── inference/              engine protocol, mock, decision (frozen);
-│   │                           preprocess/quality/torch/gradcam
-│   ├── db/                     models, session, crud
-│   ├── api/                    predict, exams, deps
-│   └── storage/local.py        magic-byte sniff, true extension (C11)
+│   ├── config.py               settings + mode enforcement (C9)
+│   ├── schemas.py              frozen — wire contract
+│   ├── core/                   errors.py (frozen envelope), limits, rate limit, security
+│   ├── inference/              engine protocol, mock (frozen), decision,
+│   │                           claude_engine + assessment, prompts/,
+│   │                           preprocess, quality
+│   ├── analysis/               /analyze catalogue and skin analyzer
+│   ├── db/                     base, models, crud
+│   ├── api/                    predict, analyze, exams, deps
+│   └── storage/                local.py (magic-byte sniff, C11), blob.py (Vercel Blob)
 ├── admin/dashboard.py          Streamlit demo panel (read-only, no login)
 ├── scripts/
 │   ├── make_test_images.py     -> scripts/out/ (5 deterministic fixtures)
 │   ├── smoke_test.sh           8 named steps against a running API
-│   └── download_model.py       operator-run, air-gapped, records SHA-256
-├── tests/                      conftest + synthetic frozen; unit/contract/integration
+│   └── smoke_claude.sh         live check with real images (billed calls)
+├── tests/                      conftest + synthetic frozen; unit/contract/integration/perf
+├── vercel.json, .python-version, .env.vercel.example
 ├── Dockerfile, docker-compose.yml, .dockerignore, .env.example
+├── start_24_7.vbs, run_backend_hidden.bat, stop_backend.bat   Windows launchers
 └── .github/workflows/backend-ci.yml   (at the REPO root)
 ```
 
-**Never commit** a populated `.env`, model weights, or `local.properties`. All
-three are git-ignored and excluded from the Docker build context.
+**Never commit** a populated `.env`, the Anthropic key, model weights,
+`local.properties` or the images in `eval/manual/`. All are git-ignored, and
+the first three are excluded from the Docker build context.
