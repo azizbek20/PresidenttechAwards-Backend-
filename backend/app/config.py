@@ -86,6 +86,10 @@ class Settings(BaseSettings):
 
     # ---- api -------------------------------------------------------------
     eye_api_key: str | None = Field(default=None, alias="EYE_API_KEY")
+    #: Second key, sent as ``X-Admin-Key``, for the admin-only exam endpoints
+    #: (``/api/v1/exams*``). It never ships in the APK, unlike ``EYE_API_KEY``.
+    #: Unset or empty = the app key alone is enough there, as before.
+    eye_admin_api_key: str | None = Field(default=None, alias="EYE_ADMIN_API_KEY")
     max_upload_mb: int = Field(default=10, ge=1, le=100, alias="MAX_UPLOAD_MB")
     inference_concurrency: int = Field(
         default=2, ge=1, le=32, alias="INFERENCE_CONCURRENCY"
@@ -148,6 +152,16 @@ class Settings(BaseSettings):
                     "non-empty EYE_API_KEY — /api/v1 must never run "
                     "unauthenticated in a live deployment."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _admin_key_differs(self) -> "Settings":
+        """An admin key equal to the app key (which ships in the APK) protects nothing."""
+        if self.eye_admin_api_key and self.eye_api_key and self.eye_admin_api_key == self.eye_api_key:
+            raise ValueError(
+                "EYE_ADMIN_API_KEY must differ from EYE_API_KEY — the app key ships "
+                "inside the APK, so an equal admin key protects nothing."
+            )
         return self
 
     @property
