@@ -63,7 +63,8 @@ def png_bytes(width: int, height: int) -> bytes:
 
 
 def sent_image(call: dict[str, Any]) -> tuple[dict[str, Any], bytes]:
-    block = call["messages"][0]["content"][0]
+    """The photo being assessed: the image block just before the instruction."""
+    block = call["messages"][-1]["content"][-2]
     return block, base64.b64decode(block["source"]["data"])
 
 
@@ -81,13 +82,13 @@ def fake() -> FakeAnthropic:
 # --------------------------------------------------------------------------
 # the request
 # --------------------------------------------------------------------------
-def test_one_call_with_image_block_then_instruction_text(
+def test_v1_is_zero_shot_one_image_block_then_instruction_text(
     fake: FakeAnthropic,
 ) -> None:
     from app.inference.claude_engine import USER_INSTRUCTION
 
     raw = jpeg_bytes(640, 480)
-    run_assess(make_engine(fake), raw)
+    run_assess(make_engine(fake, PROMPT_VERSION="v1"), raw)
 
     assert len(fake.calls) == 1
     messages = fake.calls[0]["messages"]
@@ -106,22 +107,117 @@ def test_one_call_with_image_block_then_instruction_text(
     assert content[1] == {"type": "text", "text": USER_INSTRUCTION}
 
 
-def test_schema_model_and_limits_come_from_settings(fake: FakeAnthropic) -> None:
-    from app.inference.assessment import FundusAssessment
+FEWSHOT_DIR = Path(__file__).resolve().parents[2] / "app/inference/fewshot/v2"
 
+
+def test_v2_is_few_shot_five_graded_references_then_the_photo(
+    fake: FakeAnthropic,
+) -> None:
+    import json
+
+    from app.inference.claude_engine import USER_INSTRUCTION
+
+    raw = jpeg_bytes(640, 480)
+    run_assess(make_engine(fake, PROMPT_VERSION="v2"), raw)
+
+    messages = fake.calls[0]["messages"]
+    assert len(messages) == 1 and messages[0]["role"] == "user"
+    content = messages[0]["content"]
+    # the photo to assess and the fixed instruction come last
+    assert content[-1] == {"type": "text", "text": USER_INSTRUCTION}
+    assert base64.b64decode(content[-2]["source"]["data"]) == raw
+
+    manifest = json.loads((FEWSHOT_DIR / "examples.json").read_text(encoding="utf-8"))
+    refs = [b for b in content[:-2] if b["type"] == "image"]
+    assert len(refs) == len(manifest["examples"]) == 5
+    for block, example in zip(refs, manifest["examples"]):
+        assert block["source"]["media_type"] == "image/jpeg"
+        expected = (FEWSHOT_DIR / example["file"]).read_bytes()
+        assert base64.b64decode(block["source"]["data"]) == expected
+    labels = [b["text"] for b in content[:-2] if b["type"] == "text"]
+    for grade in range(5):
+        assert any(f"ICDR grade {grade}" in t for t in labels)
+
+
+def test_few_shot_prefix_is_cached_and_the_photo_is_not(fake: FakeAnthropic) -> None:
+    run_assess(make_engine(fake, PROMPT_VERSION="v2"), jpeg_bytes(320, 240))
+
+    content = fake.calls[0]["messages"][0]["content"]
+    marked = [i for i, b in enumerate(content) if "cache_control" in b]
+    assert len(marked) == 1
+    assert content[marked[0]]["cache_control"] == {"type": "ephemeral"}
+    assert marked[0] < len(content) - 2  # before the photo being assessed
+
+
+def test_few_shot_examples_are_identical_across_calls(fake: FakeAnthropic) -> None:
+    engine = make_engine(fake, PROMPT_VERSION="v2")
+    run_assess(engine, jpeg_bytes(320, 240))
+    run_assess(engine, jpeg_bytes(640, 480))
+    first, second = (c["messages"][0]["content"][:-2] for c in fake.calls)
+    assert first == second
+
+
+def test_default_prompt_version_is_few_shot(fake: FakeAnthropic) -> None:
+    run_assess(make_engine(fake), jpeg_bytes(320, 240))
+    images = [b for b in fake.calls[0]["messages"][0]["content"] if b["type"] == "image"]
+    assert len(images) == 6
+
+
+def _walk(node: Any) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    if isinstance(node, dict):
+        found.append(node)
+        for value in node.values():
+            found += _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            found += _walk(value)
+    return found
+
+
+def test_structured_output_schema_model_and_limits_come_from_settings(
+    fake: FakeAnthropic,
+) -> None:
     run_assess(make_engine(fake), jpeg_bytes(320, 240))
 
     call = fake.calls[0]
-    assert call["output_format"] is FundusAssessment
     assert call["model"] == TEST_MODEL
     assert call["max_tokens"] == 777
-    assert call["timeout"] == 12.5
+    assert fake.timeouts == [12.5]
+    assert "output_format" not in call  # SDK-only parameter
+    fmt = call["output_config"]["format"]
+    assert fmt["type"] == "json_schema"
+    schema = fmt["schema"]
+    assert schema["type"] == "object"
+    assert set(schema["required"]) == {
+        "image_type",
+        "gradable",
+        "quality_issues",
+        "lesions",
+        "hemorrhages_in_all_4_quadrants",
+        "macular_edema_signs",
+        "icdr_grade",
+        "referable_probability",
+        "rationale",
+    }
+    for node in _walk(schema):
+        if node.get("type") == "object":
+            assert node["additionalProperties"] is False
+            assert set(node["required"]) == set(node["properties"])
+        for unsupported in ("minimum", "maximum", "minLength", "maxLength"):
+            assert unsupported not in node
+
+
+def test_request_has_no_sampling_parameters(fake: FakeAnthropic) -> None:
+    run_assess(make_engine(fake), jpeg_bytes(320, 240))
+    for key in ("temperature", "top_p", "top_k"):
+        assert key not in fake.calls[0]
 
 
 def test_system_prompt_is_the_file_body_without_its_header_comment(
     fake: FakeAnthropic,
 ) -> None:
-    run_assess(make_engine(fake), jpeg_bytes(320, 240))
+    run_assess(make_engine(fake, PROMPT_VERSION="v1"), jpeg_bytes(320, 240))
 
     system = fake.calls[0]["system"]
     assert isinstance(system, str)
@@ -555,7 +651,7 @@ def test_returns_the_assessment_version_latency_and_tokens() -> None:
         "output_tokens",
     }
     assert pred["assessment"] == a
-    assert pred["model_version"] == f"{TEST_MODEL}/prompt-v1"
+    assert pred["model_version"] == f"{TEST_MODEL}/prompt-v2"
     assert isinstance(pred["latency_ms"], float)
     assert pred["latency_ms"] >= 0
     assert pred["input_tokens"] == 4000
@@ -577,14 +673,32 @@ def test_builtin_timeout_propagates() -> None:
         run_assess(make_engine(fake), jpeg_bytes(320, 240))
 
 
-def test_sdk_timeout_propagates() -> None:
-    import anthropic
+def test_http_timeout_propagates() -> None:
     import httpx
 
-    err = anthropic.APITimeoutError(request=httpx.Request("POST", "https://x.invalid"))
+    err = httpx.ReadTimeout("timed out", request=httpx.Request("POST", "https://x.invalid"))
     fake = FakeAnthropic.failing(err)
-    with pytest.raises(anthropic.APITimeoutError):
+    with pytest.raises(httpx.TimeoutException):
         run_assess(make_engine(fake), jpeg_bytes(320, 240))
+
+
+def test_non_json_text_raises() -> None:
+    from tests.fakes import message_response
+
+    body = message_response(None)
+    body["content"] = [{"type": "text", "text": "not json"}]
+    with pytest.raises(Exception):  # noqa: B017
+        run_assess(make_engine(FakeAnthropic(response=body)), jpeg_bytes(320, 240))
+
+
+def test_thinking_blocks_before_the_answer_are_skipped() -> None:
+    from tests.fakes import message_response
+
+    a = make_assessment(icdr_grade=2, referable_probability=0.7)
+    body = message_response(a)
+    body["content"].insert(0, {"type": "thinking", "thinking": "", "signature": "x"})
+    pred = run_assess(make_engine(FakeAnthropic(response=body)), jpeg_bytes(320, 240))
+    assert pred["assessment"] == a
 
 
 @pytest.mark.parametrize("stop_reason", ["refusal", "max_tokens"])
@@ -694,3 +808,18 @@ def test_get_engine_returns_a_claude_engine_for_the_claude_source() -> None:
     engine = get_engine(settings)
     assert isinstance(engine, ClaudeEngine)
     assert engine.model_loaded is True
+
+
+def test_few_shot_token_estimate() -> None:
+    from app.inference.claude_engine import fewshot_input_tokens
+
+    assert fewshot_input_tokens("v1") == 0
+    # five ~1024x680 images at ~w*h/750 tokens each, plus their labels
+    assert 4000 < fewshot_input_tokens("v2") < 6000
+
+
+def test_unsafe_prompt_version_never_reads_a_few_shot_dir() -> None:
+    from app.inference.claude_engine import load_fewshot_examples
+
+    with pytest.raises(ValueError):
+        load_fewshot_examples("../v2")

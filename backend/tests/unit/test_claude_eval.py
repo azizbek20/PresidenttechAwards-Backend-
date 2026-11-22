@@ -1091,7 +1091,7 @@ def test_main_built_client_uses_no_retries_and_is_closed(
     norefer_jpeg_bytes: bytes,
     blurry_jpeg_bytes: bytes,
 ) -> None:
-    import anthropic
+    from app.inference import claude_http
 
     created: list[tuple[_ClosableFake, dict[str, Any]]] = []
 
@@ -1101,13 +1101,12 @@ def test_main_built_client_uses_no_retries_and_is_closed(
         return client
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
-    monkeypatch.setattr(anthropic, "AsyncAnthropic", recorder)
+    monkeypatch.setattr(claude_http, "ClaudeHTTPClient", recorder)
     csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
     out = tmp_path / "out"
     assert ev.main(["--labels", str(csv), "--out", str(out)]) == 0
     assert len(created) == 1
     client, kwargs = created[0]
-    assert kwargs["max_retries"] == 0
     assert kwargs["api_key"] == "dummy-not-a-real-key"
     assert client.closed == 1
     assert len(client.calls) == 2
@@ -1123,7 +1122,7 @@ def test_main_built_client_closed_on_error(
     norefer_jpeg_bytes: bytes,
     blurry_jpeg_bytes: bytes,
 ) -> None:
-    import anthropic
+    from app.inference import claude_http
 
     created: list[_ClosableFake] = []
 
@@ -1136,7 +1135,7 @@ def test_main_built_client_closed_on_error(
         raise RuntimeError("disk full")
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
-    monkeypatch.setattr(anthropic, "AsyncAnthropic", recorder)
+    monkeypatch.setattr(claude_http, "ClaudeHTTPClient", recorder)
     monkeypatch.setattr(ev, "write_report", boom)
     csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
     with pytest.raises(RuntimeError):

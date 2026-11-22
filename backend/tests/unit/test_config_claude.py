@@ -46,7 +46,7 @@ def test_claude_defaults() -> None:
     assert s.claude_model == "claude-sonnet-5-5"
     assert s.claude_timeout_s == 25.0
     assert s.claude_max_tokens == 4000
-    assert s.prompt_version == "v1"
+    assert s.prompt_version == "v2"
     assert s.uncertain_refers is True
 
 
@@ -55,14 +55,14 @@ def test_claude_fields_read_their_env_names(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("CLAUDE_MODEL", "claude-opus-5-5")
     monkeypatch.setenv("CLAUDE_TIMEOUT_S", "9.5")
     monkeypatch.setenv("CLAUDE_MAX_TOKENS", "1200")
-    monkeypatch.setenv("PROMPT_VERSION", "v2")
+    monkeypatch.setenv("PROMPT_VERSION", "v1")
     monkeypatch.setenv("UNCERTAIN_REFERS", "false")
     s = settings_cls()()
     assert s.anthropic_api_key == "test-key"
     assert s.claude_model == "claude-opus-5-5"
     assert s.claude_timeout_s == 9.5
     assert s.claude_max_tokens == 1200
-    assert s.prompt_version == "v2"
+    assert s.prompt_version == "v1"
     assert s.uncertain_refers is False
 
 
