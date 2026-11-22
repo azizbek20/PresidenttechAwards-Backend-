@@ -254,6 +254,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
   - Files outside CLAUDE.md's editable list, needed for this: `app/api/exams.py`, `app/core/security.py`, `admin/dashboard.py`.
   - Still on the app key alone: `GET /api/v1/analyses` (the phone's analysis history uses it and lists every analysis with its photo URL when no `patient_id` is given). Fixing it needs an Android change.
   - Gate: ruff (app, tests, eval, admin) and mypy clean; `609 passed, 1 skipped, 4 deselected`.
+  - **Live (PR #14, merged as `c5b70e2`, auto-deployed from GitHub):** the owner added `EYE_ADMIN_API_KEY` as a sensitive production variable (local copy `EYE_ADMIN_API_KEY_VERCEL` in `backend/.env`; the admin panel needs it as `EYE_ADMIN_API_KEY`). Three startups logged no missing-admin-key warning. The owner's check: `/api/v1/exams` with the app key only **403**, with app + admin key **200**; `/api/v1/analyses` with the app key only **200**. No key at all is still 401. PR #14 was merged right after opening (the repo does not allow auto-merge), with the same lint and test commands green locally; CI on `main` was still running at that time.
 
 ## Open decisions for the owner (2026-11-22)
 
