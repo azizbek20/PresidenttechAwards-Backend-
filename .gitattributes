@@ -14,3 +14,4 @@ gradlew.bat text eol=crlf
 *.jpg binary
 *.apk binary
 *.dex binary
+graphify-out/graph.json merge=graphify
