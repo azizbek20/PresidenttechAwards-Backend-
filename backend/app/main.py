@@ -80,10 +80,16 @@ def configure_logging() -> None:
     Nothing configured logging before, so Python's default (WARNING, no
     handler) dropped every INFO line of the ``eyedetect.*`` loggers, including
     the per-call ``claude_call`` line CLAUDE.md requires. The root logger,
-    uvicorn's loggers and propagation are left alone. Safe to call repeatedly.
+    uvicorn's loggers are left alone. Safe to call repeatedly.
+
+    On Vercel (``VERCEL`` set) the runtime also prints the root logger at
+    INFO, so every line came out twice (NOTES.md open decision 10); there the
+    ``eyedetect`` lines stop at our handler. Elsewhere they still propagate,
+    so ``caplog`` and any root handler keep seeing them.
     """
     log = logging.getLogger("eyedetect")
     log.setLevel(logging.INFO)
+    log.propagate = not os.getenv("VERCEL")
     if any(handler.name == _LOG_HANDLER_NAME for handler in log.handlers):
         return
     handler = _CurrentStdoutHandler()
