@@ -58,3 +58,5 @@ SPEC.md
 CLAUDE.md
 PLAN.md
 **/*.md
+# The engine reads its system prompts at boot; keep them despite **/*.md.
+!app/inference/prompts/*.md

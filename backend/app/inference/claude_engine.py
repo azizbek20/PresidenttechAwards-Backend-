@@ -1,15 +1,19 @@
 """Claude vision engine for ``POST /api/v1/predict`` (MIGRATION_PLAN.md §3.3).
 
-One request per screening: the (possibly downsized) JPEG plus a fixed
-instruction, with the versioned fundus prompt as the system prompt and the
-:class:`~app.inference.assessment.FundusAssessment` schema as structured
-output. Safety rules carried here:
+One request per screening, sent as raw HTTP to the Messages API by
+:class:`~app.inference.claude_http.ClaudeHTTPClient` (no Anthropic SDK): the
+versioned fundus prompt as the system prompt; for ``PROMPT_VERSION=v2`` five
+few-shot reference images (IDRiD train split, one per ICDR grade, labelled
+with the expert grade only); then the (possibly downsized) JPEG and a fixed
+instruction. The :class:`~app.inference.assessment.FundusAssessment` schema
+goes in ``output_config.format`` (structured output). Safety rules carried
+here:
 
 * Only the image and fixed text are sent — :meth:`ClaudeEngine.assess` takes
   image bytes and nothing else, so no patient id, eye or request metadata can
   reach the API, and :func:`prepare_jpeg` removes the file's own metadata
   (EXIF GPS and camera data, XMP, comments, data appended after the image).
-* No fallback verdict. An SDK error, a timeout, a refusal, a truncated answer
+* No fallback verdict. An HTTP error, a timeout, a refusal, a truncated answer
   or output that fails local validation all raise; ``predict.py`` maps that to
   ``500 inference_error``.
 * No automatic retries on the request path (``max_retries=0``) and a hard
@@ -21,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import json
 import math
 import re
 import time
@@ -30,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image, ImageOps
 
 from app.inference.assessment import FundusAssessment
+from app.inference.claude_http import ClaudeHTTPClient
 from app.inference.engine import ClaudePrediction
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -229,6 +235,118 @@ def validate_assessment(parsed: Any) -> FundusAssessment:
     return assessment
 
 
+# ---------------------------------------------------------------------------
+# structured output schema (raw API: output_config.format)
+# ---------------------------------------------------------------------------
+#: Keywords the structured-output endpoint rejects; ranges are checked locally
+#: in :func:`validate_assessment` instead.
+_UNSUPPORTED_KEYWORDS = ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                         "multipleOf", "minLength", "maxLength", "pattern", "title",
+                         "default", "minItems", "maxItems")
+
+
+def _close_schema(node: Any, defs: dict[str, Any]) -> Any:
+    if isinstance(node, list):
+        return [_close_schema(n, defs) for n in node]
+    if not isinstance(node, dict):
+        return node
+    if "$ref" in node:  # inline: "#/$defs/Lesions"
+        return _close_schema(defs[node["$ref"].rsplit("/", 1)[-1]], defs)
+    out = {
+        k: _close_schema(v, defs)
+        for k, v in node.items()
+        if k not in _UNSUPPORTED_KEYWORDS and k != "$defs"
+    }
+    if out.get("type") == "object" and "properties" in out:
+        out["additionalProperties"] = False
+        out["required"] = list(out["properties"])
+    return out
+
+
+def assessment_json_schema() -> dict[str, Any]:
+    """The :class:`FundusAssessment` JSON schema in the form the API accepts.
+
+    ``$ref``s inlined, every object closed (``additionalProperties: false``)
+    with every property required, and unsupported constraints removed.
+    """
+    raw = FundusAssessment.model_json_schema()
+    result: dict[str, Any] = _close_schema(raw, raw.get("$defs", {}))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# few-shot reference images (PROMPT_VERSION=v2)
+# ---------------------------------------------------------------------------
+_FEWSHOT_ROOT = Path(__file__).resolve().parent / "fewshot"
+_FEWSHOT_INTRO = (
+    "Reference examples. The next {n} photographs are fundus images from the "
+    "IDRiD dataset with the ICDR grade given by the dataset's expert graders, "
+    "one per grade. Use them only to calibrate what each grade looks like; do "
+    "not assess them. The photograph to assess comes after them."
+)
+_FEWSHOT_LABEL = "Reference example {i} of {n}: ICDR grade {grade} (expert grade)."
+#: Rough tokens for one label line; images use Claude's w*h/750 rule.
+_LABEL_TOKENS = 25
+
+
+def _image_block(b64: str) -> dict[str, Any]:
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+    }
+
+
+def load_fewshot_examples(prompt_version: str) -> list[tuple[int, bytes]]:
+    """``(icdr_grade, jpeg_bytes)`` per reference image; ``[]`` for zero-shot.
+
+    A version has few-shot examples when ``fewshot/<version>/examples.json``
+    exists (v2 does, v1 does not). A listed image that is missing raises: a
+    boot error, never a silent switch to zero-shot.
+    """
+    if not _SAFE_VERSION.fullmatch(prompt_version):
+        raise ValueError(f"unsafe PROMPT_VERSION={prompt_version!r}")
+    folder = _FEWSHOT_ROOT / prompt_version
+    manifest = folder / "examples.json"
+    if not manifest.is_file():
+        return []
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    examples = []
+    for item in data["examples"]:
+        name = str(item["file"])
+        if not _SAFE_VERSION.fullmatch(name.removesuffix(".jpg")):
+            raise ValueError(f"unsafe few-shot file name {name!r}")
+        examples.append((int(item["icdr_grade"]), (folder / name).read_bytes()))
+    return examples
+
+
+def fewshot_blocks(prompt_version: str) -> list[dict[str, Any]]:
+    """The content blocks placed before the photo; the last one is cached.
+
+    Built once per engine, so every request sends a byte-identical prefix
+    (system prompt + references) and the prompt cache can serve it.
+    """
+    examples = load_fewshot_examples(prompt_version)
+    if not examples:
+        return []
+    n = len(examples)
+    blocks: list[dict[str, Any]] = [{"type": "text", "text": _FEWSHOT_INTRO.format(n=n)}]
+    for i, (grade, jpeg) in enumerate(examples, start=1):
+        blocks.append(_image_block(base64.standard_b64encode(jpeg).decode("ascii")))
+        blocks.append({"type": "text", "text": _FEWSHOT_LABEL.format(i=i, n=n, grade=grade)})
+    blocks[-1]["cache_control"] = {"type": "ephemeral"}
+    return blocks
+
+
+def fewshot_input_tokens(prompt_version: str) -> int:
+    """Upper-bound input tokens the reference images add to one request."""
+    total = 0
+    for _, jpeg in load_fewshot_examples(prompt_version):
+        with Image.open(io.BytesIO(jpeg)) as im:
+            width, height = im.size
+        total += math.ceil(width * height / 750) + _LABEL_TOKENS
+    return total + (_LABEL_TOKENS * 3 if total else 0)
+
+
 class ClaudeEngine:
     """Engine for ``EYE_MODEL_SOURCE=claude``. Receives JPEG bytes, not a tensor."""
 
@@ -236,16 +354,12 @@ class ClaudeEngine:
 
     def __init__(self, settings: "Settings", client: Any = None) -> None:
         self._settings = settings
-        # Boot error, not a runtime fallback (plan §3.3).
+        # Boot errors, not runtime fallbacks (plan §3.3).
         self._system_prompt = load_system_prompt(settings.prompt_version)
+        self._fewshot = fewshot_blocks(settings.prompt_version)
+        self._schema = assessment_json_schema()
         if client is None and self.model_loaded:
-            from anthropic import AsyncAnthropic
-
-            client = AsyncAnthropic(
-                api_key=_secret(settings.anthropic_api_key),
-                timeout=settings.claude_timeout_s,
-                max_retries=0,
-            )
+            client = ClaudeHTTPClient(api_key=_secret(settings.anthropic_api_key))
         self._client = client
 
     @property
@@ -264,45 +378,54 @@ class ClaudeEngine:
         prepared = await asyncio.to_thread(prepare_jpeg, jpeg)
         image = base64.standard_b64encode(prepared).decode("ascii")
         settings = self._settings
-        started = time.perf_counter()
-        response = await self._client.messages.parse(
-            model=settings.claude_model,
-            max_tokens=settings.claude_max_tokens,
-            system=self._system_prompt,
-            messages=[
+        body: dict[str, Any] = {
+            "model": settings.claude_model,
+            "max_tokens": settings.claude_max_tokens,
+            "system": self._system_prompt,
+            "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": image,
-                            },
-                        },
+                        *self._fewshot,
+                        _image_block(image),
                         {"type": "text", "text": USER_INSTRUCTION},
                     ],
                 }
             ],
-            output_format=FundusAssessment,
-            timeout=settings.claude_timeout_s,
-        )
+            "output_config": {"format": {"type": "json_schema", "schema": self._schema}},
+        }
+        started = time.perf_counter()
+        response = await self._client.create_message(body, timeout=settings.claude_timeout_s)
         latency_ms = (time.perf_counter() - started) * 1000.0
 
-        stop_reason = getattr(response, "stop_reason", None)
+        stop_reason = response.get("stop_reason")
         if stop_reason in ("refusal", "max_tokens"):
             raise ClaudeOutputError(f"unusable answer: stop_reason={stop_reason}")
-        parsed = getattr(response, "parsed_output", None)
-        if parsed is None:
+        text = next(
+            (
+                b.get("text")
+                for b in response.get("content") or []
+                if isinstance(b, dict) and b.get("type") == "text"
+            ),
+            None,
+        )
+        if not text:
             raise ClaudeOutputError("no structured output in the response")
+        try:
+            parsed = json.loads(text)
+        except ValueError as exc:
+            raise ClaudeOutputError("structured output is not valid JSON") from exc
         assessment = validate_assessment(parsed)
 
-        usage = getattr(response, "usage", None)
+        usage = response.get("usage") or {}
+        input_tokens = sum(
+            int(usage.get(k) or 0)
+            for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+        )
         return ClaudePrediction(
             assessment=assessment,
             model_version=self.model_version,
             latency_ms=latency_ms,
-            input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
-            output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
+            input_tokens=input_tokens,
+            output_tokens=int(usage.get("output_tokens") or 0),
         )

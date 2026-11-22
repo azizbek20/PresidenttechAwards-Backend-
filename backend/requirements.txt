@@ -9,7 +9,7 @@ opencv-python-headless==4.10.*
 psycopg[binary]==3.2.*
 
 # Claude vision engine (docs/MIGRATION_PLAN.md §3.3)
-anthropic==2.12.*
+httpx==0.27.*
 
 # Vercel Blob media storage, EYE_STORAGE=blob (MIGRATION_PLAN.md §3.8). The
 # standalone Blob client from Vercel's Python SDK (`vercel.blob`), not the full
