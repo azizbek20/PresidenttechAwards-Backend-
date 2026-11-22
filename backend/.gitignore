@@ -19,3 +19,7 @@ htmlcov/
 # URLs (exam-UUID paths under /static/images, /static/heatmaps — see
 # app/main.py's static mounts) mapped to request timestamps.
 *.log
+# Claude migration eval: patient-like images never go into git (PROMPTS.md 2b)
+/eval/manual/
+/eval/data/
+/eval/results/*.jpg

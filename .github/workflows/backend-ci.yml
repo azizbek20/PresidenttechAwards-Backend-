@@ -11,7 +11,7 @@
 #
 # Runners are x86_64. The dev machine builds linux/arm64 natively — neither
 # passes `--platform`, so each builds for itself. That is deliberate: an
-# emulated cross-build of torch is slow and proves nothing extra.
+# emulated cross-build is slow and proves nothing extra.
 
 name: backend-ci
 
@@ -59,26 +59,14 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
-            backend/requirements-torch.txt
 
-      # Install order is IDENTICAL to the venv and the Dockerfile (SPEC §4.1):
-      # torch from its pinned index first, then everything else from PyPI.
+      # Same install as the venv (backend/CLAUDE.md "AFTER Phase 1"): torch and
+      # grad-cam are gone, so there is no separate index and no opencv fix.
       # requirements-dev.txt starts with `-r requirements.txt`.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-torch.txt
           pip install -r requirements-dev.txt
-
-      # Same packaging fix as the Dockerfile: grad-cam drags in the GUI
-      # `opencv-python`, which overwrites the same cv2 package directory and
-      # then fails on `libGL.so.1` wherever no OpenGL exists. Headless is force
-      # -reinstalled with --no-deps so numpy's pin is untouched.
-      - name: Fix opencv (grad-cam pulls in the GUI build)
-        run: |
-          pip uninstall -y opencv-python
-          pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
-          python -c "import cv2; print('cv2', cv2.__version__)"
 
       # The RULE SET IS PINNED BY CONFIG, not by the linter's release defaults:
       # `backend/ruff.toml` (select = E4,E7,E9,F) and `backend/mypy.ini`
@@ -108,19 +96,11 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
-            backend/requirements-torch.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-torch.txt
           pip install -r requirements-dev.txt
-
-      - name: Fix opencv (grad-cam pulls in the GUI build)
-        run: |
-          pip uninstall -y opencv-python
-          pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
-          python -c "import cv2; print('cv2', cv2.__version__)"
 
       # `model` needs a licensed checkpoint that is never in CI; `perf` is a
       # timing guard that a shared runner cannot measure honestly.

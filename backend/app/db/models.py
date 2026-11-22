@@ -88,10 +88,13 @@ def static_url(stored: str | None, subdir: str) -> str | None:
     may reasonably hand over either the relative URL or a filesystem path. Both
     are accepted and both read back as the stable relative URL the app persists
     in Room (C6).
+
+    An absolute ``http(s)://`` URL (Vercel Blob, ``EYE_STORAGE=blob``, plan
+    §3.8) is already public and stable: it is returned unchanged.
     """
     if stored is None:
         return None
-    if stored.startswith("/static/"):
+    if stored.startswith(("/static/", "https://", "http://")):
         return stored
     return f"/static/{subdir}/{PurePath(stored).name}"
 
@@ -211,6 +214,10 @@ class Result(Base):
     #: response the phone originally received.
     decision_text: Mapped[str] = mapped_column(Text, nullable=False)
     model_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Claude migration (plan §3.6): the raw structured assessment, as JSON, for
+    #: the admin panel and the eval. NULL for the mock engine and for a
+    #: quality-gate UNGRADABLE (no model call was made).
+    assessment_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow
     )

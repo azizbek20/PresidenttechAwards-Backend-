@@ -13,7 +13,7 @@ ordering carries real safety weight:
 * persistence (step 10) is unconditional — a result the admin panel cannot
   corroborate never reaches the phone (C10).
 
-Agent A (`preprocess`, `quality`, `gradcam`) and Agent B (`db.base`, the
+Agent A (`preprocess`, `quality`) and Agent B (`db.base`, the
 `crud` bodies) supply the modules imported below; this file only orchestrates
 them against the frozen signatures.
 """
@@ -23,27 +23,30 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-# Agent A delivers `preprocess`/`quality`/`gradcam` and Agent B delivers
+# Agent A delivers `preprocess`/`quality` and Agent B delivers
 # `db.base` at the Phase 2 merge. They are imported as modules (not as loose
 # functions) so tests can substitute them by dotted string, and aliased so the
 # import form stays resolvable for the type checker on every branch.
 import app.db.base as db_base
-import app.inference.gradcam as heatmaps
 import app.inference.preprocess as preprocessing
 import app.inference.quality as quality_gate
 from app.api.deps import engine_for, fill_additive_keys, semaphore_for
 from app.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.db import crud
-from app.inference.decision import DecisionResult, decide
-from app.inference.engine import ModelUnavailable
+from app.inference.decision import DecisionResult, decide, decide_from_assessment
+from app.inference.engine import (
+    ClaudePrediction,
+    InferenceEngine,
+    ModelUnavailable,
+    Prediction,
+)
 from app.schemas import (
     DISCLAIMER,
     Decision,
@@ -53,7 +56,10 @@ from app.schemas import (
     TaskResponse,
     TaskStatusResponse,
 )
-from app.storage import local as storage
+import app.storage as storage
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.inference.claude_engine import ClaudeEngine
 
 logger = logging.getLogger("eyedetect.predict")
 
@@ -174,25 +180,6 @@ def _lookup_replay(
         return "replay", dict(prior)
 
 
-def _render_heatmap(
-    engine: Any, img: Any, tensor: Any, out_path: Path
-) -> bool:
-    """Step 8, best effort: a missing heatmap is never a failed screening."""
-    try:
-        display = preprocessing.display_copy(img)
-        model = getattr(engine, "model", None)
-        # A real torch model gets Grad-CAM; the mock path gets the stand-in
-        # overlay, and a failed render just means no heatmap.
-        if model is not None and tensor is not None and heatmaps.render_heatmap(
-            model, tensor, display, out_path
-        ):
-            return True
-        return bool(heatmaps.mock_heatmap(display, out_path))
-    except Exception:
-        logger.warning("heatmap rendering failed", exc_info=True)
-        return False
-
-
 def _persist(
     *,
     exam_id: str,
@@ -207,6 +194,7 @@ def _persist(
     heatmap_url: str | None,
     processed_at: datetime,
     idempotency_key: str | None,
+    assessment_json: str | None = None,
 ) -> None:
     """Step 10. One transaction, owned by Agent B's ``crud``.
 
@@ -231,6 +219,7 @@ def _persist(
             heatmap_path=heatmap_url,
             processed_at=processed_at,
             idempotency_key=idempotency_key,
+            assessment_json=assessment_json,
         )
 
 
@@ -241,6 +230,21 @@ async def predict(
     patient_id: str | None = Form(default=None),
     eye: str | None = Form(default=None),
 ) -> PredictResponse:
+    return await run_screening(request, file, patient_id, eye)
+
+
+async def run_screening(
+    request: Request,
+    file: UploadFile,
+    patient_id: str | None,
+    eye: str | None,
+) -> PredictResponse:
+    """Steps 1-11, shared by ``/predict`` and ``/predict/async`` (plan §3.6).
+
+    One code path means one set of errors: both endpoints raise the same
+    ``ApiError`` at the same step, and neither can produce a verdict the other
+    would not.
+    """
     settings = get_settings()
 
     # ---- 1. eye validation ------------------------------------------------
@@ -324,45 +328,84 @@ async def predict(
     report = await run_in_threadpool(quality_gate.assess, img, settings)
 
     # ---- 6. inference, only when the gate passed -------------------------
-    pred = None
-    tensor = None
+    # Two engine kinds (plan §3.6): a `wants_jpeg` engine (Claude) is awaited
+    # with the uploaded bytes and nothing else — never patient_id or eye; the
+    # mock still receives the normalised tensor.
+    wants_jpeg = bool(getattr(engine, "wants_jpeg", False))
+    pred: Prediction | None = None
+    claude_pred: ClaudePrediction | None = None
     # The C9 gate ran at 3c, before dedup and before anything was written.
     if report.ok:
         try:
-            tensor = await run_in_threadpool(
-                _to_tensor, img, settings.engine_input_size
-            )
-            # `async with` (not acquire/release): a client that navigates away
-            # mid-request is cancelled here, and the permit must still come
-            # back or the server dies of slow permit exhaustion (C16).
-            async with semaphore_for(request.app):
-                pred = await run_in_threadpool(engine.predict, tensor)
+            if wants_jpeg:
+                claude = cast("ClaudeEngine", engine)
+                # `async with` (not acquire/release): a client that navigates
+                # away mid-request is cancelled here, and the permit must still
+                # come back or the server dies of slow permit exhaustion (C16).
+                async with semaphore_for(request.app):
+                    claude_pred = await claude.assess(raw)
+            else:
+                tensor = await run_in_threadpool(
+                    _to_tensor, img, settings.engine_input_size
+                )
+                tensor_engine = cast(InferenceEngine, engine)
+                async with semaphore_for(request.app):
+                    pred = await run_in_threadpool(tensor_engine.predict, tensor)
         except ModelUnavailable as exc:
             raise ApiError(503, "model_unavailable", _D_MODEL) from exc
         except ApiError:
             raise
         except Exception as exc:
+            # No fallback verdict: an API error, timeout, refusal or invalid
+            # model output is a 500 and nothing is persisted (CLAUDE.md).
             logger.exception("inference failed for exam %s", exam_id)
             raise ApiError(500, "inference_error", _D_INFERENCE) from exc
 
     # ---- 7. verdict (threshold lives server-side, only here) -------------
-    result = decide(pred, report.ok, settings.referable_threshold)
+    if wants_jpeg:
+        result = decide_from_assessment(
+            claude_pred["assessment"] if claude_pred else None,
+            report.ok,
+            settings.referable_threshold,
+            settings.uncertain_refers,
+        )
+    else:
+        result = decide(pred, report.ok, settings.referable_threshold)
 
-    # ---- 8. heatmap, best effort ------------------------------------------
+    # ---- 8. heatmap: removed in the Claude migration (plan §3.1) ----------
     heatmap_url: str | None = None
-    if report.ok:
-        heatmap_path, candidate_url = storage.heatmap_target(exam_id)
-        if await run_in_threadpool(
-            _render_heatmap, engine, img, tensor, heatmap_path
-        ):
-            heatmap_url = candidate_url
 
     # ---- 9. C2: the patient code is non-null from here on ----------------
     patient_code = patient_id or crud.generate_patient_code()
 
     # ---- 10. unconditional persistence (C10) -----------------------------
     processed_at = _utc_now()
-    model_version = pred["model_version"] if pred else settings.eye_model_version
+    request_id = str(uuid4())
+    if wants_jpeg:
+        # The engine's version even when the gate stopped the call, so a
+        # Claude deployment never records "mock-v0".
+        model_version = str(getattr(engine, "model_version", settings.eye_model_version))
+    else:
+        model_version = pred["model_version"] if pred else settings.eye_model_version
+    assessment_json = (
+        claude_pred["assessment"].model_dump_json() if claude_pred else None
+    )
+    if claude_pred is not None:
+        # One line per Claude call (backend/CLAUDE.md). Never the image bytes,
+        # the key or the patient id.
+        logger.info(
+            "claude_call request_id=%s exam_id=%s model_version=%s "
+            "latency_ms=%.0f input_tokens=%d output_tokens=%d image_type=%s "
+            "decision=%s",
+            request_id,
+            exam_id,
+            claude_pred["model_version"],
+            claude_pred["latency_ms"],
+            claude_pred["input_tokens"],
+            claude_pred["output_tokens"],
+            claude_pred["assessment"].image_type,
+            result.decision,
+        )
     try:
         await run_in_threadpool(
             _persist,
@@ -378,6 +421,7 @@ async def predict(
             heatmap_url=heatmap_url,
             processed_at=processed_at,
             idempotency_key=idempotency_key,
+            assessment_json=assessment_json,
         )
     except Exception as exc:  # C10 is unconditional: ANY failure is a 500.
         logger.exception("persistence failed for exam %s", exam_id)
@@ -394,6 +438,7 @@ async def predict(
         model_version=model_version,
         processed_at=processed_at,
         settings=settings,
+        request_id=request_id,
     )
 
 
@@ -408,8 +453,12 @@ def wire_response(
     model_version: str,
     processed_at: datetime,
     settings: Settings,
+    request_id: str | None = None,
 ) -> PredictResponse:
-    """Step 11, shared by the sync endpoint and the Celery worker."""
+    """Step 11 of :func:`run_screening`.
+
+    ``request_id`` lets the sync path reuse the id it already logged.
+    """
     return PredictResponse(
         exam_id=exam_id,
         patient_id=patient_code,
@@ -426,7 +475,7 @@ def wire_response(
         model_version=model_version,
         processed_at=_wire_time(processed_at),
         disclaimer=DISCLAIMER,
-        request_id=str(uuid4()),
+        request_id=request_id or str(uuid4()),
         mode=settings.eye_mode,
     )
 
@@ -438,56 +487,20 @@ async def predict_async(
     patient_id: str | None = Form(default=None),
     eye: str | None = Form(default=None),
 ) -> TaskResponse:
-    """Queue the screening on the Celery worker; poll ``/predict/status/{id}``.
+    """Run the screening inline; the phone then polls ``/predict/status/{id}``.
 
-    Steps 1-3b (validation, capped read, decode, C9 gate, dedup) run here so
-    that bad input is rejected synchronously with the same errors as
-    ``/predict``; steps 4-11 run in :func:`app.worker.process_exam_task`.
+    Vercel runs no background worker (issue 2, plan §3.7), so the whole flow
+    runs here through :func:`run_screening` — same steps, same errors, raised
+    immediately as HTTP errors (the app shows ``detail``). The stored exam is
+    then handed back as a ``replay:<exam_id>`` task. The first status MUST be
+    ``PENDING`` or ``PROCESSING``: the app's polling loop throws on any other
+    first status, so it is ``PROCESSING`` even though the result is ready.
     """
-    settings = get_settings()
-
-    eye = _clean(eye)
-    if eye not in _VALID_EYES:
-        raise ApiError(422, "validation_error", _D_EYE)
-    patient_id = _clean(patient_id)
-
-    raw = await _read_capped(request, file, settings.max_upload_bytes)
-    if storage.sniff_ext(raw) is None or preprocessing.load_rgb(raw) is None:
-        raise ApiError(400, "invalid_image", _D_INVALID_IMAGE)
-
-    engine = engine_for(request.app)
-    if not getattr(engine, "model_loaded", False):
-        raise ApiError(503, "model_unavailable", _D_MODEL)
-
-    content_sha256 = hashlib.sha256(raw).hexdigest()
-    idempotency_key = request.headers.get("Idempotency-Key")
-    outcome, stored = await run_in_threadpool(
-        _lookup_replay,
-        content_sha256=content_sha256,
-        idempotency_key=idempotency_key,
-        patient_code=patient_id,
-        eye=eye,
-        window_min=settings.dedup_window_min,
-    )
-    if outcome == "conflict":
-        raise ApiError(409, "idempotency_conflict", _D_IDEMPOTENCY)
-    if outcome == "replay" and stored is not None:
-        logger.info("replaying exam %s for a duplicate upload", stored.get("exam_id"))
-        return TaskResponse(
-            task_id=f"{_REPLAY_PREFIX}{stored.get('exam_id')}",
-            status="PROCESSING",
-            message="Natija topildi, tayyorlanmoqda...",
-        )
-
-    from app.worker import process_exam_task
-
-    task = process_exam_task.delay(
-        str(uuid4()), raw, patient_id, eye, idempotency_key, content_sha256
-    )
+    response = await run_screening(request, file, patient_id, eye)
     return TaskResponse(
-        task_id=task.id,
-        status="PENDING",
-        message="Rasm qabul qilindi, ishlov berilmoqda...",
+        task_id=f"{_REPLAY_PREFIX}{response.exam_id}",
+        status="PROCESSING",
+        message="Rasm tahlil qilindi, natija tayyorlanmoqda...",
     )
 
 
@@ -511,23 +524,9 @@ async def get_predict_status(task_id: str) -> TaskStatusResponse:
         result = PredictResponse.model_validate(fill_additive_keys(exam, settings))
         return TaskStatusResponse(task_id=task_id, status="SUCCESS", result=result)
 
-    from celery.result import AsyncResult
-
-    from app.worker import celery_app
-
-    task_result = AsyncResult(task_id, app=celery_app)
-    state = task_result.state
-    if state in ("PENDING", "STARTED", "RETRY"):
-        return TaskStatusResponse(task_id=task_id, status="PROCESSING")
-    if state == "SUCCESS":
-        return TaskStatusResponse(
-            task_id=task_id,
-            status="SUCCESS",
-            result=PredictResponse.model_validate(task_result.result),
-        )
-    return TaskStatusResponse(
-        task_id=task_id, status="FAILURE", error=str(task_result.info)
-    )
+    # Every task id this server issues is a replay id; anything else (e.g. a
+    # Celery id from an app session started before the migration) is unknown.
+    return TaskStatusResponse(task_id=task_id, status="FAILURE", error="Natija topilmadi")
 
 
 def _to_tensor(img: Any, size: int) -> Any:

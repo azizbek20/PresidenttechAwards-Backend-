@@ -11,14 +11,19 @@ Route authentication map (C2/C6/C16):
 
     /api/v1/*     require_api_key
     /health*      open  — probes and compose healthchecks
-    /static/*     open  — Coil sends no API key (C6)
+    /static/*     open  — Coil sends no API key (C6); only with EYE_STORAGE=local
     HEAD /        open  — ApiClient.ping() counts ANY response as online (C16)
+
+With ``EYE_STORAGE=blob`` (Vercel, plan §3.8) nothing here touches the local
+filesystem — not at import, startup, request or readiness time — and no
+``/static`` mount exists: media URLs are absolute Vercel Blob URLs.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -40,6 +45,7 @@ from app.core.limits import MaxBodySizeMiddleware
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.security import warn_if_unprotected
 from app.inference.engine import get_engine
+from app.storage import is_local as storage_is_local
 from app.storage import local as storage
 
 logger = logging.getLogger("eyedetect.main")
@@ -53,7 +59,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
 
     warn_if_unprotected(settings.eye_api_key)
-    storage.ensure_dirs()
+    if storage_is_local():
+        storage.ensure_dirs()
     await run_in_threadpool(db_base.init_db)
 
     app.state.engine = get_engine(settings)
@@ -82,6 +89,11 @@ def _db_ok() -> bool:
 
 
 def _storage_ok() -> bool:
+    if not storage_is_local():
+        # Blob: nothing local to probe (read-only FS on Vercel). Ready means
+        # the client has its credential; the upload itself is checked per
+        # request (a failed upload is a 500, never a verdict).
+        return bool(os.environ.get("BLOB_READ_WRITE_TOKEN"))
     try:
         storage.ensure_dirs()
         probe = get_settings().storage_dir / ".readiness"
@@ -104,8 +116,11 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     # StaticFiles validates its directory at construction, and the storage
-    # root may not exist yet on a fresh container.
-    storage.ensure_dirs()
+    # root may not exist yet on a fresh container. Local storage only: on
+    # Vercel the filesystem is read-only and this runs at import (issue 3).
+    local_media = storage_is_local()
+    if local_media:
+        storage.ensure_dirs()
 
     app = FastAPI(
         title="EYE DETECT AI",
@@ -210,16 +225,20 @@ def create_app() -> FastAPI:
     # entire patient database to an unauthenticated caller while
     # `GET /api/v1/exams` correctly answered 401. Serving only the media dirs
     # makes that class of exposure structurally impossible.
-    app.mount(
-        "/static/images",
-        StaticFiles(directory=settings.images_dir),
-        name="static-images",
-    )
-    app.mount(
-        "/static/heatmaps",
-        StaticFiles(directory=settings.heatmaps_dir),
-        name="static-heatmaps",
-    )
+    #
+    # Blob storage serves media from absolute Vercel Blob URLs, so nothing is
+    # mounted (and no directory is created) in that mode.
+    if local_media:
+        app.mount(
+            "/static/images",
+            StaticFiles(directory=settings.images_dir),
+            name="static-images",
+        )
+        app.mount(
+            "/static/heatmaps",
+            StaticFiles(directory=settings.heatmaps_dir),
+            name="static-heatmaps",
+        )
     return app
 
 

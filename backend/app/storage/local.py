@@ -71,15 +71,3 @@ def save_original(raw: bytes, exam_id: str) -> tuple[Path, str]:
     path = settings.images_dir / name
     path.write_bytes(raw)
     return path, f"/static/images/{name}"
-
-
-def heatmap_target(exam_id: str) -> tuple[Path, str]:
-    """Where the Grad-CAM overlay for ``exam_id`` goes, and its public URL.
-
-    Nothing is written here; the renderer (Agent A) writes the PNG and the
-    caller only publishes the URL when the render actually succeeded.
-    """
-    settings = get_settings()
-    settings.heatmaps_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{_checked_id(exam_id)}.png"
-    return settings.heatmaps_dir / name, f"/static/heatmaps/{name}"

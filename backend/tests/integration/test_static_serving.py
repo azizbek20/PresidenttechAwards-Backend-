@@ -48,10 +48,10 @@ def test_original_bytes_are_on_disk_unmodified(
     assert path.read_bytes() == refer_jpeg_bytes
 
 
-def test_heatmap_png_is_on_disk(created: dict[str, Any]) -> None:
-    path = storage_root() / "heatmaps" / f"{created['exam_id']}.png"
-    assert path.is_file()
-    assert path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+def test_no_heatmap_file_is_written(created: dict[str, Any]) -> None:
+    """Grad-CAM is gone (MIGRATION_PLAN.md §3.1 step 8): nothing lands in heatmaps/."""
+    assert created["heatmap_url"] is None
+    assert not (storage_root() / "heatmaps" / f"{created['exam_id']}.png").exists()
 
 
 def test_png_upload_is_stored_with_a_png_extension(

@@ -1,92 +1,158 @@
-# CLAUDE.md — EYE DETECT AI backend
+# CLAUDE.md — EYE DETECT AI backend (Claude migration)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with
-code in this repository. `SPEC.md` in this directory is the single source of
-truth; where this file and `SPEC.md` disagree, `SPEC.md` wins.
+This file guides Claude Code in `backend/`. It replaces the v4 multi-agent
+version (still in git history).
 
-## Hard rules for every agent (SPEC.md §0, verbatim)
+**Precedence:** for anything inside the migration's scope (model inference,
+decision rules, storage, deployment), `docs/MIGRATION_PLAN.md` wins. For
+everything else, `SPEC.md` still wins. Where this file and the plan disagree,
+stop and ask.
 
-1. You may create/modify **only the paths listed in your worktree brief** (§5).
-2. Frozen files (§4.2 list) are read-only. If an interface looks wrong, **STOP
-   and report in your final message — do not change it** (Doc 5 §6.3 rule:
-   interfaces change only at the orchestrator level, by adding, never renaming).
-3. Every function you implement must match the exact signature in this spec.
-4. Your definition of done is the exact command list in your brief exiting 0.
-   Never claim a test passed that was skipped or not run.
-5. Commit small and often on your own branch. Never merge, rebase, or touch
-   other branches. Never push.
+The migration replaces the PyTorch / ONNX / Grad-CAM inference layer with
+Claude vision (Anthropic API) and makes the backend deployable on Vercel.
+Everything that carries a safety rule stays.
 
-## Frozen files (§4.2) — read-only
+---
 
-`SPEC.md`, `CLAUDE.md`, `requirements*.txt`, `app/config.py`, `app/schemas.py`,
-`app/core/errors.py`, `app/inference/engine.py`, `app/inference/mock_engine.py`,
-`app/inference/decision.py`, `app/db/crud.py` (signatures — bodies are Agent
-B's), `tests/conftest.py`, `tests/test_frozen_kit.py`,
-`tests/fixtures/golden_predict.json`.
+## Hard rules
 
-## What agents must NOT do (§7, recap)
+1. Work only on the current phase of `docs/MIGRATION_PLAN.md`. Do not start
+   the next phase until asked.
+2. Edit only the files the current phase lists. If an interface looks wrong,
+   STOP and report — do not improvise a redesign.
+3. **Tests are written before implementation, in their own commits.**
+   Implementation commits must not touch `tests/`. If a test looks wrong
+   during implementation, stop and explain why; do not edit it.
+4. Your definition of done is the phase's command list exiting 0. Paste the
+   final lines of each command's output. Never claim a test passed that was
+   skipped or not run.
+5. Commit small and often on `feature/claude-engine`. Never push, merge,
+   rebase or touch other branches.
+6. Record what you did, what you measured and anything surprising in
+   `docs/NOTES.md` at the end of every session.
 
-No response fields beyond frozen `schemas.py` (15 legacy + `request_id`,
-`mode`), no renamed JSON keys, no problem+json, no nullable wire fields, no
-auth on `/static`, no mock predictions outside `EYE_MODE=demo`, no duplicate
-exams from a resent payload, no non-string error `detail`, no runtime model
-downloads, no `torch.load(weights_only=False)`, no CC-BY-NC model artifacts, no
-editing frozen files, no cross-branch operations, no pushes, no claims of
-untested success. When blocked → finish what is unblocked, report the blocker.
+## Still frozen (read-only)
+
+- `app/schemas.py` and `app/analysis/schemas.py` — the wire contract the
+  deployed app reads. No key renamed, removed or made nullable.
+- `app/core/errors.py` — the `{"error", "detail"}` envelope; `detail` is
+  always one short Uzbek string.
+- `app/inference/mock_engine.py` — the test double; the contract tests depend
+  on its brightness bands.
+- The existing `decide()` in `app/inference/decision.py` — add new functions
+  next to it, do not change it.
+- `tests/conftest.py`, `tests/test_frozen_kit.py`,
+  `tests/fixtures/golden_predict.json`.
+
+## Unfrozen for this migration (change as the plan says, additively where possible)
+
+`app/config.py`, `app/inference/engine.py`, `app/inference/decision.py`
+(additions only), `app/api/predict.py`, `app/main.py`, `app/storage/*`,
+`app/db/base.py`, `app/db/models.py` (one new nullable column),
+`requirements*.txt`, plus the new files the plan names.
+Also, per the Phase 0 decisions (plan §12): `app/worker.py` (Phase 1: step 8
+→ `heatmap_url = None`; deleted in Phase 3), `app/db/crud.py` (Phase 2: one
+optional `assessment_json` kwarg on `create_exam_with_result`), and
+`app/api/deps.py` (Phase 2: `engine_for()` return type only).
+
+## Test files that may change (test-only commits, listed in the plan)
+
+Delete: `tests/unit/test_torch_engine.py`, `tests/unit/test_gradcam.py`.
+Change assertions only: `tests/contract/test_static_serving.py` (no heatmap
+any more), `tests/integration/test_predict_async.py` (Celery → inline replay),
+`tests/perf/test_latency.py` (torch-only cases, if any; Phase 0 found none),
+`tests/integration/test_static_serving.py::test_heatmap_png_is_on_disk`
+(Phase 1: assert no heatmap file is written).
+New test files as each phase lists. **Any other test that starts failing is
+an implementation bug, not a test to fix** — in particular
+`test_frozen_kit.py`, `test_model_unavailable.py` and
+`test_audit_regressions.py` must keep passing unchanged (the legacy `torch`
+config value stays for exactly this reason; see the plan §3.2).
+
+## Safety invariants — never break these
+
+- Step order in `POST /api/v1/predict` stays: validate → capped read → decode
+  → model gate (3c) → dedup (3b) → save original → quality gate → inference →
+  decision → persist → respond.
+- The quality gate and dedup replay run **before** any Claude call. A failed
+  gate or a replay makes zero Claude calls.
+- No error path returns `NO_REFER`. An API error, timeout or invalid model
+  output is `500 inference_error`. There is no fallback verdict.
+- Persistence before response: a result that was not saved never reaches the
+  phone (`500 persistence_error`).
+- No mock result outside `EYE_MODE=demo`.
+- Only the image and the fixed instructions go to Claude — never
+  `patient_id`, never any other patient data.
+- Secrets only from environment variables. Never in code, tests, logs,
+  commits or chat output. The Anthropic key lives in `backend/.env`
+  (git-ignored) or the shell environment.
+- The verdict is computed only on the server, in `decision.py`.
+
+## Claude API usage
+
+- Model from `CLAUDE_MODEL` (default `claude-sonnet-5-5`; `claude-opus-5-5`
+  for comparison runs). Never hard-code a model ID elsewhere.
+- Structured output with the SDK's `messages.parse(...)` and the
+  `FundusAssessment` Pydantic model from the plan. Check the installed SDK
+  version's docs for the exact async call before writing it.
+- Timeout `CLAUDE_TIMEOUT_S` (25 s), no automatic retries on the request
+  path. The phone has its own retry button and a 30 s request timeout.
+- Numeric ranges and enum casing are not enforced by the API: validate
+  locally (lower-case enums, reject out-of-range numbers → 500).
+- **Tests never call the real API.** Use a fake client. The only real calls
+  are the manual check at the end of Phase 2 and the Phase 4 eval.
+- Log per call: `request_id`, `exam_id`, `model_version`, latency, input and
+  output tokens, `image_type`, decision. Never log image bytes or the key.
 
 ## Commands
 
 ```bash
-# environment (Python 3.11)
+# environment — Python 3.11 locally (CI), 3.12 on Vercel from Phase 3
+cd backend
 python3.11 -m venv venv && source venv/bin/activate
+
+# BEFORE Phase 1 (current requirements, torch still present):
 pip install -r requirements-torch.txt && pip install -r requirements-dev.txt
-# MANDATORY: grad-cam depends on opencv-python (the GUI build), which overwrites
-# opencv-python-headless's cv2 directory. In a container the GUI build dies on
-# `import cv2` with libGL.so.1 not found. Restore the pinned headless build:
 pip uninstall -y opencv-python && \
   pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
 
-# the default suite (what every gate runs)
-pytest -q -m "not model and not perf"
+# AFTER Phase 1 (torch and grad-cam gone, no opencv trap):
+pip install -r requirements-dev.txt
 
-# a single test
-pytest tests/contract/test_predict_contract.py::test_all_legacy_keys_present -q
+# the default suite (every phase gate)
+EYE_MODE=demo pytest -q -m "not model and not perf"
 
 # lint / types
 ruff check app tests && mypy app
 
-# run the API (demo mode, mock engine)
-EYE_API_KEY=demo123 uvicorn app.main:app --port 8000
+# run locally, mock engine (no key needed)
+EYE_MODE=demo EYE_MODEL_SOURCE=mock EYE_API_KEY=demo123 uvicorn app.main:app --port 8000
 
-# admin panel (step 5 of the demo script)
-API_URL=http://localhost:8000 EYE_API_KEY=demo123 streamlit run admin/dashboard.py
+# run locally with Claude (key from backend/.env or the shell)
+EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 \
+  QUALITY_BLUR_MIN_VAR=8 uvicorn app.main:app --port 8000
 ```
-
-## Device policy
-
-The delivered `SPEC.md` ends at §9 and contains **no §10 macOS/MPS addendum**,
-so the device contract is pinned in `app/config.py`:
-
-* `EYE_DEVICE=cpu` is the default and is **mandatory** for tests, CI, Docker
-  and every gate assertion. MPS never gates anything.
-* `EYE_DEVICE=mps` is for Apple-silicon dev runs only; `auto` picks mps when
-  genuinely available and otherwise falls back to cpu with a WARNING.
-* Grad-CAM always runs on cpu.
 
 ## Architecture notes that span files
 
-* **Two input domains reach `engine.predict`.** Tests pass a decoded RGB image
-  (HWC uint8); `api/predict.py` passes `to_model_input(retina_crop(img))`, a
-  normalised CHW float32 tensor. `mock_engine.mean_gray` inverts the ImageNet
-  transform to recover the intensity band. `IMAGENET_MEAN`/`IMAGENET_STD` live
-  in `app/inference/engine.py` and **both** `preprocess.to_model_input` and the
-  mock must use them, or every demo verdict shifts.
-* **The quality gate runs before the DR engine, always.** A blurry or dark
-  image is UNGRADABLE and `engine.predict` is never called — pinned by
-  `tests/contract/test_engine_spy.py`.
-* **C3 split truth:** the wire carries non-null placeholders for UNGRADABLE
-  (`probability=0.0, icdr_grade=0`) because the deployed APK crashes on nulls,
-  while the DB stores `NULL` so training exports stay clean.
-* **Persistence is unconditional (C10):** any DB write failure is
-  `500 persistence_error`, in every mode. A result the admin panel cannot
-  corroborate must never reach the phone.
+- **Two engine input kinds.** The mock receives a normalised CHW tensor from
+  `preprocess.to_model_input(retina_crop(img))`. The Claude engine declares
+  `wants_jpeg = True` and receives the uploaded JPEG bytes (re-encoded only
+  if the long side is over 1568 px). `predict.py` step 6 branches on that flag.
+- **Two decision functions.** `decide()` (frozen) for the mock's 5-class
+  probabilities; `decide_from_assessment()` (new) for Claude's structured
+  assessment. Both return the same `DecisionResult`.
+- **C3 split truth.** The wire carries `probability=0.0, icdr_grade=0` for
+  UNGRADABLE because the app cannot take nulls; the database stores NULL.
+- **Model gate (3c).** `engine.model_loaded == False` → 503
+  `model_unavailable`. For Claude that means `ANTHROPIC_API_KEY` is missing:
+  the app still starts, `/health/ready` is 503. Same behaviour the shadow-mode
+  tests already pin for a missing model.
+
+## Roles (multi-model workflow)
+
+- **Test writer** (Sonnet or Haiku): writes and changes tests only, from the
+  plan, before implementation. New-behaviour tests are expected to fail.
+- **Implementer** (Opus): makes the tests pass without touching `tests/`.
+- **Reviewer** (any model): checks the diff against the plan and the
+  checklist in `docs/MIGRATION_PLAN.md`; reports, does not fix.

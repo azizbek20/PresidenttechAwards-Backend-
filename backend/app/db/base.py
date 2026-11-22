@@ -38,12 +38,26 @@ def _connect_args(url: str) -> dict[str, Any]:
     return {}
 
 
+def _pool_args(url: str) -> dict[str, Any]:
+    """Postgres on serverless (plan §3.9): many short-lived instances share the
+    provider's connection limit, so each keeps a tiny pool. SQLite keeps
+    SQLAlchemy's defaults (its pool class rejects these arguments)."""
+    if url.startswith("postgresql"):
+        return {"pool_size": 2, "max_overflow": 2}
+    return {}
+
+
 def _build(url: str) -> None:
     """Caller must hold ``_LOCK``."""
     global _engine, _engine_url, _session_factory
     if _engine is not None:
         _engine.dispose()
-    _engine = create_engine(url, connect_args=_connect_args(url), pool_pre_ping=True)
+    _engine = create_engine(
+        url,
+        connect_args=_connect_args(url),
+        pool_pre_ping=True,
+        **_pool_args(url),
+    )
     _engine_url = url
     _session_factory = sessionmaker(
         bind=_engine, expire_on_commit=False, autoflush=False

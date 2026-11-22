@@ -1,10 +1,17 @@
-"""Frozen engine contract (spec §4.5, C9). DO NOT EDIT.
+"""Engine contract (spec §4.5, C9).
+
+Frozen under the v4 spec; the Claude migration (``docs/MIGRATION_PLAN.md``)
+unfreezes it for additive changes only — existing signatures stay.
 
 NOTE on the ``auto`` source: §4.5's parenthetical still mentions
 ``mock | torch | auto``, but that is residual v1 wording — C9 and §4.9 DELETE
 ``auto``. A deployment that silently degrades to mock predictions is a safety
 failure, not a convenience. Only ``mock`` and ``torch`` are accepted here; the
 config layer rejects anything else before this module is reached.
+
+``torch`` is a legacy value since Phase 1 of the migration: its engine module
+was deleted, so it always yields :class:`UnavailableEngine` (503). It stays
+because the frozen tests pin the shadow + torch rules (plan §3.2).
 """
 
 from __future__ import annotations
@@ -14,6 +21,9 @@ from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import numpy as np
+
+    from app.inference.assessment import FundusAssessment
+    from app.inference.claude_engine import ClaudeEngine
 
 logger = logging.getLogger("eyedetect.engine")
 
@@ -37,6 +47,19 @@ class Prediction(TypedDict):
     grade: int  # 0..4
     probs: list[float]  # len 5, sums to 1.0
     model_version: str
+
+
+class ClaudePrediction(TypedDict):
+    """What :meth:`ClaudeEngine.assess` returns (plan §3.3, additive).
+
+    The token and latency fields feed the per-call log line in ``predict.py``.
+    """
+
+    assessment: "FundusAssessment"
+    model_version: str
+    latency_ms: float
+    input_tokens: int
+    output_tokens: int
 
 
 @runtime_checkable
@@ -63,12 +86,19 @@ class UnavailableEngine:
         raise ModelUnavailable(self.reason)
 
 
-def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
+def get_engine(settings) -> "InferenceEngine | ClaudeEngine":  # noqa: ANN001
     """Build the engine for the configured source.
 
-    ``torch_engine`` is imported lazily so the mock path never imports torch.
-    A missing/invalid checkpoint yields :class:`UnavailableEngine` (503 at the
-    API), never a silent mock substitution.
+    ``torch``: ``app.inference.torch_engine`` no longer exists (migration
+    Phase 1), so the import below fails and the result is
+    :class:`UnavailableEngine` (503 at the API) — never a silent mock
+    substitution.
+
+    ``claude``: a :class:`ClaudeEngine`. Without ``ANTHROPIC_API_KEY`` it
+    reports ``model_loaded = False`` (503, like a missing checkpoint); a
+    missing prompt file raises here — a boot error, not a fallback (§3.3).
+    The return type is widened per plan §12.3: ``ClaudeEngine`` has
+    ``assess()``, not ``predict()``.
     """
     source = settings.eye_model_source
 
@@ -94,16 +124,11 @@ def get_engine(settings) -> InferenceEngine:  # noqa: ANN001 - frozen signature
             logger.error("torch engine failed to load: %s", exc)
             return UnavailableEngine(str(exc))
 
-    if source == "onnx":
-        try:
-            from app.inference.onnx_engine import OnnxEngine
-        except ImportError as exc:
-            logger.error("onnx engine unavailable: %s", exc)
-            return UnavailableEngine(f"onnx engine import failed: {exc}")
-        try:
-            return OnnxEngine(settings)
-        except Exception as exc:
-            logger.error("onnx engine failed to load: %s", exc)
-            return UnavailableEngine(str(exc))
+    if source == "claude":
+        from app.inference.claude_engine import ClaudeEngine
 
-    raise ValueError(f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch|onnx)")
+        return ClaudeEngine(settings)
+
+    raise ValueError(
+        f"unknown EYE_MODEL_SOURCE={source!r} (expected mock|torch|claude)"
+    )

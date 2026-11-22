@@ -24,11 +24,21 @@ or every worker will apply its own independent quota.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections import deque
 from typing import Any
 
 _JSON = b"application/json"
+
+logger = logging.getLogger("eyedetect.rate_limit")
+
+
+def _header(scope: Any, name: bytes) -> str | None:
+    for key, value in scope.get("headers") or ():
+        if key.lower() == name:
+            return bytes(value).decode("latin-1")
+    return None
 
 
 class RateLimitMiddleware:
@@ -83,6 +93,15 @@ class RateLimitMiddleware:
         if hits is None:
             hits = deque()
             self._hits[client_id] = hits
+            # Issue 9 (plan §2): behind Vercel's proxy the connection address
+            # may be the proxy's, putting every phone in one bucket. Logged
+            # once per new bucket so the deployed logs show what the limiter
+            # keys on next to the forwarded address. Keying is NOT changed yet.
+            logger.info(
+                "rate_limit new_bucket key=%s x_forwarded_for=%s",
+                client_id,
+                _header(scope, b"x-forwarded-for"),
+            )
         hits.append(now)
 
         await self.app(scope, receive, send)

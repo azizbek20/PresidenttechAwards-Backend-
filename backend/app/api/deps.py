@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from fastapi import Header
@@ -23,6 +23,9 @@ from app.core.errors import ApiError
 from app.core.security import UNAUTHORIZED_DETAIL, verify_api_key
 from app.inference.engine import InferenceEngine, get_engine
 from app.schemas import DISCLAIMER
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.inference.claude_engine import ClaudeEngine
 
 
 async def require_api_key(
@@ -35,7 +38,7 @@ async def require_api_key(
         raise ApiError(401, "unauthorized", UNAUTHORIZED_DETAIL)
 
 
-def engine_for(app: Any) -> InferenceEngine:
+def engine_for(app: Any) -> "InferenceEngine | ClaudeEngine":
     """The process-wide engine, built once during startup.
 
     The lazy fallback exists for an app object used without its lifespan (a

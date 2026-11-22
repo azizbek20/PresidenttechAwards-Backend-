@@ -2,8 +2,8 @@
 #
 # Multi-stage, non-root (uid 10001), single worker, HEALTHCHECK on /health/ready.
 # Builds natively for the host architecture. On this Apple-silicon dev machine
-# that is linux/arm64 — NEVER pass `--platform amd64`; emulated torch wheels are
-# slow and the aarch64 cpu wheels exist upstream.
+# that is linux/arm64 — NEVER pass `--platform amd64`; emulated builds are slow
+# and native aarch64 wheels exist upstream for every dependency.
 #
 # The image must build with NO model weights present (`models/` is bind-mounted
 # read-only at run time), so nothing here touches the network for artifacts.
@@ -27,28 +27,16 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools wheel
 
 WORKDIR /build
-COPY requirements-torch.txt requirements.txt ./
+COPY requirements.txt requirements-admin.txt ./
 
-# Install order is IDENTICAL to the venv and to CI (SPEC.md §4.1):
-# torch first from its pinned index, then everything else from PyPI. The two
-# indexes stay separate so torch can never resolve from PyPI and PyPI packages
-# can never resolve from the torch index (dependency-confusion guard).
-RUN pip install -r requirements-torch.txt
-RUN pip install -r requirements.txt
+# Everything from PyPI. Torch and grad-cam are gone (migration Phase 1), and
+# with grad-cam went the GUI `opencv-python` it used to drag in, so no
+# uninstall/reinstall fix is needed any more. The admin service runs from this
+# image (docker-compose.yml), so its requirements are installed too.
+RUN pip install -r requirements.txt -r requirements-admin.txt
 
-# --- CRITICAL PACKAGING FIX ------------------------------------------------
-# `grad-cam` depends on `opencv-python` (the GUI build). pip installs it
-# alongside `opencv-python-headless` and it OVERWRITES the same `cv2` package
-# directory. Inside a container the GUI build then dies at `import cv2` with
-#   ImportError: libGL.so.1: cannot open shared object file
-# because slim images ship no OpenGL. Removing the GUI build and force-
-# reinstalling headless (--no-deps, so numpy's pin is untouched) leaves
-# cv2 4.10.0 in place and grad-cam still imports.
-RUN pip uninstall -y opencv-python && \
-    pip install --force-reinstall --no-deps opencv-python-headless==4.10.0.84
-
-# Fail the BUILD, not production, if the fix ever regresses. (Repeated in the
-# runtime stage, which is the environment that actually ships.)
+# Fail the BUILD, not production, if a GUI OpenCV ever sneaks back in (slim
+# images ship no libGL). Repeated in the runtime stage, which is what ships.
 RUN python -c "import cv2; print('cv2', cv2.__version__)"
 
 # ---------------------------------------------------------------------------
@@ -56,9 +44,9 @@ RUN python -c "import cv2; print('cv2', cv2.__version__)"
 # ---------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS runtime
 
-# libgomp1: torch's OpenMP runtime. libglib2.0-0: still dlopened by the
-# headless OpenCV wheel. Deliberately NO libgl1 — if it were installed, the
-# packaging bug above would hide instead of failing loudly.
+# libgomp1: OpenMP runtime (was required by torch; kept until the image is
+# re-verified without it). libglib2.0-0: still dlopened by the headless OpenCV
+# wheel. Deliberately NO libgl1 — a GUI OpenCV must fail loudly, not hide.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgomp1 \
         libglib2.0-0 \
@@ -77,9 +65,9 @@ COPY --from=builder /opt/venv /opt/venv
 
 # The guard that counts: this stage has the SHIPPED system libraries, so it is
 # where a re-introduced `opencv-python` would blow up with
-# `libGL.so.1: cannot open shared object file`. Importing pytorch_grad_cam too
-# proves the fix did not break the package that pulled the GUI build in.
-RUN python -c "import cv2, torch, pytorch_grad_cam; print('cv2', cv2.__version__, '| torch', torch.__version__)"
+# `libGL.so.1: cannot open shared object file`. onnxruntime (the /analyze skin
+# model) and streamlit (the admin service) must import here too.
+RUN python -c "import cv2, onnxruntime, streamlit; print('cv2', cv2.__version__, '| onnxruntime', onnxruntime.__version__)"
 
 WORKDIR /app
 
