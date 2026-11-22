@@ -217,3 +217,126 @@ def test_quality_gate_failure_logs_no_claude_call(
     assert claude_app.fake.calls == []
     assert _call_records(caplog) == []
 
+
+
+# --------------------------------------------------------------------------
+# 4. Vercel: one line per event (NOTES.md open decision 10)
+#
+# Vercel's runtime prints the root logger at INFO to stdout, so with
+# propagation on every app line appeared twice: ours (prefixed) and raw.
+# --------------------------------------------------------------------------
+BASIC_CONFIG = (
+    'logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")\n'
+)
+
+
+def _run_child(tmp_path: Path, body: str, *, vercel: str | None) -> subprocess.CompletedProcess[str]:
+    storage = tmp_path / "storage"
+    storage.mkdir(exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "VERCEL")}
+    env.update(
+        {
+            "EYE_ENV_FILE": "",
+            "EYE_MODE": "demo",
+            "EYE_MODEL_SOURCE": "mock",
+            "EYE_STORAGE_DIR": str(storage),
+            "DATABASE_URL": f"sqlite:///{tmp_path / 'sub.db'}",
+        }
+    )
+    if vercel is not None:
+        env["VERCEL"] = vercel
+    proc = subprocess.run(
+        [sys.executable, "-c", "import logging, sys\n" + body],
+        cwd=BACKEND,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return proc
+
+
+def _probe_lines(stdout: str, probe: str) -> tuple[list[str], list[str]]:
+    hits = [line for line in stdout.splitlines() if probe in line]
+    prefixed = [line for line in hits if line == f"INFO eyedetect.predict {probe}"]
+    bare = [line for line in hits if line == probe]
+    assert len(prefixed) + len(bare) == len(hits), stdout  # no other shapes
+    return prefixed, bare
+
+
+def _probe_code(*, root_first: bool) -> tuple[str, str]:
+    probe = f"probe-{uuid.uuid4().hex}"
+    log = f"logging.getLogger('eyedetect.predict').info({probe!r})\n"
+    if root_first:
+        body = BASIC_CONFIG + "from app.main import create_app\ncreate_app()\n" + log
+    else:
+        body = "from app.main import create_app\ncreate_app()\n" + BASIC_CONFIG + log
+    return probe, body
+
+
+@pytest.mark.parametrize("root_first", [True, False], ids=["root-before-app", "root-after-app"])
+def test_vercel_prints_each_line_once(tmp_path: Path, root_first: bool) -> None:
+    probe, body = _probe_code(root_first=root_first)
+    proc = _run_child(tmp_path, body, vercel="1")
+    prefixed, bare = _probe_lines(proc.stdout, probe)
+    assert len(prefixed) == 1, proc.stdout
+    assert bare == [], proc.stdout
+
+
+def test_without_vercel_root_handler_doubles_the_line(tmp_path: Path) -> None:
+    """Control: why the VERCEL switch exists. Must pass before and after the fix."""
+    probe, body = _probe_code(root_first=True)
+    proc = _run_child(tmp_path, body, vercel=None)
+    prefixed, bare = _probe_lines(proc.stdout, probe)
+    assert len(prefixed) == 1, proc.stdout
+    assert len(bare) == 1, proc.stdout
+
+
+def test_vercel_empty_value_counts_as_unset(tmp_path: Path) -> None:
+    probe, body = _probe_code(root_first=True)
+    proc = _run_child(tmp_path, body, vercel="")
+    prefixed, bare = _probe_lines(proc.stdout, probe)
+    assert (len(prefixed), len(bare)) == (1, 1), proc.stdout
+
+
+@pytest.fixture
+def _propagation_restored() -> Any:
+    yield
+    logging.getLogger("eyedetect").propagate = True
+    purge_app_modules()
+
+
+def test_propagate_follows_vercel_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, _propagation_restored: Any
+) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    _build_app(monkeypatch, tmp_path)()
+    assert logging.getLogger("eyedetect").propagate is False
+    assert len(_named_handlers()) == 1
+
+    monkeypatch.delenv("VERCEL")
+    _build_app(monkeypatch, tmp_path)()
+    assert logging.getLogger("eyedetect").propagate is True
+    assert len(_named_handlers()) == 1
+
+    monkeypatch.setenv("VERCEL", "1")
+    _build_app(monkeypatch, tmp_path)()
+    assert logging.getLogger("eyedetect").propagate is False
+
+    monkeypatch.setenv("VERCEL", "")
+    _build_app(monkeypatch, tmp_path)()
+    assert logging.getLogger("eyedetect").propagate is True
+    assert len(_named_handlers()) == 1
+
+
+def test_repeated_call_in_same_import_restores_propagation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, _propagation_restored: Any
+) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    create_app = _build_app(monkeypatch, tmp_path)
+    create_app()
+    assert logging.getLogger("eyedetect").propagate is False
+    monkeypatch.delenv("VERCEL")
+    create_app()
+    assert logging.getLogger("eyedetect").propagate is True
