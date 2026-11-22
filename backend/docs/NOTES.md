@@ -207,13 +207,17 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - Cost: about 6–15 ms per 1568 px image (one extra decode to verify the copy), off the event loop.
    - Gate: ruff and mypy clean; `474 passed, 1 skipped, 4 deselected`.
 3. ~~**The test arithmetic bug**~~ — approved and fixed (`588` → `600`, test-only commit). Suite: `450 passed, 1 skipped, 4 deselected`.
-4. **`backend/README.md`** still documents the torch install, `download_model.py` and Grad-CAM (Phase 1 review). It is outside every phase's file list. Approve a docs-only update?
+4. ~~**`backend/README.md`** still documents the torch install, `download_model.py` and Grad-CAM (Phase 1 review).~~ — approved and done on 2026-11-22 (docs-only commit).
+   - README: the torch install, the opencv trap, the checkpoint and `download_model.py` notes and the Grad-CAM device rule are gone. It now covers running with the mock or Claude engine, `smoke_claude.sh`, both decision functions, the no-fallback and image-only rules, inline `/predict/async`, a Vercel section, the current layout, and the empty heatmap card for Android (8.3). The stale "rate limiting deferred" item is replaced: the limiter exists (30 per minute per IP, in memory, per process).
+   - `.env.example` had the same leftovers (shadow "requires torch", Grad-CAM on cpu) and no Claude settings. Now it has `ANTHROPIC_API_KEY` (empty), the `CLAUDE_*` defaults, `PROMPT_VERSION`, `UNCERTAIN_REFERS` and `EYE_STORAGE`, and its compose DB path is corrected to `/app/data/eye.db`. Both env examples load into `Settings` with the stated values.
+   - **Found: `.env.vercel.example` still set `CLAUDE_MAX_TOKENS=800`**, so copying it into Vercel would have overridden the new 4000 default (decision 1). Now 4000.
+   - **Found: `.dockerignore` excludes `**/*.md`**, which includes the prompt `app/inference/prompts/fundus_v1.md`. The Docker image therefore cannot run the Claude engine (it stays the mock demo stack; the README says so). Vercel does not read `.dockerignore`. Not changed.
 5. **`onnxruntime` on Vercel.**
    - It stays in `requirements.txt` per §12.2, but is useless on Vercel, because `skin.onnx` is not deployed there.
    - Measured installed sizes (macOS; Linux is smaller): cv2 152 MB, numpy 60, onnxruntime 59 plus its dependency **sympy 79 and mpmath 5**, anthropic 33, sqlalchemy 20, PIL 14. The whole production set is about 461 MB on macOS.
    - The Phase 3 reviewer estimates 350–400 MB on Linux. Vercel's FastAPI docs give a standard **500 MB** Python bundle limit (up to 5 GB on Fluid compute, in beta), so it should fit.
    - If a deploy fails on size, `onnxruntime` and sympy (about 150 MB) are the first thing to drop. For example, move it to a `requirements-analysis.txt` that only the Dockerfile installs.
-6. **Windows launchers (Phase 3 review).** `backend/run_backend_hidden.bat:5` still starts `celery -A app.worker.celery_app worker`, and `stop_backend.bat` kills Celery processes. `app/worker.py` no longer exists, so the launcher would fail. Both files are outside every phase's file list. Approve removing the Celery lines?
+6. ~~**Windows launchers (Phase 3 review).** `backend/run_backend_hidden.bat:5` still starts `celery -A app.worker.celery_app worker`, and `stop_backend.bat` kills Celery processes.~~ — approved and done on 2026-11-22: both Celery lines are removed, and the stop message no longer mentions Celery. Not changed: `stop_backend.bat` uses `wmic`, which is deprecated and missing from newer Windows 11 installs (24H2 and later) by default. If stopping silently does nothing there, that is why.
 
 ## Vercel deploy steps (for the owner; nothing was deployed)
 
@@ -224,7 +228,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 5. Settings → Environment Variables: every name in `backend/.env.vercel.example`.
    - `EYE_MODE=shadow`, `EYE_MODEL_SOURCE=claude`, `EYE_STORAGE=blob`, `QUALITY_BLUR_MIN_VAR=8`, `MAX_UPLOAD_MB=4`.
    - `EYE_API_KEY` from `openssl rand -hex 32`, the same value as the app's `API_KEY`.
-   - `ANTHROPIC_API_KEY`, and `CLAUDE_MAX_TOKENS` per decision 1.
+   - `ANTHROPIC_API_KEY`, and `CLAUDE_MAX_TOKENS=4000` (decision 1).
 6. Deploy. Then:
    - `bash scripts/smoke_claude.sh https://<project>.vercel.app <EYE_API_KEY> eval/manual`
    - Check the function logs for `claude_call` lines (and none for the blurred image), and for `rate_limit new_bucket key=... x_forwarded_for=...` (issue 9: is `key` the phone's IP or a proxy IP?).
