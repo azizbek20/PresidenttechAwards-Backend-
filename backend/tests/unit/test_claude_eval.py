@@ -895,13 +895,13 @@ def test_main_prints_estimate_before_first_call(
 ) -> None:
     csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
     seen: list[str] = []
-    original = fake.messages.parse
+    original = fake.create_message
 
-    async def spying(**kwargs: Any) -> Any:
+    async def spying(body: Any, *, timeout: float) -> Any:
         seen.append(capsys.readouterr().out)
-        return await original(**kwargs)
+        return await original(body, timeout=timeout)
 
-    fake.messages.parse = spying  # type: ignore[method-assign]
+    fake.create_message = spying  # type: ignore[method-assign]
     assert run_main(ev, csv, tmp_path / "out", fake) == 0
     assert seen and "estimate" in seen[0].lower()
 
