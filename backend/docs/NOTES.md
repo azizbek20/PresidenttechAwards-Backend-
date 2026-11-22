@@ -168,7 +168,7 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
   - The aspect-preserving result is 1200 × 1568/3136 = **600**, which the engine produces; the reviewer confirmed it independently.
   - Fixed on 2026-11-22 with the owner's approval in a test-only commit (`588` → `600`); see the Phase 3 gate below.
 - Review (2c, Sonnet): no blockers. Its should-fix items are open decisions 1 and 2 below; its nit (image prep on the event loop) is fixed in `e956b45`.
-- **Not done: the manual real-key check.** It needs your four images in `backend/eval/manual/`, which is git-ignored.
+- ~~**Not done: the manual real-key check.**~~ Done on 2026-11-22 with public images: all smoke checks passed. See "Manual Claude checks" below, including two findings (open decisions 8 and 9).
 
 ### 2026-11-22 — Phase 3 (Vercel-ready, not deployed)
 
@@ -245,6 +245,13 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - Today the pass bar uses sensitivity and specificity **excluding** UNGRADABLE images, as the old torch eval did; the report also shows the strict figures that count them as misses.
    - Why it matters: an engine that calls every hard referable image UNGRADABLE scores well on the plain figure. Clinically an UNGRADABLE result asks for a retake or a referral, so it is not a silent miss, but a high ungradable rate makes the service less useful.
    - Options: keep it as is; make the pass bar use the strict figures; or keep the plain figures and add a cap on the ungradable rate (for example, at most 10% of referable images). No change is made without your decision.
+8. **A definite referable lesion on a poor photo returns UNGRADABLE (manual check, finding A).** For you and the ophthalmologist; it is a decision-rule change (plan §3.5), so nothing is changed yet.
+   - Today: rule 3 (`gradable: false` → UNGRADABLE, "retake") runs before the lesion rules, even when Claude marks a grade-2+ lesion as **present** (here: neovascularization, grade 4, p = 0.95).
+   - Option, sensitivity-first: if `gradable` is false **but** any grade-2+ lesion is `present` (not `uncertain`), return REFER with a text that also asks for a retake. Otherwise keep UNGRADABLE. Implemented with tests first in `decide_from_assessment`, leaving the frozen `decide()` alone.
+   - Or keep it as is: the operator retakes, and a second poor photo is referred by local protocol.
+9. **The per-call log line is never printed (manual check, finding B).** A bug against CLAUDE.md ("log per call ..."), and the Vercel deploy step 6 relies on these lines.
+   - Cause: no `logging` configuration anywhere in `app/`; Python's default shows WARNING and above, so the INFO lines `claude_call ...` and `rate_limit new_bucket ...` are dropped. Tests read log records directly, so none caught it.
+   - Fix (proposed before the Vercel deploy): configure the `eyedetect` logger at INFO with a stdout handler at app start, with a test that the line reaches stdout. Outside every phase's file list (`app/main.py` is unfrozen), so it waits for your go-ahead.
 
 ## Vercel deploy steps (for the owner; nothing was deployed)
 
@@ -265,11 +272,29 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 
 <!-- Phase 2/3: per image — decision, icdr_grade, image_type, latency, tokens. -->
 
-*Pending.* Put `referable.jpg`, `normal.jpg`, `external_eye.jpg` and `blurred.jpg` in `backend/eval/manual/` (git-ignored). Then, with the key in `backend/.env`:
-1. Start the server: `EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 QUALITY_BLUR_MIN_VAR=8 uvicorn app.main:app --port 8000`
-2. Run the smoke test: `bash scripts/smoke_claude.sh http://localhost:8000 demo123 eval/manual`
+### 2026-11-22 — local run with the real key (closes Phase 2's manual check)
 
-These are the only real API calls before Phase 4, and they are billed.
+- Setup: `main` code (feature branch tip after PRs #9 and #10), `EYE_MODE=shadow EYE_MODEL_SOURCE=claude QUALITY_BLUR_MIN_VAR=8 MAX_UPLOAD_MB=4 CLAUDE_MODEL=claude-sonnet-5-5 CLAUDE_MAX_TOKENS=4000 PROMPT_VERSION=v1`, local storage and SQLite in a scratch folder. The key was read by the app from the main checkout's `backend/.env` through `EYE_ENV_FILE`; it never passed through the shell. `/health/ready` reported `model: true`.
+- Images, all public from Wikimedia Commons, kept in `backend/eval/manual/` (git-ignored, not redistributed):
+  - `referable.jpg`: "Fundus - diabetic retinopathy.png" (Hao et al., CC BY 4.0), its printed "A" panel label blacked out, saved as JPEG.
+  - `normal.jpg`: "Fundus photograph of normal left eye.jpg" (Mikael Häggström, CC0).
+  - `external_eye.jpg`: "Human eye close up, anterior view.jpg" (Rapidreflex, CC BY-SA 4.0).
+  - `blurred.jpg`: the normal fundus with a Gaussian blur (radius 14), made here.
+  - `referable_pdr_film_scan.jpg`: "Fundus Proliferative retinopathy EDA01.JPG" (National Eye Institute, public domain), kept for the finding below.
+- Local quality gate first (free): blur variance 67.7 / 69.6 / 204.9 pass; `blurred.jpg` 1.65 fails.
+- `scripts/smoke_claude.sh`: **all checks passed** — health 200, wrong key 401, 5 MB 413, then:
+
+  | Image | Claude's assessment | Verdict |
+  |---|---|---|
+  | referable | fundus, gradable, grade 2, hard exudates present within about one disc diameter of the macula, macular edema signs present, p = 0.87 | **REFER** |
+  | normal | fundus, gradable, grade 0, no lesions, p = 0.04 | **NO_REFER** |
+  | external_eye | `external_eye`, "not a retinal fundus image" | **UNGRADABLE**, not-a-fundus text |
+  | blurred | no Claude call (quality gate) | **UNGRADABLE** |
+
+  The database stores NULL probability and grade for the UNGRADABLE rows (C3), and an `assessment_json` for every Claude answer, none for the blurred image.
+- **Finding A (rule, see open decision 8):** the NEI proliferative-DR film scan, the first referable image tried, came back **UNGRADABLE**. Claude reported `neovascularization: present`, grade 4, p = 0.95, but `gradable: false` (blur, obstruction: "soft and hazy, the macula is not clearly identifiable"). Plan §3.5 rule 3 makes not-gradable win before the lesions are read, so a photo with sight-threatening disease visible gets "retake" instead of "refer".
+- **Finding B (bug, see open decision 9):** no `claude_call` line (nor any other INFO line from the app) appeared in the server output. The app never configures logging, so its `eyedetect.*` INFO lines are dropped. Latency and tokens per call were therefore not captured here; the Phase 4 eval measures them itself.
+- Billed calls: 4 (Sonnet 5.5), roughly $0.02–0.05 each.
 
 ## Eval results
 
