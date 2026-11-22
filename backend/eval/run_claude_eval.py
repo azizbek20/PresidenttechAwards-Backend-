@@ -25,10 +25,17 @@ Cost and safety:
 * No threshold, rule or prompt is changed here: the settings come from the
   environment and ``.env`` as in production. Set ``QUALITY_BLUR_MIN_VAR=8``
   like every real deployment.
-* The eval's own client retries transport errors twice (429/5xx); the request,
-  validation and decision path is the production one.
+* The client is built like production's (``max_retries=0``), so a timeout or
+  API error shows up as an error for that image, as the phone would see a 500.
 
 Writes ``eval/results/<date>-<model>-<prompt>.json`` plus a Markdown summary.
+While it runs, every finished image is appended to a ``.partial.jsonl`` file
+there, so a crash or Ctrl-C keeps the calls already paid for; the file is
+removed once the report is written. The report names images by file name: if
+your file names carry patient identity, rename them before committing results.
+
+The pass bar (§8) counts only images that were actually scored (UNGRADABLE
+excluded), and never passes unless ``--split`` names a held-out split.
 """
 
 import argparse
@@ -39,8 +46,9 @@ import json
 import math
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -207,66 +215,72 @@ def _local_checks(raw: bytes, settings: Any) -> tuple[str | None, bool | None]:
 
 
 async def evaluate(
-    items: list[Item], engine: Any, settings: Any, concurrency: int = DEFAULT_CONCURRENCY
+    items: list[Item],
+    engine: Any,
+    settings: Any,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    on_result: Callable[[ImageResult], None] | None = None,
 ) -> list[ImageResult]:
-    """Screen every item; results in input order. Claude sees only the bytes."""
+    """Screen every item; results in input order. Claude sees only the bytes.
+
+    A failure on one image (unreadable file, a local check, the Claude call, the
+    decision) becomes that image's ``error``; the rest of the run goes on.
+    ``on_result`` gets each finished result as soon as it is done.
+    """
     from app.inference.decision import decide_from_assessment
 
+    # Bounds the whole per-image work, so at most `concurrency` files are held.
     semaphore = asyncio.Semaphore(concurrency)
-    done = 0
+    calls_done = 0
 
     async def screen(item: Item) -> ImageResult:
-        nonlocal done
-        base: dict[str, Any] = {
+        fields: dict[str, Any] = {
             "image": item.path.name, "kind": item.kind, "true_grade": item.true_grade,
+            "decision": None, "pred_grade": None, "image_type": None, "quality_ok": None,
+            "called_claude": False, "latency_ms": None, "input_tokens": 0,
+            "output_tokens": 0, "error": None,
         }
-        empty: dict[str, Any] = {
-            "decision": None, "pred_grade": None, "image_type": None,
-            "latency_ms": None, "input_tokens": 0, "output_tokens": 0,
-        }
-        raw = await asyncio.to_thread(item.path.read_bytes)
         try:
+            raw = await asyncio.to_thread(item.path.read_bytes)
             error, ok = await asyncio.to_thread(_local_checks, raw, settings)
-        except Exception as exc:  # noqa: BLE001 - recorded, the run goes on
-            error, ok = type(exc).__name__, None
-        if error is not None:
-            return ImageResult(
-                **base, **empty, quality_ok=None, called_claude=False, error=error
-            )
-        pred = None
-        if ok:
-            try:
-                async with semaphore:
-                    pred = await engine.assess(raw)
-            except Exception as exc:  # noqa: BLE001 - no fallback verdict
-                return ImageResult(
-                    **base, **empty, quality_ok=True, called_claude=True,
-                    error=type(exc).__name__,
+            if error is not None:
+                fields["error"] = error
+                return ImageResult(**fields)
+            fields["quality_ok"] = ok
+            pred = None
+            if ok:  # the gate passed: one Claude call, with the bytes and nothing else
+                fields["called_claude"] = True
+                pred = await engine.assess(raw)
+                fields.update(
+                    image_type=pred["assessment"].image_type,
+                    latency_ms=float(pred["latency_ms"]),
+                    input_tokens=int(pred["input_tokens"]),
+                    output_tokens=int(pred["output_tokens"]),
                 )
-            finally:
-                done += 1
-                if done % 10 == 0:
-                    print(f"  ... {done} Claude calls done", file=sys.stderr)
-        result = decide_from_assessment(
-            pred["assessment"] if pred else None,
-            bool(ok),
-            settings.referable_threshold,
-            settings.uncertain_refers,
-        )
-        return ImageResult(
-            **base,
-            decision=result.decision,
-            pred_grade=result.db_icdr_grade,
-            image_type=pred["assessment"].image_type if pred else None,
-            quality_ok=bool(ok),
-            called_claude=pred is not None,
-            latency_ms=float(pred["latency_ms"]) if pred else None,
-            input_tokens=int(pred["input_tokens"]) if pred else 0,
-            output_tokens=int(pred["output_tokens"]) if pred else 0,
-            error=None,
-        )
+            result = decide_from_assessment(
+                pred["assessment"] if pred else None,
+                bool(ok),
+                settings.referable_threshold,
+                settings.uncertain_refers,
+            )
+            fields.update(decision=result.decision, pred_grade=result.db_icdr_grade)
+        except Exception as exc:  # noqa: BLE001 - no fallback verdict; the run goes on
+            fields.update(error=type(exc).__name__, decision=None, pred_grade=None)
+        return ImageResult(**fields)
 
-    return list(await asyncio.gather(*(screen(item) for item in items)))
+    async def bounded(item: Item) -> ImageResult:
+        nonlocal calls_done
+        async with semaphore:
+            result = await screen(item)
+        if on_result is not None:
+            on_result(result)
+        if result.called_claude:
+            calls_done += 1
+            if calls_done % 10 == 0:
+                print(f"  ... {calls_done} Claude calls done", file=sys.stderr)
+        return result
+
+    return list(await asyncio.gather(*(bounded(item) for item in items)))
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +347,12 @@ def summarize(results: list[ImageResult], price_in: float, price_out: float) -> 
         "sensitivity_ci": _ci(tp, tp + fn),
         "specificity": _rate(tn, tn + fp),
         "specificity_ci": _ci(tn, tn + fp),
+        # Strict variants: an UNGRADABLE fundus image counts as a miss. Reported
+        # only; pass_bar does not read them (an owner/ophthalmologist decision).
+        "sensitivity_incl_ungradable": _rate(tp, len(referable)),
+        "sensitivity_incl_ungradable_ci": _ci(tp, len(referable)),
+        "specificity_incl_ungradable": _rate(tn, len(non_referable)),
+        "specificity_incl_ungradable_ci": _ci(tn, len(non_referable)),
         "ungradable": ungradable,
         "ungradable_rate": _rate(ungradable, len(fundus)),
         "ungradable_rate_referable": _rate(
@@ -365,17 +385,31 @@ def _at_least(value: float | None, bar: float) -> bool:
     return value is not None and value >= bar
 
 
-def pass_bar(summary: dict[str, Any]) -> dict[str, Any]:
-    """MIGRATION_PLAN.md §8, one boolean per criterion."""
+_NOT_HELD_OUT = {"all", "train", "training"}
+
+
+def _held_out(split: str | None) -> bool:
+    name = (split or "").strip().lower()
+    return bool(name) and name not in _NOT_HELD_OUT
+
+
+def pass_bar(summary: dict[str, Any], split: str | None = None) -> dict[str, Any]:
+    """MIGRATION_PLAN.md §8, one boolean per criterion.
+
+    The 100-image minimums count images that were actually scored (REFER or
+    NO_REFER), so UNGRADABLE ones cannot make a small sample look large. An
+    unknown, ``all`` or training split never passes: §8 is about held-out data.
+    """
     criteria = {
-        "n_referable>=100": summary["n_referable"] >= 100,
-        "n_non_referable>=100": summary["n_non_referable"] >= 100,
+        "referable_scored>=100": summary["tp"] + summary["fn"] >= 100,
+        "non_referable_scored>=100": summary["tn"] + summary["fp"] >= 100,
         "sensitivity>=0.90": _at_least(summary["sensitivity"], 0.90),
         "specificity>=0.80": _at_least(summary["specificity"], 0.80),
         "non_fundus_all_ungradable": (
             summary["non_fundus_n"] > 0 and summary["non_fundus_rejection_rate"] == 1.0
         ),
         "no_errors": summary["n_errors"] == 0,
+        "held_out_split": _held_out(split),
     }
     return {"criteria": criteria, "passed": all(criteria.values())}
 
@@ -408,10 +442,17 @@ def _markdown(summary: dict[str, Any], meta: dict[str, Any], bar: dict[str, Any]
         "",
         "| Metric | Value | 95% CI |",
         "|---|---|---|",
-        f"| Sensitivity (referable DR, grade ≥ 2) | {_pct(s['sensitivity'])} "
-        f"({s['tp']}/{s['tp'] + s['fn']}) | {_pct_ci(s['sensitivity_ci'])} |",
-        f"| Specificity | {_pct(s['specificity'])} ({s['tn']}/{s['tn'] + s['fp']}) "
-        f"| {_pct_ci(s['specificity_ci'])} |",
+        f"| Sensitivity (referable DR, grade ≥ 2), excluding UNGRADABLE | "
+        f"{_pct(s['sensitivity'])} ({s['tp']}/{s['tp'] + s['fn']}) "
+        f"| {_pct_ci(s['sensitivity_ci'])} |",
+        f"| Sensitivity, counting UNGRADABLE as a miss | "
+        f"{_pct(s['sensitivity_incl_ungradable'])} ({s['tp']}/{s['n_referable']}) "
+        f"| {_pct_ci(s['sensitivity_incl_ungradable_ci'])} |",
+        f"| Specificity, excluding UNGRADABLE | {_pct(s['specificity'])} "
+        f"({s['tn']}/{s['tn'] + s['fp']}) | {_pct_ci(s['specificity_ci'])} |",
+        f"| Specificity, counting UNGRADABLE as not cleared | "
+        f"{_pct(s['specificity_incl_ungradable'])} ({s['tn']}/{s['n_non_referable']}) "
+        f"| {_pct_ci(s['specificity_incl_ungradable_ci'])} |",
         f"| Ungradable fundus | {_pct(s['ungradable_rate'])} (referable "
         f"{_pct(s['ungradable_rate_referable'])}, non-referable "
         f"{_pct(s['ungradable_rate_non_referable'])}) | |",
@@ -426,6 +467,11 @@ def _markdown(summary: dict[str, Any], meta: dict[str, Any], bar: dict[str, Any]
         f"FP {s['fp']}, TN {s['tn']}.",
         "",
         "## Pass bar (MIGRATION_PLAN.md §8)",
+        "",
+        f"Split `{meta.get('split')}`"
+        + (f", pilot limited to {meta['limit']} per folder" if meta.get("limit") else "")
+        + ". The minimums count scored images only; the sensitivity and specificity "
+        "criteria use the rows that exclude UNGRADABLE.",
         "",
         "| Criterion | Result |",
         "|---|---|",
@@ -458,7 +504,7 @@ def write_report(
     while (out_dir / f"{base}.json").exists() or (out_dir / f"{base}.md").exists():
         n += 1
         base = f"{stem}-{n}"
-    bar = pass_bar(summary)
+    bar = pass_bar(summary, meta.get("split"))
     payload = {
         "meta": meta,
         "summary": summary,
@@ -591,25 +637,57 @@ def main(argv: list[str] | None = None, *, client: Any = None) -> int:
             return 2
         from anthropic import AsyncAnthropic
 
-        client = AsyncAnthropic(api_key=key, timeout=settings.claude_timeout_s, max_retries=2)
+        # Same as production (app/inference/claude_engine.py): no retries.
+        client = AsyncAnthropic(api_key=key, timeout=settings.claude_timeout_s, max_retries=0)
     engine = ClaudeEngine(settings, client=client)
 
-    async def run() -> list[ImageResult]:
-        try:
-            return await evaluate(items, engine, settings, args.concurrency)
-        finally:
-            close = getattr(client, "close", None)
-            if owned and close is not None:
-                await close()
+    # 7. run, saving each finished image as it comes; summarise; report
+    today = date.today()
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%H%M%S")
+    partial = out_dir / f"{today.isoformat()}-{model}-{settings.prompt_version}-{stamp}.partial.jsonl"
+    with partial.open("a", encoding="utf-8") as progress:
 
-    # 7. run, summarise, report
-    results = asyncio.run(run())
-    summary = summarize(results, price_in, price_out)
-    meta = {
-        "model": model,
+        def save(result: ImageResult) -> None:
+            progress.write(json.dumps(asdict(result)) + "\n")
+            progress.flush()
+
+        async def run() -> list[ImageResult]:
+            try:
+                return await evaluate(items, engine, settings, args.concurrency, on_result=save)
+            finally:
+                close = getattr(client, "close", None)
+                if owned and close is not None:
+                    await close()
+
+        print(f"Saving results as they finish to {partial}")
+        results = asyncio.run(run())
+        summary = summarize(results, price_in, price_out)
+        meta = _meta(args, settings, engine, price_in, price_out, estimate, owned)
+        json_path, md_path = write_report(summary, meta, results, out_dir, today)
+    partial.unlink(missing_ok=True)  # the report now holds every result
+    bar = pass_bar(summary, args.split)
+    print(f"Report: {json_path}\n        {md_path}")
+    print(f"Sensitivity {_pct(summary['sensitivity'])}, specificity {_pct(summary['specificity'])}, "
+          f"cost ${summary['cost_total_usd']:.2f} -> pass bar {'PASS' if bar['passed'] else 'FAIL'}")
+    return 0
+
+
+def _meta(
+    args: argparse.Namespace,
+    settings: Any,
+    engine: Any,
+    price_in: float,
+    price_out: float,
+    estimate: float,
+    owned: bool,
+) -> dict[str, Any]:
+    return {
+        "model": settings.claude_model,
         "prompt_version": settings.prompt_version,
         "model_version": engine.model_version,
-        "labels": Path(args.labels).name,
+        "labels": Path(args.labels).name,  # the file name, never its directory
         "split": args.split,
         "limit": args.limit,
         "concurrency": args.concurrency,
@@ -617,16 +695,11 @@ def main(argv: list[str] | None = None, *, client: Any = None) -> int:
         "uncertain_refers": settings.uncertain_refers,
         "quality_blur_min_var": settings.quality_blur_min_var,
         "claude_max_tokens": settings.claude_max_tokens,
+        "client_max_retries": 0 if owned else None,  # None: a client was injected
         "price_in_per_mtok": price_in,
         "price_out_per_mtok": price_out,
         "estimate_usd": estimate,
     }
-    json_path, md_path = write_report(summary, meta, results, args.out, date.today())
-    bar = pass_bar(summary)
-    print(f"Report: {json_path}\n        {md_path}")
-    print(f"Sensitivity {_pct(summary['sensitivity'])}, specificity {_pct(summary['specificity'])}, "
-          f"cost ${summary['cost_total_usd']:.2f} -> pass bar {'PASS' if bar['passed'] else 'FAIL'}")
-    return 0
 
 
 if __name__ == "__main__":
