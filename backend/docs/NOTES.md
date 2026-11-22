@@ -193,6 +193,28 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
   - Should-fix items are open decisions 5 and 6 below. Nit: the rate-limit line logs client IPs at INFO, which is intended for issue 9 and noted for privacy.
 - Not done here: `vercel deploy`, the live smoke test, and the Postgres round trip. They need your Vercel account and stores; steps below.
 
+### 2026-11-22 — Phase 4 (accuracy eval: script written, not run)
+
+- PR #9 merged phases 0–3 into `main` (merge commit `6391b23`). Phase 4 continues on `feature/claude-engine`, whose tip is in `main`.
+- Tests first, by a Sonnet test writer, from an interface spec: `8151c83` adds `tests/unit/test_claude_eval.py` (67 tests). Red before implementation: `67 errors` (module missing), every other test passing. Implementation `d389140` (`eval/run_claude_eval.py`) touches no tests; all 67 passed on the first run.
+- Outside the plan's Phase 4 file list, because the test-first rule needs it: the new test file.
+- What the script does:
+  - Every image takes `/predict`'s own steps: size cap (`MAX_UPLOAD_MB`), format sniff, decode, quality gate, then `ClaudeEngine.assess(raw)` only if the gate passed, then `decide_from_assessment` with the configured threshold and `UNCERTAIN_REFERS`. Settings come from the environment and `.env` as in production; only `EYE_MODE=demo` and `EYE_MODEL_SOURCE=claude` are forced. Nothing changes a threshold, rule or prompt.
+  - Claude gets the image bytes only. `patient_id` is used only to refuse a CSV where a patient sits in two splits (§8), and is never sent or written to the report, which names images by file name only.
+  - Before any call it runs the local steps on every image, then prints how many will reach Claude and an **upper-bound** cost (every answer at `CLAUDE_MAX_TOKENS`, input estimated from the prepared image size and the prompt length). Above `--max-cost` ($10 default) it sends nothing unless `--yes`. `--limit N` runs a pilot.
+  - Concurrency 2. The client matches production (`max_retries=0`), so a timeout or API error is recorded as that image's error, as the phone would get a 500. Any failure on one image (unreadable file, local check, Claude call, decision) is that image's error and the run continues; errors fail the pass bar's `no_errors` criterion.
+  - Every finished image is appended to `<date>-<model>-<prompt>-<time>.partial.jsonl` in the results folder, so a crash or Ctrl-C keeps the calls already paid for. It is deleted once the report is written.
+  - Report: sensitivity and specificity for referable DR with Wilson 95% CIs, the 5×5 grade confusion, decisions per true grade, ungradable rates (overall, referable, non-referable), non-fundus rejection, p50/p95 latency, mean tokens, cost per scan and total. Written to `eval/results/<date>-<model>-<prompt>.json` and `.md`, never overwriting.
+  - Two sensitivity and specificity rows: excluding UNGRADABLE (what the pass bar uses), and counting UNGRADABLE as a miss (see open decision 7).
+  - Pass bar (§8): the 100-image minimums count only **scored** images (REFER or NO_REFER), and it never passes unless `--split` names a held-out split (not `all`, `train`, `training` or blank).
+  - Prices used: Sonnet 5.5 $2 / $10 per MTok in/out, Opus 5.5 $4 / $20 (`--price-in/--price-out` override).
+  - The report names images by file name. If the names carry patient identity (EyePACS uses `<patient>_left.jpeg`), rename the files before committing results.
+- Review (Sonnet): no blockers. It confirmed the eval follows `run_screening` step for step and that nothing can be sent before the estimate or above `--max-cost` without `--yes`. Should-fix items, all fixed after new tests: (1) the 100 minimums counted UNGRADABLE images, so a sensitivity on 60 images could pass; (2) excluding UNGRADABLE flatters sensitivity with nothing reporting the strict figure; (3) `--split all` could report PASS on data that is not held out; (4) one unexpected error or Ctrl-C lost the whole run. Nits fixed: retries now match production, and each file is read inside the concurrency limit. Left as documented: file names in the report.
+  - Round 2 followed the same order: amended spec, then `74417a0` (test writer: 96 tests, 38 failing against `d389140`, all of them new or changed pass-bar and robustness tests), then `af3675d` (implementation, no tests touched). The test change rewrote the pass-bar tests to the stricter criteria; it does not loosen anything.
+- Smoke run of the real CLI with no key (synthetic images, `env -u ANTHROPIC_API_KEY`): `--max-cost 0` printed the estimate and exited 3 with nothing sent; a patient in two splits exited 2; no key exited 2 after the estimate, before any results folder was created. With the fake client the report rendered as expected and the partial file was removed. The upper bound is about **$0.046 per image** on Sonnet, nearly all of it the 4000-token output cap, so a 300-image run shows about $14 and needs `--yes`.
+- Gate: ruff (app, tests, eval) and mypy (`app`, and `eval/run_claude_eval.py` separately) clean; `570 passed, 1 skipped, 4 deselected`.
+- **Not done: the eval run itself.** It needs a labelled CSV (≥ 100 referable and ≥ 100 non-referable held-out images, no patient on both sides of a split), a folder of non-fundus phone photos, and your go-ahead for the billed calls. The IDRiD official test split (103 images) is too small for §8 on its own.
+
 ## Open decisions for the owner (2026-11-22)
 
 1. ~~**`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**~~ — approved and done on 2026-11-22: the default is now **4000** (test `test_claude_defaults` updated first in its own commit; suite `450 passed, 1 skipped, 4 deselected`). The background:
@@ -218,6 +240,11 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - The Phase 3 reviewer estimates 350–400 MB on Linux. Vercel's FastAPI docs give a standard **500 MB** Python bundle limit (up to 5 GB on Fluid compute, in beta), so it should fit.
    - If a deploy fails on size, `onnxruntime` and sympy (about 150 MB) are the first thing to drop. For example, move it to a `requirements-analysis.txt` that only the Dockerfile installs.
 6. ~~**Windows launchers (Phase 3 review).** `backend/run_backend_hidden.bat:5` still starts `celery -A app.worker.celery_app worker`, and `stop_backend.bat` kills Celery processes.~~ — approved and done on 2026-11-22: both Celery lines are removed, and the stop message no longer mentions Celery. Not changed: `stop_backend.bat` uses `wmic`, which is deprecated and missing from newer Windows 11 installs (24H2 and later) by default. If stopping silently does nothing there, that is why.
+
+7. **Should the §8 pass bar count UNGRADABLE fundus images as misses? (Phase 4 review)** For you and the ophthalmologist.
+   - Today the pass bar uses sensitivity and specificity **excluding** UNGRADABLE images, as the old torch eval did; the report also shows the strict figures that count them as misses.
+   - Why it matters: an engine that calls every hard referable image UNGRADABLE scores well on the plain figure. Clinically an UNGRADABLE result asks for a retake or a referral, so it is not a silent miss, but a high ungradable rate makes the service less useful.
+   - Options: keep it as is; make the pass bar use the strict figures; or keep the plain figures and add a cap on the ungradable rate (for example, at most 10% of referable images). No change is made without your decision.
 
 ## Vercel deploy steps (for the owner; nothing was deployed)
 
@@ -247,3 +274,8 @@ These are the only real API calls before Phase 4, and they are billed.
 ## Eval results
 
 <!-- Phase 4: link to eval/results/*.json and the summary against the pass bar. -->
+
+*Pending.* To run, from `backend/`, with the key in `backend/.env`:
+1. Put the images under `eval/data/` (git-ignored), with `eval/data/labels.csv` (`image_path,icdr_grade,patient_id,split`, paths relative to the CSV) and a folder of non-fundus phone eye photos, e.g. `eval/data/non_fundus/`.
+2. Pilot, a few billed calls: `QUALITY_BLUR_MIN_VAR=8 python eval/run_claude_eval.py --labels eval/data/labels.csv --non-fundus eval/data/non_fundus --limit 5`
+3. Full run with `CLAUDE_MODEL=claude-sonnet-5-5` (the default). It prints the upper-bound cost and stops above $10; add `--yes` once you accept it.
