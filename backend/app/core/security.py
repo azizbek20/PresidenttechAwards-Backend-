@@ -61,3 +61,15 @@ def warn_if_unprotected(expected: str | None) -> None:
     """Emit the single startup WARNING required by C2 when auth is off."""
     if auth_disabled(expected):
         logger.warning(_OPEN_API_WARNING)
+
+
+_NO_ADMIN_KEY_WARNING = (
+    "EYE_ADMIN_API_KEY is not set: /api/v1/exams (every exam and its photo URL) "
+    "is readable with the app key, which ships inside the APK."
+)
+
+
+def warn_if_no_admin_key(mode: str, admin_key: str | None) -> None:
+    """One startup WARNING when a live (shadow) deployment has no admin key."""
+    if mode == "shadow" and auth_disabled(admin_key):
+        logger.warning(_NO_ADMIN_KEY_WARNING)

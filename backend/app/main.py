@@ -44,7 +44,7 @@ from app.config import get_settings
 from app.core.errors import register_handlers
 from app.core.limits import MaxBodySizeMiddleware
 from app.core.rate_limit import RateLimitMiddleware
-from app.core.security import warn_if_unprotected
+from app.core.security import warn_if_no_admin_key, warn_if_unprotected
 from app.inference.engine import get_engine
 from app.storage import is_local as storage_is_local
 from app.storage import local as storage
@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
 
     warn_if_unprotected(settings.eye_api_key)
+    warn_if_no_admin_key(settings.eye_mode, settings.eye_admin_api_key)
     if storage_is_local():
         storage.ensure_dirs()
     await run_in_threadpool(db_base.init_db)

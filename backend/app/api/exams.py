@@ -1,25 +1,40 @@
 """Exam history endpoints (spec §5-C C5).
 
-The list feeds the Streamlit admin panel (step 5 of the demo script, C5) and
-the phone's History screen; the detail endpoint returns the *same* shape as
-``POST /predict`` so the client can reuse one parser.
+The list feeds the Streamlit admin panel (step 5 of the demo script, C5); the
+detail endpoint returns the *same* shape as ``POST /predict`` so a client can
+reuse one parser. Neither Android app calls them (phone history is local).
+
+Admin key: together they expose every exam of every phone and its photo URL,
+while the app key (``X-API-Key``) ships inside the APK and can be extracted.
+With ``EYE_ADMIN_API_KEY`` set they also require ``X-Admin-Key``; the app key
+is still checked first by the ``/api/v1`` router (401), then this one (403).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Header, Query
 from starlette.concurrency import run_in_threadpool
 
 import app.db.base as db_base  # Agent B; arrives at the Phase 2 merge.
 from app.api.deps import fill_additive_keys
 from app.config import get_settings
 from app.core.errors import ApiError
+from app.core.security import UNAUTHORIZED_DETAIL, verify_api_key
 from app.db import crud
 from app.schemas import ExamSummary, PredictResponse
 
-router = APIRouter()
+
+async def require_admin_key(
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+) -> None:
+    """403 unless the configured admin key was presented (no-op when unset)."""
+    if not verify_api_key(x_admin_key, get_settings().eye_admin_api_key):
+        raise ApiError(403, "unauthorized", UNAUTHORIZED_DETAIL)
+
+
+router = APIRouter(dependencies=[Depends(require_admin_key)])
 
 _D_NOT_FOUND = "So'ralgan yozuv topilmadi"
 

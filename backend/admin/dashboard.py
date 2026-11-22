@@ -3,6 +3,9 @@
     API_URL=http://localhost:8000 EYE_API_KEY=demo123 \
         streamlit run admin/dashboard.py
 
+Add ``EYE_ADMIN_API_KEY=...`` when the API has one set: the exam endpoints this
+panel reads then also require it (sent as ``X-Admin-Key``).
+
 DEMO-ONLY. THIS PANEL HAS NO LOGIN.
 -----------------------------------
 There is no authentication, no session, no per-user scoping and no audit of who
@@ -29,6 +32,7 @@ import streamlit as st
 
 API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 API_KEY = os.getenv("EYE_API_KEY", "")
+ADMIN_API_KEY = os.getenv("EYE_ADMIN_API_KEY", "")
 REQUEST_TIMEOUT = 15
 PAGE_SIZE = 100
 
@@ -43,7 +47,10 @@ st.set_page_config(page_title="EYE DETECT AI — admin", page_icon="👁", layou
 def _headers() -> dict[str, str]:
     # Absent key = the API was started without EYE_API_KEY; sending an empty
     # header would look like a wrong key rather than like no key.
-    return {"X-API-Key": API_KEY} if API_KEY else {}
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    if ADMIN_API_KEY:
+        headers["X-Admin-Key"] = ADMIN_API_KEY
+    return headers
 
 
 def _absolute(url: str | None) -> str | None:

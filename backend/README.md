@@ -53,6 +53,13 @@ EYE_MODE=shadow EYE_MODEL_SOURCE=claude EYE_API_KEY=demo123 \
 * Without `ANTHROPIC_API_KEY` the app still starts, but `/health/ready` is 503
   and `/api/v1/predict` returns `503 model_unavailable`.
 * Shadow mode with `claude` refuses to boot without a non-empty `EYE_API_KEY`.
+* **Two keys.** `EYE_API_KEY` (header `X-API-Key`) is the app key; it is built
+  into the APK, so treat it as extractable. `EYE_ADMIN_API_KEY` (header
+  `X-Admin-Key`, must differ) additionally guards `/api/v1/exams` and
+  `/api/v1/exams/{id}`, which list every exam and its photo URL; only the admin
+  panel calls them, and it sends the admin key from its own
+  `EYE_ADMIN_API_KEY`. Without an admin key those two endpoints accept the app
+  key alone, and a shadow deployment logs a startup warning.
 * `QUALITY_BLUR_MIN_VAR=8`: the config default of 50 rejects most sharp real
   fundus photos (the IDRiD calibration is in `.env.example`).
 * An `eye.db` created before the migration lacks the new `assessment_json`
