@@ -339,9 +339,19 @@ fun ClinicalDetailCard(result: PredictResponse) {
         val pid = result.patientId ?: stringResource(R.string.result_unknown_patient)
         val eye = eyeShortLabel(result.eye)
         KeyValueRow(stringResource(R.string.result_patient_eye), "$pid · $eye")
-        KeyValueRow(stringResource(R.string.result_model), result.modelVersion)
+        KeyValueRow(stringResource(R.string.result_model), modelDisplayName(result.modelVersion))
     }
 }
+
+/**
+ * Ekranda ko'rsatiladigan model nomi. Bulutli vision API (server `model_version`i
+ * "claude-…/prompt-…") foydalanuvchiga "Bulutli vision AI (API)" deb ko'rsatiladi;
+ * boshqa versiyalar (mock, oflayn TFLite) o'zgarishsiz. Server va tarix bazasida
+ * to'liq `model_version` saqlanib qoladi.
+ */
+@Composable
+fun modelDisplayName(modelVersion: String): String =
+    if (modelVersion.startsWith("claude")) stringResource(R.string.result_model_cloud_api) else modelVersion
 
 /**
  * Mahalliy CV evristikasi kartasi (xiralik/opacity + qizil refleks) — backend

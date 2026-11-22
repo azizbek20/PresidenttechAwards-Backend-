@@ -121,6 +121,7 @@
     <string name="result_share_button">Поделиться</string>
     <string name="result_find_doctor_button">Найти офтальмолога рядом</string>
     <string name="result_find_doctor_query">офтальмолог</string>
+    <string name="result_model_cloud_api">Облачный vision-ИИ (API)</string>
     <string name="result_share_chooser_title">Поделиться результатом</string>
     <string name="result_share_text">%1$s — результат скрининга\n\nПациент: %2$s\nГлаз: %3$s\nРешение: %4$s\nВероятность referable DR: %5$s\nСтепень ICDR: %6$s\nДата: %7$s\n\n%8$s</string>
 

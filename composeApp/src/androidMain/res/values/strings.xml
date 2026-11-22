@@ -121,6 +121,7 @@
     <string name="result_share_button">Ulashish</string>
     <string name="result_find_doctor_button">Yaqin oftalmologni topish</string>
     <string name="result_find_doctor_query">oftalmolog</string>
+    <string name="result_model_cloud_api">Bulutli vision AI (API)</string>
     <string name="result_share_chooser_title">Natijani ulashish</string>
     <string name="result_share_text">%1$s — skrining natijasi\n\nBemor: %2$s\nKo\'z: %3$s\nQaror: %4$s\nReferable DR ehtimoli: %5$s\nICDR daraja: %6$s\nSana: %7$s\n\n%8$s</string>
 

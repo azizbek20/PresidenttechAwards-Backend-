@@ -340,7 +340,7 @@ private fun AnalysisResultContent(result: AnalyzeResponse, imageUri: Uri?) {
             DetailRow(stringResource(R.string.analysis_detail_patient), result.patientId)
             if (result.bodySite.isNotBlank()) DetailRow(stringResource(R.string.analysis_body_site_label), result.bodySite)
             DetailRow(stringResource(R.string.analysis_detail_quality), qualityLabel(result.quality))
-            DetailRow(stringResource(R.string.analysis_detail_model), result.modelVersion)
+            DetailRow(stringResource(R.string.analysis_detail_model), com.eyedetect.ai.ui.components.modelDisplayName(result.modelVersion))
         }
     }
     DisclaimerText(result.disclaimer)
