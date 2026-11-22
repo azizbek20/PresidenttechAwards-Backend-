@@ -119,6 +119,8 @@
     <string name="result_recommendation_no_refer">Следующий шаг: повторный вызов через 12 месяцев.</string>
     <string name="result_recommendation_ungradable">Следующий шаг: переснимите (обратите внимание на фокус/свет) или направьте к специалисту.</string>
     <string name="result_share_button">Поделиться</string>
+    <string name="result_find_doctor_button">Найти офтальмолога рядом</string>
+    <string name="result_find_doctor_query">офтальмолог</string>
     <string name="result_share_chooser_title">Поделиться результатом</string>
     <string name="result_share_text">%1$s — результат скрининга\n\nПациент: %2$s\nГлаз: %3$s\nРешение: %4$s\nВероятность referable DR: %5$s\nСтепень ICDR: %6$s\nДата: %7$s\n\n%8$s</string>
 

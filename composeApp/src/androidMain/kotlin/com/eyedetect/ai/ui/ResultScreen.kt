@@ -1,7 +1,9 @@
 package com.eyedetect.ai.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -198,6 +200,18 @@ private fun DetailCards(
     onShare: () -> Unit,
     includeHeatmap: Boolean,
 ) {
+    // Yo'llash kerak bo'lsa — keyingi qadamni darhol bajarish mumkin bo'lsin:
+    // xaritada yaqin atrofdagi oftalmologlar (foydalanuvchi o'zi tanlaydi, hech narsa yuborilmaydi).
+    if (r.decision == "REFER") {
+        val context = LocalContext.current
+        val query = stringResource(R.string.result_find_doctor_query)
+        PrimaryButton(
+            text = "🩺 " + stringResource(R.string.result_find_doctor_button),
+            onClick = { openNearbyDoctors(context, query) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
     ClinicalDetailCard(r)
 
     // Mahalliy CV evristikasi (opacity/red-reflex) — mavjud bo'lsa
@@ -218,6 +232,20 @@ private fun DetailCards(
         text = "🔗 " + stringResource(R.string.result_share_button),
         onClick = onShare,
     )
+}
+
+/**
+ * Xarita ilovasida (yoki brauzerda) yaqin atrofdagi oftalmologlarni qidiradi.
+ * Google Maps "search" URL'i Maps o'rnatilgan bo'lsa ilovada, aks holda brauzerda ochiladi;
+ * bemor ma'lumoti URL'ga qo'shilmaydi — faqat qidiruv so'zi.
+ */
+private fun openNearbyDoctors(context: Context, query: String) {
+    val uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=" + Uri.encode(query))
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    } catch (_: ActivityNotFoundException) {
+        // Na xarita, na brauzer yo'q — jim o'tib ketamiz, natija ekrani o'zgarmaydi.
+    }
 }
 
 /** Tizim ulashish oynasini (ACTION_SEND) ochadi — foydalanuvchi o'zi ilova va qabul qiluvchini tanlaydi. */
