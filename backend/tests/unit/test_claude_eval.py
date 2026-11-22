@@ -402,6 +402,63 @@ def test_evaluate_concurrency_cap(ev: ModuleType, tmp_path: Path, refer_jpeg_byt
     assert engine.max_in_flight == 2
 
 
+def test_evaluate_deleted_file_is_an_error_not_a_crash(
+    ev: ModuleType, tmp_path: Path, refer_jpeg_bytes: bytes
+) -> None:
+    gone = write(tmp_path, "gone.jpg", refer_jpeg_bytes)
+    ok = write(tmp_path, "ok.jpg", refer_jpeg_bytes)
+    items = [fundus_item(ev, gone), fundus_item(ev, ok)]
+    gone.unlink()
+    engine = FakeEngine()
+    results = run_eval(ev, items, engine, make_settings())
+    assert results[0].error == "FileNotFoundError"
+    assert results[0].decision is None
+    assert results[0].called_claude is False
+    assert results[1].error is None and results[1].decision == "NO_REFER"
+    assert len(engine.calls) == 1
+
+
+def test_evaluate_decision_exception_is_isolated(
+    ev: ModuleType, tmp_path: Path, refer_jpeg_bytes: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.inference.decision as decision_mod
+
+    real = decision_mod.decide_from_assessment
+    seen = {"n": 0}
+
+    def flaky(*args: Any, **kwargs: Any) -> Any:
+        seen["n"] += 1
+        if seen["n"] == 1:
+            raise ZeroDivisionError("bad")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr("app.inference.decision.decide_from_assessment", flaky)
+    items = [fundus_item(ev, write(tmp_path, f"i{n}.jpg", refer_jpeg_bytes)) for n in range(3)]
+    engine = FakeEngine()
+    results = run_eval(ev, items, engine, make_settings(), concurrency=1)
+    assert results[0].error == "ZeroDivisionError"
+    assert results[0].called_claude is True
+    assert results[0].decision is None
+    assert [r.error for r in results[1:]] == [None, None]
+    assert [r.decision for r in results[1:]] == ["NO_REFER", "NO_REFER"]
+
+
+def test_evaluate_on_result_called_once_per_item(
+    ev: ModuleType, tmp_path: Path, refer_jpeg_bytes: bytes, blurry_jpeg_bytes: bytes, text_file_bytes: bytes
+) -> None:
+    items = [
+        fundus_item(ev, write(tmp_path, "a.jpg", refer_jpeg_bytes)),
+        fundus_item(ev, write(tmp_path, "b.jpg", blurry_jpeg_bytes)),
+        fundus_item(ev, write(tmp_path, "c.jpg", text_file_bytes)),
+        fundus_item(ev, write(tmp_path, "d.jpg", refer_jpeg_bytes)),
+    ]
+    got: list[Any] = []
+    results = run_eval(ev, items, FakeEngine(), make_settings(), on_result=got.append)
+    assert len(got) == len(items)
+    assert sorted(id(r) for r in got) == sorted(id(r) for r in results)
+    assert sorted(r.image for r in got) == ["a.jpg", "b.jpg", "c.jpg", "d.jpg"]
+
+
 # --------------------------------------------------------------------------
 # summarize
 # --------------------------------------------------------------------------
@@ -475,6 +532,19 @@ def test_summarize_confusion_and_rates(ev: ModuleType, mixed: list[Any]) -> None
     assert s["ungradable_rate_non_referable"] == pytest.approx(1 / 3)
 
 
+def test_summarize_incl_ungradable(ev: ModuleType, mixed: list[Any]) -> None:
+    s = ev.summarize(mixed, PRICE_IN, PRICE_OUT)
+    # tp=2 of n_referable=4 (f6 is UNGRADABLE); tn=1 of n_non_referable=3 (f7 UNGRADABLE)
+    assert s["sensitivity_incl_ungradable"] == pytest.approx(2 / 4)
+    assert s["specificity_incl_ungradable"] == pytest.approx(1 / 3)
+    assert s["sensitivity_incl_ungradable_ci"] == pytest.approx(list(ev.wilson_ci(2, 4)))
+    assert s["specificity_incl_ungradable_ci"] == pytest.approx(list(ev.wilson_ci(1, 3)))
+    assert isinstance(s["sensitivity_incl_ungradable_ci"], list)
+    # the plain numbers are unchanged
+    assert s["sensitivity"] == pytest.approx(2 / 3)
+    assert s["specificity"] == pytest.approx(1 / 2)
+
+
 def test_summarize_grade_confusion(ev: ModuleType, mixed: list[Any]) -> None:
     s = ev.summarize(mixed, PRICE_IN, PRICE_OUT)
     expected = [[0] * 5 for _ in range(5)]
@@ -545,6 +615,10 @@ def test_summarize_empty_has_none_for_zero_denominators(ev: ModuleType) -> None:
         "mean_input_tokens",
         "mean_output_tokens",
         "cost_per_scan_usd",
+        "sensitivity_incl_ungradable",
+        "sensitivity_incl_ungradable_ci",
+        "specificity_incl_ungradable",
+        "specificity_incl_ungradable_ci",
     ):
         assert key in s and s[key] is None, key
     assert s["n_images"] == 0 and s["claude_calls"] == 0
@@ -560,6 +634,10 @@ def test_summarize_all_ungradable_has_no_sensitivity(ev: ModuleType) -> None:
     assert s["sensitivity"] is None and s["specificity"] is None
     assert s["ungradable_rate_referable"] == 1.0
     assert s["ungradable_rate_non_referable"] is None
+    assert s["sensitivity_incl_ungradable"] == 0.0
+    assert s["sensitivity_incl_ungradable_ci"] == pytest.approx(list(ev.wilson_ci(0, 1)))
+    assert s["specificity_incl_ungradable"] is None
+    assert s["specificity_incl_ungradable_ci"] is None
 
 
 # --------------------------------------------------------------------------
@@ -567,6 +645,10 @@ def test_summarize_all_ungradable_has_no_sensitivity(ev: ModuleType) -> None:
 # --------------------------------------------------------------------------
 def good_summary() -> dict[str, Any]:
     return {
+        "tp": 90,
+        "fn": 10,
+        "tn": 80,
+        "fp": 20,
         "n_referable": 100,
         "n_non_referable": 100,
         "sensitivity": 0.90,
@@ -578,17 +660,18 @@ def good_summary() -> dict[str, Any]:
 
 
 CRITERIA = (
-    "n_referable>=100",
-    "n_non_referable>=100",
+    "referable_scored>=100",
+    "non_referable_scored>=100",
     "sensitivity>=0.90",
     "specificity>=0.80",
     "non_fundus_all_ungradable",
     "no_errors",
+    "held_out_split",
 )
 
 
 def test_pass_bar_all_pass_at_boundaries(ev: ModuleType) -> None:
-    bar = ev.pass_bar(good_summary())
+    bar = ev.pass_bar(good_summary(), "test")
     assert set(bar["criteria"]) == set(CRITERIA)
     assert all(v is True for v in bar["criteria"].values())
     assert bar["passed"] is True
@@ -597,8 +680,10 @@ def test_pass_bar_all_pass_at_boundaries(ev: ModuleType) -> None:
 @pytest.mark.parametrize(
     "change,criterion",
     [
-        ({"n_referable": 99}, "n_referable>=100"),
-        ({"n_non_referable": 99}, "n_non_referable>=100"),
+        ({"tp": 59}, "referable_scored>=100"),
+        ({"fn": 9}, "referable_scored>=100"),
+        ({"tn": 79}, "non_referable_scored>=100"),
+        ({"fp": 19}, "non_referable_scored>=100"),
         ({"sensitivity": 0.8999}, "sensitivity>=0.90"),
         ({"specificity": 0.7999}, "specificity>=0.80"),
         ({"non_fundus_rejection_rate": 0.99}, "non_fundus_all_ungradable"),
@@ -611,10 +696,56 @@ def test_pass_bar_all_pass_at_boundaries(ev: ModuleType) -> None:
 def test_pass_bar_single_failure(ev: ModuleType, change: dict[str, Any], criterion: str) -> None:
     summary = good_summary()
     summary.update(change)
-    bar = ev.pass_bar(summary)
+    bar = ev.pass_bar(summary, "test")
     assert bar["criteria"][criterion] is False
     assert [k for k, v in bar["criteria"].items() if not v] == [criterion]
     assert bar["passed"] is False
+
+
+def test_pass_bar_counts_scored_not_labelled(ev: ModuleType) -> None:
+    summary = good_summary()
+    summary.update(n_referable=100, tp=50, fn=10)  # 40 of the 100 were UNGRADABLE
+    bar = ev.pass_bar(summary, "test")
+    assert bar["criteria"]["referable_scored>=100"] is False
+    summary.update(n_referable=10, tp=90, fn=10)
+    assert ev.pass_bar(summary, "test")["criteria"]["referable_scored>=100"] is True
+
+
+def test_pass_bar_non_referable_scored_not_labelled(ev: ModuleType) -> None:
+    summary = good_summary()
+    summary.update(n_non_referable=100, tn=40, fp=20)
+    assert ev.pass_bar(summary, "test")["criteria"]["non_referable_scored>=100"] is False
+
+
+@pytest.mark.parametrize("split", [None, "all", "ALL", " train ", "training", "Train", ""])
+def test_pass_bar_split_not_held_out(ev: ModuleType, split: Any) -> None:
+    bar = ev.pass_bar(good_summary(), split)
+    assert bar["criteria"]["held_out_split"] is False
+    assert bar["passed"] is False
+
+
+@pytest.mark.parametrize("split", ["test", "holdout", "val", " Test "])
+def test_pass_bar_split_held_out(ev: ModuleType, split: str) -> None:
+    bar = ev.pass_bar(good_summary(), split)
+    assert bar["criteria"]["held_out_split"] is True
+    assert bar["passed"] is True
+
+
+def test_pass_bar_split_defaults_to_unknown(ev: ModuleType) -> None:
+    bar = ev.pass_bar(good_summary())
+    assert bar["criteria"]["held_out_split"] is False
+
+
+def test_pass_bar_ignores_incl_ungradable_keys(ev: ModuleType) -> None:
+    base = ev.pass_bar(good_summary(), "test")
+    summary = good_summary()
+    summary.update(
+        sensitivity_incl_ungradable=0.1,
+        sensitivity_incl_ungradable_ci=[0.0, 0.2],
+        specificity_incl_ungradable=0.1,
+        specificity_incl_ungradable_ci=[0.0, 0.2],
+    )
+    assert ev.pass_bar(summary, "test") == base
 
 
 # --------------------------------------------------------------------------
@@ -654,6 +785,30 @@ def test_write_report_never_overwrites(ev: ModuleType, mixed: list[Any], tmp_pat
     assert third[0].name == "2026-11-22-claude-sonnet-5-5-v1-3.json"
     assert first[0].read_text(encoding="utf-8") == before
     assert len({first[0], second[0], third[0]}) == 3
+
+
+def test_write_report_split_all_never_passes(ev: ModuleType, mixed: list[Any], tmp_path: Path) -> None:
+    summary = ev.summarize(mixed, PRICE_IN, PRICE_OUT)
+    summary.update(good_summary())
+    summary["errors"] = {}
+    ok_json, _ = ev.write_report(summary, {**META, "split": "test"}, mixed, tmp_path / "a", TODAY)
+    assert json.loads(ok_json.read_text(encoding="utf-8"))["pass_bar"]["passed"] is True
+    json_path, md_path = ev.write_report(summary, {**META, "split": "all"}, mixed, tmp_path / "b", TODAY)
+    bar = json.loads(json_path.read_text(encoding="utf-8"))["pass_bar"]
+    assert bar["passed"] is False
+    assert bar["criteria"]["held_out_split"] is False
+    md = md_path.read_text(encoding="utf-8")
+    assert "held_out_split" in md
+    assert "excluding UNGRADABLE" in md
+    assert "counting UNGRADABLE as a miss" in md
+
+
+def test_write_report_missing_split_never_passes(ev: ModuleType, mixed: list[Any], tmp_path: Path) -> None:
+    summary = ev.summarize(mixed, PRICE_IN, PRICE_OUT)
+    summary.update(good_summary())
+    summary["errors"] = {}
+    json_path, _ = ev.write_report(summary, META, mixed, tmp_path, TODAY)
+    assert json.loads(json_path.read_text(encoding="utf-8"))["pass_bar"]["passed"] is False
 
 
 def test_write_report_pass_and_fail_wording(ev: ModuleType, tmp_path: Path) -> None:
@@ -873,3 +1028,146 @@ def test_main_non_fundus_folder(
     assert data["summary"]["non_fundus_n"] == 2
     assert data["summary"]["non_fundus_rejection_rate"] == 1.0
     assert str(nf) not in json.dumps(data["images"])
+
+
+def partial_files(out: Path) -> list[Path]:
+    return sorted(out.glob("*.partial.jsonl"))
+
+
+def test_main_success_leaves_no_partial_file(
+    ev: ModuleType,
+    tmp_path: Path,
+    fake: FakeAnthropic,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    out = tmp_path / "out"
+    assert run_main(ev, csv, out, fake) == 0
+    assert partial_files(out) == []
+
+
+def test_main_report_failure_keeps_partial_results(
+    ev: ModuleType,
+    tmp_path: Path,
+    fake: FakeAnthropic,
+    monkeypatch: pytest.MonkeyPatch,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    out = tmp_path / "out"
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(ev, "write_report", boom)
+    with pytest.raises(RuntimeError, match="disk full"):
+        run_main(ev, csv, out, fake)
+    (partial,) = partial_files(out)
+    lines = [json.loads(line) for line in partial.read_text(encoding="utf-8").splitlines() if line]
+    assert sorted(line["image"] for line in lines) == ["a.jpg", "b.jpg", "c.jpg"]
+    blob = partial.read_text(encoding="utf-8")
+    for pid in SECRET_IDS:
+        assert pid not in blob
+
+
+class _ClosableFake(FakeAnthropic):
+    def __init__(self) -> None:
+        super().__init__(response=FakeAnthropic.returning(make_assessment()).response)
+        self.closed = 0
+
+    async def close(self) -> None:
+        self.closed += 1
+
+
+def test_main_built_client_uses_no_retries_and_is_closed(
+    ev: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    import anthropic
+
+    created: list[tuple[_ClosableFake, dict[str, Any]]] = []
+
+    def recorder(**kwargs: Any) -> _ClosableFake:
+        client = _ClosableFake()
+        created.append((client, kwargs))
+        return client
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+    monkeypatch.setattr(anthropic, "AsyncAnthropic", recorder)
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    out = tmp_path / "out"
+    assert ev.main(["--labels", str(csv), "--out", str(out)]) == 0
+    assert len(created) == 1
+    client, kwargs = created[0]
+    assert kwargs["max_retries"] == 0
+    assert kwargs["api_key"] == "dummy-not-a-real-key"
+    assert client.closed == 1
+    assert len(client.calls) == 2
+    data = json.loads(next(out.glob("*.json")).read_text(encoding="utf-8"))
+    assert data["meta"]["client_max_retries"] == 0
+
+
+def test_main_built_client_closed_on_error(
+    ev: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    import anthropic
+
+    created: list[_ClosableFake] = []
+
+    def recorder(**kwargs: Any) -> _ClosableFake:
+        client = _ClosableFake()
+        created.append(client)
+        return client
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+    monkeypatch.setattr(anthropic, "AsyncAnthropic", recorder)
+    monkeypatch.setattr(ev, "write_report", boom)
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    with pytest.raises(RuntimeError):
+        ev.main(["--labels", str(csv), "--out", str(tmp_path / "out")])
+    assert [c.closed for c in created] == [1]
+
+
+def test_main_injected_client_is_not_closed(
+    ev: ModuleType,
+    tmp_path: Path,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    client = _ClosableFake()
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    out = tmp_path / "out"
+    assert run_main(ev, csv, out, client) == 0
+    assert client.closed == 0
+    data = json.loads(next(out.glob("*.json")).read_text(encoding="utf-8"))
+    assert data["meta"]["client_max_retries"] is None
+
+
+def test_main_over_budget_with_yes_proceeds(
+    ev: ModuleType,
+    tmp_path: Path,
+    fake: FakeAnthropic,
+    refer_jpeg_bytes: bytes,
+    norefer_jpeg_bytes: bytes,
+    blurry_jpeg_bytes: bytes,
+) -> None:
+    csv = make_dataset(tmp_path, refer_jpeg_bytes, norefer_jpeg_bytes, blurry_jpeg_bytes)
+    assert run_main(ev, csv, tmp_path / "out", fake, "--max-cost", "0.000001", "--yes") == 0
+    assert len(fake.calls) == 2
