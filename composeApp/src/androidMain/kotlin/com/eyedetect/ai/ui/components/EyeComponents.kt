@@ -401,12 +401,15 @@ fun EyeSymmetryCard(state: EyeSymmetryUiState?) {
     }
 }
 
-/** Heatmap kartasi — asl rasm + Grad-CAM yonma-yon (6-hujjat, 6.D.3). */
+/**
+ * Heatmap kartasi — asl rasm + Grad-CAM yonma-yon (6-hujjat, 6.D.3).
+ * Server heatmap bermasa (Claude engine'da Grad-CAM yo'q) karta umuman ko'rsatilmaydi:
+ * aks holda "issiq (qizil) joylar" yozuvi heatmap'siz yolg'iz asl rasm ostida qolardi.
+ */
 @Composable
 fun HeatmapCard(result: PredictResponse) {
     val origUrl = ApiClient.absoluteUrl(result.imageUrl)
-    val heatUrl = ApiClient.absoluteUrl(result.heatmapUrl)
-    if (origUrl == null && heatUrl == null) return
+    val heatUrl = ApiClient.absoluteUrl(result.heatmapUrl) ?: return
 
     SectionCard(stringResource(R.string.result_heatmap_title)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -418,14 +421,12 @@ fun HeatmapCard(result: PredictResponse) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            heatUrl?.let { url ->
-                HeatCell(
-                    caption = stringResource(R.string.result_gradcam),
-                    url = url,
-                    desc = stringResource(R.string.result_gradcam_content_desc),
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            HeatCell(
+                caption = stringResource(R.string.result_gradcam),
+                url = heatUrl,
+                desc = stringResource(R.string.result_gradcam_content_desc),
+                modifier = Modifier.weight(1f),
+            )
         }
         Text(
             stringResource(R.string.result_heatmap_note),

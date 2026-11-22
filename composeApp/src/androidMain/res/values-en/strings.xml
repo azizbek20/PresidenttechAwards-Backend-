@@ -119,6 +119,8 @@
     <string name="result_recommendation_no_refer">Next step: recall in 12 months.</string>
     <string name="result_recommendation_ungradable">Next step: retake the photo (mind focus/lighting) or refer to a specialist.</string>
     <string name="result_share_button">Share</string>
+    <string name="result_find_doctor_button">Find an ophthalmologist nearby</string>
+    <string name="result_find_doctor_query">ophthalmologist</string>
     <string name="result_share_chooser_title">Share result</string>
     <string name="result_share_text">%1$s — screening result\n\nPatient: %2$s\nEye: %3$s\nDecision: %4$s\nReferable DR probability: %5$s\nICDR grade: %6$s\nDate: %7$s\n\n%8$s</string>
 
