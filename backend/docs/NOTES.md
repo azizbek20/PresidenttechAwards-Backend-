@@ -249,9 +249,14 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - Today: rule 3 (`gradable: false` → UNGRADABLE, "retake") runs before the lesion rules, even when Claude marks a grade-2+ lesion as **present** (here: neovascularization, grade 4, p = 0.95).
    - Option, sensitivity-first: if `gradable` is false **but** any grade-2+ lesion is `present` (not `uncertain`), return REFER with a text that also asks for a retake. Otherwise keep UNGRADABLE. Implemented with tests first in `decide_from_assessment`, leaving the frozen `decide()` alone.
    - Or keep it as is: the operator retakes, and a second poor photo is referred by local protocol.
-9. **The per-call log line is never printed (manual check, finding B).** A bug against CLAUDE.md ("log per call ..."), and the Vercel deploy step 6 relies on these lines.
-   - Cause: no `logging` configuration anywhere in `app/`; Python's default shows WARNING and above, so the INFO lines `claude_call ...` and `rate_limit new_bucket ...` are dropped. Tests read log records directly, so none caught it.
-   - Fix (proposed before the Vercel deploy): configure the `eyedetect` logger at INFO with a stdout handler at app start, with a test that the line reaches stdout. Outside every phase's file list (`app/main.py` is unfrozen), so it waits for your go-ahead.
+9. ~~**The per-call log line is never printed (manual check, finding B).**~~ — approved and fixed on 2026-11-22, before the Vercel deploy.
+   - Cause: no `logging` configuration anywhere in `app/`; Python's default shows WARNING and above, so the INFO lines `claude_call ...` and `rate_limit new_bucket ...` were dropped. Tests read log records directly, so none caught it.
+   - Tests first (Sonnet test writer, `d223e3e`, `tests/contract/test_logging.py`, 7 tests): a subprocess proves a line reaches real stdout exactly once; in-process checks of level, the single named handler across re-imports, emit-time stdout and an untouched root logger; and the `claude_call` line's fields with no patient id, API key or image data. 4 failed before the fix; 3 passed already and guard it.
+   - Fix `f8936be` (`app/main.py` only): `configure_logging()`, called first in `create_app()`, sets the `eyedetect` logger to INFO and attaches one handler named `eyedetect-stdout` that writes to the current `sys.stdout` as `LEVEL logger message`. Root, uvicorn loggers and propagation are untouched.
+   - Verified under real uvicorn (mock mode, no key): `INFO eyedetect.main started mode=demo ...` and `INFO eyedetect.rate_limit rate_limit new_bucket key=127.0.0.1 x_forwarded_for=None` each appear once.
+   - Audit: every INFO line in `app/` logs ids, mode, tokens, decisions or byte counts; none carries a patient id, key or image data. The rate-limit line logs the client IP on purpose (issue 9).
+   - If Vercel's runtime also installs a root handler, each line could appear twice in its logs; check after the first deploy.
+   - Gate: ruff and mypy clean; `577 passed, 1 skipped, 4 deselected`.
 
 ## Vercel deploy steps (for the owner; nothing was deployed)
 
