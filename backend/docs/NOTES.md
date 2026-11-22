@@ -215,6 +215,27 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
 - Gate: ruff (app, tests, eval) and mypy (`app`, and `eval/run_claude_eval.py` separately) clean; `570 passed, 1 skipped, 4 deselected`.
 - **Not done: the eval run itself.** It needs a labelled CSV (≥ 100 referable and ≥ 100 non-referable held-out images, no patient on both sides of a split), a folder of non-fundus phone photos, and your go-ahead for the billed calls. The IDRiD official test split (103 images) is too small for §8 on its own.
 
+### 2026-11-22 — Vercel deploy (closes Phase 3)
+
+- Live at **https://eye-detect-backend.vercel.app** (Vercel project `eye-detect-backend`, personal Hobby scope), deployed from a clean `git archive` of `main` at `e9ac308` with the Vercel CLI (66.6.0). The owner signed in, accepted Neon's terms and typed both secrets; nothing secret passed through Claude.
+- Resources: Blob store `eye-detect-media` (public access, iad1, production + preview) and Neon Postgres `eye-detect-db` (Free plan, production + preview; the app reads its pooled `DATABASE_URL`). Function region iad1, the same as both stores.
+- Production variables: the 13 non-secret values from `.env.vercel.example` (with `CLAUDE_MAX_TOKENS=4000`), plus `ANTHROPIC_API_KEY` and a new random `EYE_API_KEY` as sensitive variables. The owner's local copy of that key is `EYE_API_KEY_VERCEL` in `backend/.env` (git-ignored); it is also the Android app's `API_KEY` for the release build.
+- **Gotcha:** the first deploy failed ("The pattern `app/main.py` defined in `functions` doesn't match any Serverless Functions inside the `api` directory"). A project created empty from the CLI gets the Framework Preset **Other**. Setting it to **FastAPI** (`vercel api /v9/projects/eye-detect-backend -X PATCH -F framework=fastapi`) fixed it; no code change. Vercel runs the FastAPI lifespan, so `create_all` made the tables on the empty Neon database.
+- Live checks: `/health` 200, `/health/ready` 200 with database, storage and model all true, `HEAD /` 204, no key 401 with the Uzbek detail.
+- **Live smoke test (`scripts/smoke_claude.sh`, run by the owner with the production key): all checks passed** — wrong key 401, 5 MB 413, referable REFER, normal NO_REFER, front-of-eye photo UNGRADABLE with the not-a-fundus text, blurred UNGRADABLE.
+- Function logs (`vercel logs`), the first real per-call numbers on Sonnet 5.5:
+
+  | Image | latency_ms | input_tokens | output_tokens | Decision |
+  |---|---|---|---|---|
+  | referable | 5769 | 4186 | 720 | REFER |
+  | normal | 2667 | 5640 | 287 | NO_REFER |
+  | external_eye | 2533 | 6175 | 263 | UNGRADABLE |
+
+  About **$0.015 per scan** at $2 / $10 per MTok, about a third of the eval's upper bound. The largest answer used 720 output tokens (thinking included), close to the old 800 default and far under 4000 (decision 1). The blurred exam has **no** `claude_call` line: zero Claude calls on a gate failure, confirmed in production.
+- Issue 9 answered: the `rate_limit new_bucket` line shows `key` equal to `X-Forwarded-For`, the caller's own public IP, so behind Vercel's proxy the limiter keys per client as intended. No change needed.
+- Each app line appears **twice** in Vercel's logs: once from our handler (`INFO eyedetect.predict claude_call ...`) and once raw (`claude_call ...`), because Vercel's runtime also prints the root logger at INFO (httpx's own INFO lines show up too). See open decision 10.
+- Not done: pushes to GitHub do not redeploy (CLI upload, no Git connection), and the Postgres async round trip test was not run separately; the live smoke test persisted every exam in Neon before responding (C10). Vercel's Hobby plan is for personal, non-commercial use; a clinical service needs Pro.
+
 ## Open decisions for the owner (2026-11-22)
 
 1. ~~**`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**~~ — approved and done on 2026-11-22: the default is now **4000** (test `test_claude_defaults` updated first in its own commit; suite `450 passed, 1 skipped, 4 deselected`). The background:
@@ -255,10 +276,18 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
    - Fix `f8936be` (`app/main.py` only): `configure_logging()`, called first in `create_app()`, sets the `eyedetect` logger to INFO and attaches one handler named `eyedetect-stdout` that writes to the current `sys.stdout` as `LEVEL logger message`. Root, uvicorn loggers and propagation are untouched.
    - Verified under real uvicorn (mock mode, no key): `INFO eyedetect.main started mode=demo ...` and `INFO eyedetect.rate_limit rate_limit new_bucket key=127.0.0.1 x_forwarded_for=None` each appear once.
    - Audit: every INFO line in `app/` logs ids, mode, tokens, decisions or byte counts; none carries a patient id, key or image data. The rate-limit line logs the client IP on purpose (issue 9).
-   - If Vercel's runtime also installs a root handler, each line could appear twice in its logs; check after the first deploy.
+   - If Vercel's runtime also installs a root handler, each line could appear twice in its logs; check after the first deploy. Checked: it does (decision 10).
+10. ~~**Duplicate app log lines on Vercel (deploy).**~~ — approved and fixed on 2026-11-22; not yet redeployed.
+    - Seen in production: each `eyedetect` line appeared twice, with and without the `INFO eyedetect.<name>` prefix, including the lifespan `started` line, so Vercel's root handler is active by startup. Every stdout line is tagged "info" by Vercel, so our prefix is the only place the real level shows.
+    - Fix: `configure_logging()` sets `propagate = not VERCEL` on every call (Vercel sets `VERCEL=1` in its runtime). On Vercel only our prefixed line is printed, whenever Vercel configures its root logger; elsewhere (uvicorn, pytest's `caplog`) nothing changes. This replaces the first idea (skip our handler when root prints INFO), which depended on when Vercel sets up logging.
+    - Tests first (`b269a6d`, 6 new cases in `tests/contract/test_logging.py`): subprocesses with `VERCEL=1` and root printing INFO configured before or after the app import print the probe once; a control without `VERCEL` prints it twice; in-process `propagate` follows `VERCEL` and is restored when it is unset or empty. 4 failed before the fix (fix `f5f15d3`), 13/13 pass after.
+    - Gate: ruff and mypy clean; `583 passed, 1 skipped, 4 deselected`.
    - Gate: ruff and mypy clean; `577 passed, 1 skipped, 4 deselected`.
 
-## Vercel deploy steps (for the owner; nothing was deployed)
+## Vercel deploy steps (done on 2026-11-22 with the CLI; see "Vercel deploy" above)
+
+With the CLI, also set the project's **Framework Preset = FastAPI**; a project created empty gets "Other" and the build fails.
+
 
 1. Merge or push `feature/claude-engine` as you prefer (the kit forbids me pushing).
 2. Vercel → Add New → Project → import the repository. Set **Root Directory = `backend`**. Vercel finds the FastAPI `app` at `app/main.py` and reads `.python-version` (3.12) and `requirements.txt`.
