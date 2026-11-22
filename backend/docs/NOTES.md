@@ -234,7 +234,11 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
   About **$0.015 per scan** at $2 / $10 per MTok, about a third of the eval's upper bound. The largest answer used 720 output tokens (thinking included), close to the old 800 default and far under 4000 (decision 1). The blurred exam has **no** `claude_call` line: zero Claude calls on a gate failure, confirmed in production.
 - Issue 9 answered: the `rate_limit new_bucket` line shows `key` equal to `X-Forwarded-For`, the caller's own public IP, so behind Vercel's proxy the limiter keys per client as intended. No change needed.
 - Each app line appears **twice** in Vercel's logs: once from our handler (`INFO eyedetect.predict claude_call ...`) and once raw (`claude_call ...`), because Vercel's runtime also prints the root logger at INFO (httpx's own INFO lines show up too). See open decision 10.
-- Not done: pushes to GitHub do not redeploy (CLI upload, no Git connection), and the Postgres async round trip test was not run separately; the live smoke test persisted every exam in Neon before responding (C10). Vercel's Hobby plan is for personal, non-commercial use; a clinical service needs Pro.
+- Not done: the Postgres async round trip test was not run separately; the live smoke test persisted every exam in Neon before responding (C10). Vercel's Hobby plan is for personal, non-commercial use; a clinical service needs Pro.
+- **Auto deploys (2026-11-22, owner's request):** the project is connected to GitHub (`vercel git connect`; the Vercel GitHub app already had access). Settings: Root Directory **`backend`**, production branch **`main`**, Framework Preset FastAPI, and an Ignored Build Step `if [ "$VERCEL_ENV" = "production" ]; then exit 1; else exit 0; fi`.
+  - Every merge to `main` now builds and deploys production; nothing else needs to be run.
+  - Pushes to other branches are **skipped** (no preview deployments): preview has the Blob and Neon variables but none of the app's settings or secrets, so a preview would boot as demo with local storage and crash on Vercel's read-only filesystem. To get previews, add the app variables for Preview (with a separate Neon branch) and remove the ignore command.
+  - Manual deploys with the CLI must now run from the **repository root** (a `git archive` of the whole repo), because Vercel applies Root Directory `backend` to what is uploaded.
 
 ## Open decisions for the owner (2026-11-22)
 
