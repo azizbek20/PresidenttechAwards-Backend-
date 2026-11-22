@@ -240,6 +240,21 @@ Follow-on for the missed tests: `ensure_dirs()` and the `/static/heatmaps` mount
   - Pushes to other branches are **skipped** (no preview deployments): preview has the Blob and Neon variables but none of the app's settings or secrets, so a preview would boot as demo with local storage and crash on Vercel's read-only filesystem. To get previews, add the app variables for Preview (with a separate Neon branch) and remove the ignore command.
   - Manual deploys with the CLI must now run from the **repository root** (a `git archive` of the whole repo), because Vercel applies Root Directory `backend` to what is uploaded.
 
+### 2026-11-22 — authentication review and admin key
+
+- Review (source only, focused on authentication; no live probing). Correct as built: every `/api/v1` route requires `X-API-Key` (checked by building the app and listing each route's dependencies); `secrets.compare_digest`; header only; 401 envelope; no key in logs (tested); shadow + claude refuses to boot without a key; 256-bit random production key; the release APK is HTTPS-only and refuses the placeholder key; CORS `*` without credentials is fine because the key is a header, not a cookie; the rate limiter keys on the real client IP behind Vercel. Open by design: `/health*`, `HEAD /`, `/docs`, `/redoc`, `/openapi.json` (kept public for the Kotlin team, owner's decision), `/static` (local storage only).
+- Weaknesses, in order:
+  1. **One shared key, compiled into the APK** (`composeApp/build.gradle.kts` → `BuildConfig.API_KEY`, sent by `ApiClient.kt`), so anyone with the APK can extract it. With it, `GET /api/v1/exams` listed every exam of every phone and `GET /api/v1/exams/{id}` its photo URL. Known C7 trade-off; acceptable only under C13 (synthetic or consented data). Partly fixed below.
+  2. Photos are public Blob URLs that never expire (C6, Coil sends no key): anyone holding a URL can view the photo.
+  3. The rate limit is in memory per instance, so on Vercel it does not cap total traffic or Anthropic spend if the key leaks. Owner action: set a monthly spend limit for the API key in the Anthropic console.
+  4. Minor: public docs reveal the API's shape; `/health/ready` shows component status; rotating the app key breaks installed phones until they update.
+- **Fix for 1 (owner-approved): a separate admin key** for the two exam endpoints, which neither Android app calls (the KMP app uses `/predict`, `/predict/async`, `/predict/status`, `/analyze`, `/analyses`; the old `android` branch app only `/predict`; phone history is local).
+  - `EYE_ADMIN_API_KEY` (header `X-Admin-Key`, constant-time). Set: those two endpoints also need it (403 envelope, frozen "unauthorized" + Uzbek detail); the app key is still checked first (401). Unset or empty: unchanged. Every other route is unchanged. Settings refuse an admin key equal to the app key; a shadow deployment without one logs a startup WARNING (from the lifespan, like the no-app-key warning). The admin panel sends `X-Admin-Key` from its own `EYE_ADMIN_API_KEY`.
+  - Tests first (`ab999b3`, `tests/contract/test_admin_key.py`, 26 cases; 14 failed before). Fix `f80c743` touches no tests. Two tests first failed because the warning was emitted per `create_app()` (twice: the module-level app plus the test's build); the warning moved to the lifespan, which runs once per started app, and the tests were not changed.
+  - Files outside CLAUDE.md's editable list, needed for this: `app/api/exams.py`, `app/core/security.py`, `admin/dashboard.py`.
+  - Still on the app key alone: `GET /api/v1/analyses` (the phone's analysis history uses it and lists every analysis with its photo URL when no `patient_id` is given). Fixing it needs an Android change.
+  - Gate: ruff (app, tests, eval, admin) and mypy clean; `609 passed, 1 skipped, 4 deselected`.
+
 ## Open decisions for the owner (2026-11-22)
 
 1. ~~**`CLAUDE_MAX_TOKENS=800` versus thinking (Phase 2 review).**~~ — approved and done on 2026-11-22: the default is now **4000** (test `test_claude_defaults` updated first in its own commit; suite `450 passed, 1 skipped, 4 deselected`). The background:
