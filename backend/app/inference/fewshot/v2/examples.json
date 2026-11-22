@@ -1,0 +1,31 @@
+{
+  "attribution": "IDRiD (c) Prasanna Porwal, Samiksha Pachade, Manesh Kokare. CC BY 4.0.",
+  "label_source": "IDRiD expert ICDR grade only (no lesion labels)",
+  "examples": [
+    {
+      "file": "grade0.jpg",
+      "icdr_grade": 0,
+      "source": "IDRiD train IDRiD_138.jpg"
+    },
+    {
+      "file": "grade1.jpg",
+      "icdr_grade": 1,
+      "source": "IDRiD train IDRiD_021.jpg"
+    },
+    {
+      "file": "grade2.jpg",
+      "icdr_grade": 2,
+      "source": "IDRiD train IDRiD_003.jpg"
+    },
+    {
+      "file": "grade3.jpg",
+      "icdr_grade": 3,
+      "source": "IDRiD train IDRiD_001.jpg"
+    },
+    {
+      "file": "grade4.jpg",
+      "icdr_grade": 4,
+      "source": "IDRiD train IDRiD_005.jpg"
+    }
+  ]
+}

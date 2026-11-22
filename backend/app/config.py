@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     #: Selects app/inference/prompts/fundus_<version>.md; also part of
     #: model_version, so bump it whenever the prompt changes.
     prompt_version: str = Field(
-        default="v1", pattern=r"^[A-Za-z0-9_-]+$", alias="PROMPT_VERSION"
+        default="v2", pattern=r"^[A-Za-z0-9_-]+$", alias="PROMPT_VERSION"
     )
     uncertain_refers: bool = Field(default=True, alias="UNCERTAIN_REFERS")
 

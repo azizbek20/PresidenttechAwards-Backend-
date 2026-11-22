@@ -192,12 +192,12 @@ def test_graded_refer_persists_the_assessment_and_the_model_version(
     assert body["grade_label"] == "Og'ir NPDR"
     assert body["probability"] == 0.93
     assert body["heatmap_url"] is None
-    assert body["model_version"] == f"{MODEL}/prompt-v1"
+    assert body["model_version"] == f"{MODEL}/prompt-v2"
 
     rows = result_rows()
     assert len(rows) == 1
     assert rows[0].assessment_json == assessment.model_dump_json()
-    assert rows[0].model_version == f"{MODEL}/prompt-v1"
+    assert rows[0].model_version == f"{MODEL}/prompt-v2"
     assert rows[0].icdr_grade == 3
     assert rows[0].probability == 0.93
 

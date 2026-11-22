@@ -92,10 +92,17 @@ config value stays for exactly this reason; see the plan §3.2).
 
 - Model from `CLAUDE_MODEL` (default `claude-sonnet-5-5`; `claude-opus-5-5`
   for comparison runs). Never hard-code a model ID elsewhere.
-- Structured output with the SDK's `messages.parse(...)` and the
-  `FundusAssessment` Pydantic model from the plan. Check the installed SDK
-  version's docs for the exact async call before writing it.
-- Timeout `CLAUDE_TIMEOUT_S` (25 s), no automatic retries on the request
+- **No Anthropic SDK.** The engine calls `POST /v1/messages` with raw HTTP
+  (`httpx`) through `app/inference/claude_http.py`; `anthropic` is not a
+  dependency and `tests/unit/test_claude_http.py` fails if it is imported.
+- Structured output via `output_config.format` (`json_schema`), built from
+  the `FundusAssessment` Pydantic model by `assessment_json_schema()`.
+- **Few-shot.** `PROMPT_VERSION=v2` (default) sends five reference images
+  from `app/inference/fewshot/v2/` (IDRiD train split, one per ICDR grade,
+  expert grade only; rebuilt by `scripts/build_fewshot.py`) before the photo,
+  with a prompt-cache breakpoint after them. `v1` is the zero-shot baseline.
+  Never pick few-shot images from the eval (test) split.
+- Timeout `CLAUDE_TIMEOUT_S` (25 s), one HTTP attempt (no retries) on the request
   path. The phone has its own retry button and a 30 s request timeout.
 - Numeric ranges and enum casing are not enforced by the API: validate
   locally (lower-case enums, reject out-of-range numbers → 500).

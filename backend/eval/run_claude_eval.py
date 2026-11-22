@@ -580,13 +580,18 @@ def main(argv: list[str] | None = None, *, client: Any = None) -> int:
 
     # 3. settings exactly as production reads them, engine source forced to claude
     from app.config import Settings
-    from app.inference.claude_engine import ClaudeEngine, load_system_prompt
+    from app.inference.claude_engine import (
+        ClaudeEngine,
+        fewshot_input_tokens,
+        load_system_prompt,
+    )
 
     # Init kwargs (by alias) win over env and .env; nothing else is overridden.
     overrides: dict[str, Any] = {"EYE_MODE": "demo", "EYE_MODEL_SOURCE": "claude"}
     try:
         settings = Settings(**overrides)
         system_prompt = load_system_prompt(settings.prompt_version)
+        fewshot_tokens = fewshot_input_tokens(settings.prompt_version)
     except (ValueError, OSError) as exc:
         print(f"settings: {exc}")
         return 2
@@ -609,7 +614,7 @@ def main(argv: list[str] | None = None, *, client: Any = None) -> int:
             n_gated += 1
         else:
             n_calls += 1
-            tokens += estimate_input_tokens(raw, system_prompt)
+            tokens += estimate_input_tokens(raw, system_prompt) + fewshot_tokens
     estimate = upper_bound_cost(tokens, n_calls, settings.claude_max_tokens, price_in, price_out)
     n_fundus = sum(1 for i in items if i.kind == "fundus")
     print(f"Images: {n_fundus} fundus (split {args.split!r}), {len(items) - n_fundus} non-fundus")
@@ -635,10 +640,11 @@ def main(argv: list[str] | None = None, *, client: Any = None) -> int:
         if not key:
             print("ANTHROPIC_API_KEY is not set (backend/.env or the shell)")
             return 2
-        from anthropic import AsyncAnthropic
+        from app.inference import claude_http
 
-        # Same as production (app/inference/claude_engine.py): no retries.
-        client = AsyncAnthropic(api_key=key, timeout=settings.claude_timeout_s, max_retries=0)
+        # Same as production (app/inference/claude_engine.py): raw HTTP, no
+        # SDK, no retries; the engine applies the timeout per call.
+        client = claude_http.ClaudeHTTPClient(api_key=key)
     engine = ClaudeEngine(settings, client=client)
 
     # 7. run, saving each finished image as it comes; summarise; report
