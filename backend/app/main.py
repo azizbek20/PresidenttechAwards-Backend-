@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -51,6 +52,44 @@ from app.storage import local as storage
 logger = logging.getLogger("eyedetect.main")
 
 API_PREFIX = "/api/v1"
+
+#: The one handler :func:`configure_logging` attaches. Found by name, not by
+#: class: the test harness re-imports this module, which makes a new class.
+_LOG_HANDLER_NAME = "eyedetect-stdout"
+
+
+class _CurrentStdoutHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    """Writes to whatever ``sys.stdout`` is when a record is emitted.
+
+    Like the stdlib's ``logging.lastResort``: a stream bound at creation could
+    be one pytest has since closed.
+    """
+
+    @property  # type: ignore[override]
+    def stream(self) -> Any:
+        return sys.stdout
+
+    @stream.setter
+    def stream(self, value: Any) -> None:  # StreamHandler.__init__ assigns it
+        pass
+
+
+def configure_logging() -> None:
+    """Make the app's own INFO lines visible (NOTES.md open decision 9).
+
+    Nothing configured logging before, so Python's default (WARNING, no
+    handler) dropped every INFO line of the ``eyedetect.*`` loggers, including
+    the per-call ``claude_call`` line CLAUDE.md requires. The root logger,
+    uvicorn's loggers and propagation are left alone. Safe to call repeatedly.
+    """
+    log = logging.getLogger("eyedetect")
+    log.setLevel(logging.INFO)
+    if any(handler.name == _LOG_HANDLER_NAME for handler in log.handlers):
+        return
+    handler = _CurrentStdoutHandler()
+    handler.name = _LOG_HANDLER_NAME
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    log.addHandler(handler)
 
 
 @asynccontextmanager
@@ -113,6 +152,7 @@ def _model_ok(app: FastAPI) -> bool:
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     settings = get_settings()
 
     # StaticFiles validates its directory at construction, and the storage
